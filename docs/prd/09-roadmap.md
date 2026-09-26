@@ -33,6 +33,7 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 - [x] Insurance staking (shares, cooldown, retire on wipe)
 - [x] xStocks collateral: haircut, multiplier, extension allow-list (+ closed-market haircut)
 - [x] Fuzzing (Trident / proptest) for the invariants in `05` §7 (proptest on the crates + a randomized LiteSVM harness in CI)
+- [x] Weekend replay backtest (`yarn backtest`, `07` §7): 9/10 tickers pass; **NVDA fails** at the mega-cap table (owner decision pending)
 - **Gate:** a liquidation actually executes in tests **and** on devnet. On Stellar it never did (see `11`). Weekend replay backtest passes (`07` §7)
 
 ## Phase 3 — Off-chain stack (Weeks 6–10, overlapping: 11-02 → 12-06)

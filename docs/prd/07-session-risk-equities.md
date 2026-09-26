@@ -139,3 +139,27 @@ close was first *observed*, which can only make the band narrower
 Backtest: replay 2 years of Monday opens and earnings gaps per ticker against
 these numbers. The target is that fewer than 1 in 1,000 account-weekends end
 in bad debt.
+
+**Built and run (2026-09-26):** `yarn backtest`
+(`scripts/backtest/weekend_replay.py`, report in
+`docs/backtest/weekend-replay.md`). It replays every close → next open
+(weekends and holidays, and every overnight gap, which contains the earnings
+gaps; extended hours count as Closed, `06` §8). The model: after the close's
+grace window every holder has equity ≥ the Closed maintenance ratio
+`m_c = 2 × MM` (anything below was liquidated near the last close). No
+liquidation is credited during the closure (conservative). An account is bad
+debt at the open if the adverse gap exceeds its equity ratio. Two books:
+*worst* (all at `m_c`) and *typical* (a quarter each at 1, 1.25, 1.5 and
+2 × `m_c`). Data is Yahoo daily OHLC, cached for research only, never
+committed.
+
+Result, 2024-09 → 2026-09: **9 of 10 tickers pass; NVDA fails.** Its
+2025-01-27 open (DeepSeek, −12.49%) is beyond the mega-cap `m_c` of 12%,
+giving 1.12‰ of typical-book weekends in bad debt (4.46‰ worst book).
+MSFT and AMZN also have overnight earnings gaps above 12% (12.13%, 12.53%),
+0.25–0.50‰ typical. All other gaps, including high-vol names, stay inside
+`m_c`. No weekend gap exceeded its Closed band ceiling. With ~112 weekends a
+ticker, one bad weekend is already ~1.1‰, so the target is really "no bad
+weekend in two years". **Open decision for the owner:** move NVDA to the
+high-vol class, or raise mega-cap MM (e.g. 7% → `m_c` 14%); see the Phase 2
+gate in `09`.

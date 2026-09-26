@@ -7,7 +7,8 @@
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "e2e": "scripts/e2e-local.sh",
     "test:sdk": "cd sdk && node --test \"test/**/*.test.ts\"",
-    "test:program": "cargo test --manifest-path integration/Cargo.toml"
+    "test:program": "cargo test --manifest-path integration/Cargo.toml",
+    "backtest": "scripts/backtest/weekend_replay.py --out docs/backtest/weekend-replay.md"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",

@@ -6,3 +6,4 @@ node_modules/
 .anchor/
 test-ledger/
 .e2e/
+.backtest-cache/
