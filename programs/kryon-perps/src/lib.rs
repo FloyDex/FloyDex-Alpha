@@ -115,6 +115,13 @@ pub mod kryon_perps {
         instructions::market_ops::handle_post_mark(ctx, mid)
     }
 
+    // --- permissionless keepers ---
+
+    /// Hourly funding from the book premium (`05` §2).
+    pub fn update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
+        instructions::funding::handle_update_funding(ctx)
+    }
+
     // --- user ---
 
     pub fn init_user(ctx: Context<InitUser>, sub_id: u8) -> Result<()> {

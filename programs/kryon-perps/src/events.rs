@@ -114,3 +114,14 @@ pub struct MarkPosted {
     pub mid: i128,
     pub mark_ema: i128,
 }
+
+#[event]
+pub struct FundingUpdated {
+    pub market_id: u16,
+    pub session: u8,
+    /// PRECISION-scaled premium of the book over the index.
+    pub premium: i128,
+    pub rate_per_hour: i128,
+    pub long_index: i128,
+    pub short_index: i128,
+}

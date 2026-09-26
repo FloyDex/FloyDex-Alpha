@@ -119,7 +119,24 @@ effect.
 
 ### Permissionless keepers
 `update_funding(market)` (hourly; premium from mark vs. index;
-`MAX_FUNDING_ELAPSED_SECS` cap), `liquidate(user, position_id)` (uses
+`MAX_FUNDING_ELAPSED_SECS` cap).
+
+**`update_funding` as built (decided 2026-09-26):**
+- Premium = the book against the index, never OI imbalance (`11` L8). In
+  session: `(mark_ema − oracle) / oracle`. Closed:
+  `(closed_mark_price(last_close, mark_ema) − last_close) / last_close`
+  (`07` §4). Halted: 0. Also 0 when `mark_ema` is older than
+  `MARK_EMA_MAX_AGE_SECS` = 900 s (no fill or posted mid in 15 min):
+  a stale book price against a moving oracle is not a premium.
+- No minimum interval: each call charges `rate × elapsed` with elapsed
+  capped at 1 h, so calling more often only samples the premium more often
+  (closer to a TWAP). The keeper runs it hourly; anyone may call it.
+- Refused while paused: positions can't be closed then, so they shouldn't
+  be charged. The first call after unpausing charges at most 1 h.
+- Positions settle funding on their next fill (rounded against the holder);
+  health counts the pending amount through the market's indexes.
+
+`liquidate(user, position_id)` (uses
 `plan_liquidation`; reward ≤ `max_reward_bps` ≤ 10%; the deficit goes to the
 insurance fund; bad debt is recorded), `adl(...)` (only when
 `Insurance.bad_debt > 0`, only against profitable positions, the same rules

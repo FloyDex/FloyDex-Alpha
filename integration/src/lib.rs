@@ -1222,3 +1222,36 @@ impl World {
         });
     }
 }
+
+impl World {
+    /// `update_funding` paid for by `payer` (permissionless).
+    pub fn update_funding_as(&mut self, market_id: u16, payer: &Keypair) -> TxResult {
+        let m = self.market(market_id);
+        let i = ix(
+            ka::UpdateFunding {
+                exchange: exchange_pda(),
+                market: market_pda(market_id),
+                price_update: kryon_perps::oracle::push_feed_address(
+                    m.pyth_shard_id,
+                    &m.pyth_feed_id,
+                ),
+                event_authority: event_authority(),
+                program: kryon_perps::ID,
+            },
+            ki::UpdateFunding {},
+        );
+        send(&mut self.svm, &[i], payer, &[])
+    }
+
+    pub fn update_funding(&mut self, market_id: u16) -> TxResult {
+        let k = funded(&mut self.svm);
+        self.update_funding_as(market_id, &k)
+    }
+
+    /// Advance the clock and re-publish the market's oracle at `dollars`.
+    pub fn tick(&mut self, secs: i64, dollars: f64) {
+        self.warp(secs);
+        let now = self.now();
+        mock_usd(&mut self.svm, FEED_TSLA, dollars, now);
+    }
+}
