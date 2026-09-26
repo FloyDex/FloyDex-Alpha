@@ -1,0 +1,10 @@
+[package]
+name = "protocol-core"
+description = "Chain-agnostic fixed-point math, types and oracle guards for Kryon perps."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ethnum = { workspace = true }

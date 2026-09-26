@@ -1,0 +1,10 @@
+[package]
+name = "risk-engine"
+description = "Pure account-risk, margin, funding, and liquidation engine."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+protocol-core = { workspace = true }
