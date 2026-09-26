@@ -27,3 +27,7 @@ anchor-spl = { version = "=0.31.1", default-features = false, features = ["token
 pyth-solana-receiver-sdk = "=1.0.1"
 protocol-core = { workspace = true }
 risk-engine = { workspace = true }
+bytemuck = { version = "1", features = ["derive", "min_const_generics"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("custom-heap", "custom-panic", "anchor-debug"))'] }

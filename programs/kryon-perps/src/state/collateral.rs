@@ -1,0 +1,38 @@
+use anchor_lang::prelude::*;
+
+/// One accepted collateral mint. PDA `["collateral", mint]`; its token
+/// account is the PDA `["vault", mint]`, owned by this account.
+#[account]
+#[derive(InitSpace, Debug)]
+pub struct Collateral {
+    pub mint: Pubkey,
+    /// SPL Token or Token-2022, whichever owns `mint`.
+    pub token_program: Pubkey,
+    pub vault: Pubkey,
+    pub decimals: u8,
+    /// Index into balance slots; assigned in `add_collateral` order.
+    pub index: u8,
+    /// The settlement asset: PnL, fees and funding settle in it and it is
+    /// valued at par (no oracle). Exactly one collateral has this set.
+    pub is_settlement: bool,
+    pub active: bool,
+    pub haircut_bps: u32,
+    /// Pyth feed for non-settlement collateral. Zero for the settlement asset.
+    pub pyth_feed_id: [u8; 32],
+    /// Max `total_deposited`, in token base units.
+    pub deposit_cap: u64,
+    /// Deposits net of withdrawals, in token base units. Drives the cap.
+    pub total_deposited: u64,
+    /// Trading fees collected, PRECISION-scaled (settlement collateral only).
+    pub fees_accrued: i128,
+    pub bump: u8,
+    pub vault_bump: u8,
+    pub _reserved: [u8; 32],
+}
+
+impl Collateral {
+    /// Token base units → PRECISION (1e18) units.
+    pub fn scale(&self) -> i128 {
+        10i128.pow(u32::from(crate::constants::MAX_DECIMALS - self.decimals))
+    }
+}

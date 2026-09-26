@@ -2,6 +2,10 @@ use anchor_lang::prelude::*;
 
 declare_id!("2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB");
 
+pub mod constants;
+pub mod error;
+pub mod state;
+
 #[cfg(feature = "bench")]
 pub mod bench;
 
@@ -20,3 +24,6 @@ pub mod kryon_perps {
 #[cfg(feature = "bench")]
 #[derive(Accounts)]
 pub struct Bench {}
+
+#[cfg(test)]
+mod layout_tests;
