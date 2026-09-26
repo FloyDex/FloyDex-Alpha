@@ -1147,3 +1147,30 @@ pub fn assert_conserved_flat(w: &World, usdc: &Asset, users: &[&Trader]) {
         "vault {vault} vs balances+fees {sum}: dust {dust}"
     );
 }
+
+impl World {
+    pub fn post_calendar(
+        &mut self,
+        market_id: u16,
+        windows: Vec<kryon_perps::SessionWindowArgs>,
+    ) -> TxResult {
+        let c = self.calendar.insecure_clone();
+        let i = ix(
+            ka::PostSessionCalendar {
+                exchange: exchange_pda(),
+                calendar_authority: c.pubkey(),
+                market: market_pda(market_id),
+            },
+            ki::PostSessionCalendar { windows },
+        );
+        send(&mut self.svm, &[i], &c, &[])
+    }
+}
+
+pub fn window(start: i64, end: i64, session: u8) -> kryon_perps::SessionWindowArgs {
+    kryon_perps::SessionWindowArgs {
+        start: start as u64,
+        end: end as u64,
+        session,
+    }
+}

@@ -82,6 +82,31 @@ pub mod kryon_perps {
         instructions::collateral::handle_add_collateral(ctx, params)
     }
 
+    pub fn set_market_oracle(
+        ctx: Context<SetMarketOracle>,
+        market_id: u16,
+        pyth_shard_id: u16,
+        max_oracle_age_secs: u64,
+        max_oracle_confidence_bps: u32,
+    ) -> Result<()> {
+        instructions::market_ops::handle_set_market_oracle(
+            ctx,
+            market_id,
+            pyth_shard_id,
+            max_oracle_age_secs,
+            max_oracle_confidence_bps,
+        )
+    }
+
+    // --- calendar authority (keeper) ---
+
+    pub fn post_session_calendar(
+        ctx: Context<PostSessionCalendar>,
+        windows: Vec<SessionWindowArgs>,
+    ) -> Result<()> {
+        instructions::market_ops::handle_post_session_calendar(ctx, windows)
+    }
+
     // --- user ---
 
     pub fn init_user(ctx: Context<InitUser>, sub_id: u8) -> Result<()> {
