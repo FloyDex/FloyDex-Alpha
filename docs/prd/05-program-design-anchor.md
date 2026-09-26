@@ -172,15 +172,17 @@ crates still use I256.
 | negative pnl | 5,305 | 5,551 (falls back) | 1,675 |
 | near the i128 limit / 1e18 | 5,979 | 6,232 (falls back) | 1,776 |
 
-All prototypes return results identical to I256 on these inputs. **Verdict:
-I256 is too heavy.** A health check does about 7–8 `mul_div`s per position,
-so two users with 3 positions each come to ~45 calls × ~5k ≈ 225k CU of math
-alone, against the < 250k `settle_fills` target. A plain u128 path doesn't
-help, because PRECISION × PRECISION products overflow u128. **Proposal
-(pending decision):** a 64-bit-limb `mul_div` with an exact 256-bit product
-and a u64-denominator fast path (PRECISION and BPS), falling back to I256
-otherwise. It gives bit-identical results at ~3.5× less CU and needs a
-differential/proptest against I256 before it lands in `protocol-core`.
+All prototypes returned results identical to I256 on these inputs. I256 was
+too heavy: a health check does about 7–8 `mul_div`s per position, so two users
+with 3 positions each spent ~225k CU on math alone.
+
+**Decision (2026-09-26): adopted the limb path in `protocol-core`.**
+`mul_div` now uses an exact 256-bit product in u64 limbs plus division by a
+u64 denominator, and falls back to I256 (`mul_div_i256`) for denominators
+wider than u64. A differential proptest (200k cases per run, plus an
+edge-case grid including `i128::MIN/MAX`) pins bit-identical results.
+Measured after the switch: **761 / 1,144 / 1,302 / 1,411 / 1,516 CU** for the
+five cases above.
 
 ## 7. Invariants to fuzz (Trident or proptest on `risk-engine`)
 

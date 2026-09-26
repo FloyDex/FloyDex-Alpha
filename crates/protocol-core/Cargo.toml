@@ -9,3 +9,6 @@ rust-version.workspace = true
 
 [dependencies]
 ethnum = { workspace = true }
+
+[dev-dependencies]
+proptest = { version = "1", default-features = false, features = ["std"] }

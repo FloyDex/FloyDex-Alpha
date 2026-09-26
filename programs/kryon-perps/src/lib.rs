@@ -15,26 +15,6 @@ pub mod kryon_perps {
     pub fn bench_mul_div(_ctx: Context<Bench>, a: i128, b: i128, denominator: i128) -> Result<()> {
         bench::mul_div(a, b, denominator)
     }
-
-    #[cfg(feature = "bench")]
-    pub fn bench_mul_div_u128(
-        _ctx: Context<Bench>,
-        a: i128,
-        b: i128,
-        denominator: i128,
-    ) -> Result<()> {
-        bench::mul_div_u128(a, b, denominator)
-    }
-
-    #[cfg(feature = "bench")]
-    pub fn bench_mul_div_limbs(
-        _ctx: Context<Bench>,
-        a: i128,
-        b: i128,
-        denominator: i128,
-    ) -> Result<()> {
-        bench::mul_div_limbs_bench(a, b, denominator)
-    }
 }
 
 #[cfg(feature = "bench")]

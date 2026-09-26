@@ -56,14 +56,6 @@ fn mul_div_compute_units() {
         let i256 = kryon_perps::instruction::BenchMulDiv { a, b, denominator: d }.data();
         let (logs, _) = run(&mut svm, &payer, i256);
         let line = logs.iter().find(|l| l.contains("bench mul_div:")).unwrap();
-        println!("I256  {name:<28} {line}");
-        let u128 = kryon_perps::instruction::BenchMulDivU128 { a, b, denominator: d }.data();
-        let (logs, _) = run(&mut svm, &payer, u128);
-        let line = logs.iter().find(|l| l.contains("bench mul_div_u128:")).unwrap();
-        println!("u128  {name:<28} {line}");
-        let limbs = kryon_perps::instruction::BenchMulDivLimbs { a, b, denominator: d }.data();
-        let (logs, _) = run(&mut svm, &payer, limbs);
-        let line = logs.iter().find(|l| l.contains("bench mul_div_limbs:")).unwrap();
-        println!("limbs {name:<28} {line}");
+        println!("{name:<28} {line}");
     }
 }
