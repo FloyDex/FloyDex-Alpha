@@ -829,3 +829,34 @@ pub fn inject_position(
         u.open_positions += 1;
     });
 }
+
+impl World {
+    pub fn set_delegate(&mut self, t: &Trader, delegate: &Pubkey, expiry: i64) -> TxResult {
+        let i = ix(
+            ka::OwnerOnly {
+                owner: t.key(),
+                user_account: t.user,
+                event_authority: event_authority(),
+                program: kryon_perps::ID,
+            },
+            ki::SetDelegate {
+                delegate: *delegate,
+                expiry,
+            },
+        );
+        send(&mut self.svm, &[i], &t.kp, &[])
+    }
+
+    pub fn revoke_delegate(&mut self, t: &Trader) -> TxResult {
+        let i = ix(
+            ka::OwnerOnly {
+                owner: t.key(),
+                user_account: t.user,
+                event_authority: event_authority(),
+                program: kryon_perps::ID,
+            },
+            ki::RevokeDelegate {},
+        );
+        send(&mut self.svm, &[i], &t.kp, &[])
+    }
+}

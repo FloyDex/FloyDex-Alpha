@@ -89,6 +89,14 @@ pub mod kryon_perps {
         instructions::user::handle_deposit(ctx, amount)
     }
 
+    pub fn set_delegate(ctx: Context<OwnerOnly>, delegate: Pubkey, expiry: i64) -> Result<()> {
+        instructions::delegate::handle_set_delegate(ctx, delegate, expiry)
+    }
+
+    pub fn revoke_delegate(ctx: Context<OwnerOnly>) -> Result<()> {
+        instructions::delegate::handle_revoke_delegate(ctx)
+    }
+
     /// Remaining accounts: see `health` (only needed with positions or debt).
     pub fn withdraw<'info>(
         ctx: Context<'_, '_, 'info, 'info, MoveCollateral<'info>>,
