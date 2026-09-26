@@ -160,6 +160,11 @@ MSFT and AMZN also have overnight earnings gaps above 12% (12.13%, 12.53%),
 0.25–0.50‰ typical. All other gaps, including high-vol names, stay inside
 `m_c`. No weekend gap exceeded its Closed band ceiling. With ~112 weekends a
 ticker, one bad weekend is already ~1.1‰, so the target is really "no bad
-weekend in two years". **Open decision for the owner:** move NVDA to the
-high-vol class, or raise mega-cap MM (e.g. 7% → `m_c` 14%); see the Phase 2
-gate in `09`.
+weekend in two years".
+
+**Decided 2026-09-26 (owner delegated the call):** mega-cap maintenance
+margin 6% → **7%** (`m_c` 14%), initial margin unchanged at 12.5% (8x).
+Chosen over moving only NVDA to high-vol because the MSFT and AMZN earnings
+gaps (12.13%, 12.53%) sat just as close to the old 12%. At 7% every
+mega-cap gap of the two years clears `m_c` by ≥ 1.5 points. Rerun: **all 10
+tickers pass, 0‰ in both books** (`docs/backtest/weekend-replay.md`).
