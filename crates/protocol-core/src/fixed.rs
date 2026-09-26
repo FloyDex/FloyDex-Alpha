@@ -38,15 +38,58 @@ pub fn checked_div(a: i128, b: i128) -> Result<i128, CoreError> {
 // inline(never): one shared copy of the body per program.
 #[inline(never)]
 pub fn mul_div(a: i128, b: i128, denominator: i128) -> Result<i128, CoreError> {
+    mul_div_rounded(a, b, denominator, Rounding::TowardZero)
+}
+
+/// How [`mul_div_rounded`] rounds an inexact quotient.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Rounding {
+    TowardZero,
+    /// Toward −∞: a realized loss of 1.5 wei is charged as 2.
+    Floor,
+    /// Toward +∞: a fee of 1.5 wei is charged as 2.
+    Ceil,
+}
+
+/// `a * b / denominator` rounded toward −∞.
+#[inline]
+pub fn mul_div_floor(a: i128, b: i128, denominator: i128) -> Result<i128, CoreError> {
+    mul_div_rounded(a, b, denominator, Rounding::Floor)
+}
+
+/// `a * b / denominator` rounded toward +∞.
+#[inline]
+pub fn mul_div_ceil(a: i128, b: i128, denominator: i128) -> Result<i128, CoreError> {
+    mul_div_rounded(a, b, denominator, Rounding::Ceil)
+}
+
+#[inline(never)]
+pub fn mul_div_rounded(
+    a: i128,
+    b: i128,
+    denominator: i128,
+    rounding: Rounding,
+) -> Result<i128, CoreError> {
     if denominator == 0 {
         return Err(CoreError::DivisionByZero);
     }
     let d = denominator.unsigned_abs();
     if d > u64::MAX as u128 {
-        return mul_div_i256(a, b, denominator);
+        return mul_div_i256_rounded(a, b, denominator, rounding);
     }
     let negative = (a < 0) ^ (b < 0) ^ (denominator < 0);
-    let magnitude = mul_div_u64_limbs(a.unsigned_abs(), b.unsigned_abs(), d as u64)?;
+    let (mut magnitude, remainder) =
+        mul_div_u64_limbs(a.unsigned_abs(), b.unsigned_abs(), d as u64)?;
+    // An inexact quotient moves one step away from zero when the rounding
+    // direction points away from zero for this sign.
+    let away = match rounding {
+        Rounding::TowardZero => false,
+        Rounding::Floor => negative,
+        Rounding::Ceil => !negative,
+    };
+    if away && remainder != 0 {
+        magnitude = magnitude.checked_add(1).ok_or(CoreError::MathOverflow)?;
+    }
     if negative {
         if magnitude > i128::MIN.unsigned_abs() {
             return Err(CoreError::MathOverflow);
@@ -57,8 +100,9 @@ pub fn mul_div(a: i128, b: i128, denominator: i128) -> Result<i128, CoreError> {
     }
 }
 
-/// `x * y / d` for unsigned inputs; errors if the quotient exceeds u128.
-fn mul_div_u64_limbs(x: u128, y: u128, d: u64) -> Result<u128, CoreError> {
+/// `(x * y / d, x * y % d)` for unsigned inputs; errors if the quotient
+/// exceeds u128.
+fn mul_div_u64_limbs(x: u128, y: u128, d: u64) -> Result<(u128, u128), CoreError> {
     const LO: u128 = u64::MAX as u128;
     let (x0, x1, y0, y1) = (x & LO, x >> 64, y & LO, y >> 64);
     let p00 = x0 * y0;
@@ -81,7 +125,28 @@ fn mul_div_u64_limbs(x: u128, y: u128, d: u64) -> Result<u128, CoreError> {
     if q[0] != 0 || q[1] != 0 {
         return Err(CoreError::MathOverflow);
     }
-    Ok((q[2] << 64) | q[3])
+    Ok(((q[2] << 64) | q[3], rem))
+}
+
+fn mul_div_i256_rounded(
+    a: i128,
+    b: i128,
+    denominator: i128,
+    rounding: Rounding,
+) -> Result<i128, CoreError> {
+    let product = I256::from(a) * I256::from(b); // |a·b| < 2^254: cannot overflow
+    let d = I256::from(denominator);
+    let mut q = product.checked_div(d).ok_or(CoreError::MathOverflow)?;
+    let inexact = product.checked_rem(d).ok_or(CoreError::MathOverflow)? != I256::ZERO;
+    let negative = (product < I256::ZERO) ^ (d < I256::ZERO);
+    if inexact {
+        match rounding {
+            Rounding::Floor if negative => q -= I256::ONE,
+            Rounding::Ceil if !negative => q += I256::ONE,
+            _ => {}
+        }
+    }
+    i128::try_from(q).map_err(|_| CoreError::MathOverflow)
 }
 
 /// The original I256 implementation: the fallback for wide denominators and
@@ -197,6 +262,20 @@ mod tests {
     }
 
     #[test]
+    fn floor_and_ceil_round_inexact_quotients_outward() {
+        assert_eq!(mul_div_floor(3, 1, 2), Ok(1));
+        assert_eq!(mul_div_ceil(3, 1, 2), Ok(2));
+        assert_eq!(mul_div_floor(-3, 1, 2), Ok(-2));
+        assert_eq!(mul_div_ceil(-3, 1, 2), Ok(-1));
+        assert_eq!(mul_div_floor(4, 1, 2), Ok(2));
+        assert_eq!(mul_div_ceil(-4, 1, 2), Ok(-2));
+        let wide = (u64::MAX as i128) * 4;
+        assert_eq!(mul_div_floor(-1, 1, wide), Ok(-1));
+        assert_eq!(mul_div_ceil(1, 1, wide), Ok(1));
+        assert_eq!(mul_div_floor(1, 1, wide), Ok(0));
+    }
+
+    #[test]
     fn i128_min_quotient_is_representable() {
         assert_eq!(mul_div(i128::MIN, 1, 1), Ok(i128::MIN));
         assert_eq!(mul_div(i128::MIN, -1, 1), Err(CoreError::MathOverflow));
@@ -234,6 +313,19 @@ mod differential {
         #[test]
         fn limb_mul_div_is_bit_identical_to_i256(a in operand(), b in operand(), d in denominator()) {
             prop_assert_eq!(mul_div(a, b, d), mul_div_i256(a, b, d));
+        }
+
+        #[test]
+        fn floor_and_ceil_match_i256(a in operand(), b in operand(), d in denominator()) {
+            prop_assert_eq!(mul_div_floor(a, b, d), mul_div_i256_rounded(a, b, d, Rounding::Floor));
+            prop_assert_eq!(mul_div_ceil(a, b, d), mul_div_i256_rounded(a, b, d, Rounding::Ceil));
+        }
+
+        #[test]
+        fn floor_and_ceil_bracket_the_truncated_quotient(a in operand(), b in operand(), d in denominator()) {
+            if let (Ok(t), Ok(f), Ok(c)) = (mul_div(a, b, d), mul_div_floor(a, b, d), mul_div_ceil(a, b, d)) {
+                prop_assert!(f <= t && t <= c && c - f <= 1);
+            }
         }
     }
 }
