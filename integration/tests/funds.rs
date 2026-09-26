@@ -354,6 +354,7 @@ fn xstock_collateral_is_priced_and_haircut() {
             meta(feed, false),
             meta(collateral_pda(&x.mint), false),
             meta(xfeed, false),
+            meta(x.mint, false),
         ]
     };
     // Equity = 800 − 100 = 700, IM 500 → 200 free. Withdrawing 2 shares

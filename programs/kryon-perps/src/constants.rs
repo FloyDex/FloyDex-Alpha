@@ -37,6 +37,10 @@ pub const MAX_UNSTAKE_COOLDOWN_SECS: u64 = 90 * 86_400;
 pub const MAX_CLOSE_RAMP_SECS: u32 = 4 * 3_600;
 pub const MAX_CLOSE_GRACE_SECS: u32 = 4 * 3_600;
 
+/// Oldest price a collateral may be valued at (a long weekend plus a
+/// holiday), at its closed haircut.
+pub const MAX_CLOSED_PRICE_AGE_SECS: u64 = 5 * 86_400;
+
 /// Largest move of the mark EMA per update, from a fill or a posted mid.
 pub const MARK_MAX_STEP_BPS: u32 = 50;
 /// `post_mark` rate limit per market.

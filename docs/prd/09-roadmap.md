@@ -31,7 +31,7 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 - [x] update_funding (premium-based, elapsed cap)
 - [x] liquidate (partial, capped reward) → insurance → bad debt → ADL (position transfer; OI capped against the fund)
 - [x] Insurance staking (shares, cooldown, retire on wipe)
-- [ ] xStocks collateral: haircut, multiplier, extension allow-list
+- [x] xStocks collateral: haircut, multiplier, extension allow-list (+ closed-market haircut)
 - [ ] Fuzzing (Trident / proptest) for the invariants in `05` §7
 - **Gate:** a liquidation actually executes in tests **and** on devnet. On Stellar it never did (see `11`). Weekend replay backtest passes (`07` §7)
 

@@ -192,9 +192,62 @@ pub fn ceil_div(a: i128, b: i128) -> Result<i128, CoreError> {
     checked_add(checked_div(checked_sub(a, 1)?, b)?, 1)
 }
 
+/// A positive, finite IEEE-754 double (given as its bits) as a
+/// PRECISION-scaled integer, rounded down, with integer arithmetic only.
+///
+/// Token-2022's scaled-UI-amount multiplier is stored as an `f64`; decoding
+/// the bits exactly keeps float math out of valuation. Zero, negatives,
+/// NaN and infinities are refused, as is anything whose value does not fit.
+pub fn f64_bits_to_precision(bits: u64) -> Result<i128, CoreError> {
+    let sign = bits >> 63;
+    let exp = ((bits >> 52) & 0x7ff) as i32;
+    let frac = bits & ((1u64 << 52) - 1);
+    if sign != 0 || exp == 0x7ff || (exp == 0 && frac == 0) {
+        return Err(CoreError::InvalidPrice);
+    }
+    // value = mantissa · 2^shift
+    let (mantissa, shift) = if exp == 0 {
+        (frac, -1074)
+    } else {
+        (frac | (1u64 << 52), exp - 1075)
+    };
+    // mantissa < 2^53 and PRECISION < 2^60: the product fits in u128.
+    let scaled = u128::from(mantissa) * PRECISION as u128;
+    let out = if shift >= 0 {
+        if shift >= 128 || scaled.leading_zeros() < shift as u32 + 1 {
+            return Err(CoreError::MathOverflow);
+        }
+        scaled << shift
+    } else if -shift >= 128 {
+        0
+    } else {
+        scaled >> (-shift)
+    };
+    i128::try_from(out).map_err(|_| CoreError::MathOverflow)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn f64_bits_decode_exactly() {
+        let d = |x: f64| f64_bits_to_precision(x.to_bits());
+        assert_eq!(d(1.0).unwrap(), PRECISION);
+        assert_eq!(d(0.5).unwrap(), PRECISION / 2);
+        assert_eq!(d(10.0).unwrap(), 10 * PRECISION);
+        assert_eq!(d(0.25).unwrap(), PRECISION / 4);
+        // 1.1 is really 1.100000000000000088817841970012523…
+        assert_eq!(d(1.1).unwrap(), 1_100_000_000_000_000_088);
+        assert_eq!(d(1e-18).unwrap(), 1, "the double just above 1e-18");
+        assert_eq!(d(5e-19).unwrap(), 0, "rounds down below one wei");
+        assert_eq!(d(1e9).unwrap(), 1_000_000_000 * PRECISION);
+        for bad in [0.0, -0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(d(bad).is_err(), "{bad}");
+        }
+        assert_eq!(d(1e30), Err(CoreError::MathOverflow));
+        assert_eq!(d(f64::MIN_POSITIVE).unwrap(), 0);
+    }
 
     #[test]
     fn mul_precision_scales_down() {
@@ -306,6 +359,18 @@ mod differential {
             (-1_000_000_000 * PRECISION..1_000_000_000 * PRECISION),
             (-10_000i128..=10_000),
         ]
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(20_000))]
+
+        /// Matches the float product to within f64's own rounding.
+        #[test]
+        fn f64_decode_matches_float_math(x in 1e-6f64..1e6f64) {
+            let got = f64_bits_to_precision(x.to_bits()).unwrap() as f64;
+            let want = x * 1e18;
+            prop_assert!((got - want).abs() <= want * 1e-15 + 1.0, "{} vs {}", got, want);
+        }
     }
 
     proptest! {

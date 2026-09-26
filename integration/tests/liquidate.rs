@@ -314,7 +314,7 @@ fn other_collateral_is_sold_to_the_liquidator_at_its_haircut_value() {
         100 * W,
         PX,
     );
-    let xrisk = vec![meta(collateral_pda(&x.mint), false), meta(xfeed, false)];
+    let xrisk = collateral_risk(&x, xfeed);
     p.maker_risk = xrisk.clone();
     assert_ok(w.settle(1, &[p], &[(&ak, &bk)]));
 
@@ -323,7 +323,7 @@ fn other_collateral_is_sold_to_the_liquidator_at_its_haircut_value() {
     let now = w.now();
     mock_usd(&mut w.svm, FEED_TSLA, 170.0, now);
     let xfeed = mock_usd(&mut w.svm, FEED_XSTOCK, 250.0, now);
-    let xrisk = vec![meta(collateral_pda(&x.mint), false), meta(xfeed, false)];
+    let xrisk = collateral_risk(&x, xfeed);
     let id = w
         .user(&alice)
         .positions

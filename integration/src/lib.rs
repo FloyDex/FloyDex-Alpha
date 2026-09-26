@@ -527,6 +527,8 @@ pub fn settlement_params() -> kryon_perps::CollateralParams {
         max_oracle_confidence_bps: 0,
         deposit_cap: u64::MAX,
         is_settlement: true,
+        closed_haircut_bps: 0,
+        max_closed_age_secs: 0,
     }
 }
 
@@ -679,6 +681,8 @@ impl World {
             max_oracle_confidence_bps: 100,
             deposit_cap: u64::MAX,
             is_settlement: false,
+            closed_haircut_bps: 0,
+            max_closed_age_secs: 0,
         };
         let i = self.add_collateral_ix(&mint, spl_token_2022::ID, p);
         assert_ok(self.admin_send(&[i]));
@@ -1459,4 +1463,118 @@ impl World {
         );
         send(&mut self.svm, &[compute_budget(400_000), i], &keeper, &[])
     }
+}
+
+// --- crafted Token-2022 mints (extensions newer than the pinned crate) ---
+
+/// Token-2022 extension type numbers, as `kryon_perps::token_ext::ext`.
+pub use kryon_perps::token_ext::ext;
+
+/// Scaled-UI-amount extension value: authority, multiplier, the unix time
+/// `new_multiplier` takes effect, new multiplier.
+pub fn scaled_ui(multiplier: f64, effective_at: i64, new_multiplier: f64) -> (u16, Vec<u8>) {
+    let mut v = vec![0u8; 32];
+    v.extend_from_slice(&multiplier.to_bits().to_le_bytes());
+    v.extend_from_slice(&effective_at.to_le_bytes());
+    v.extend_from_slice(&new_multiplier.to_bits().to_le_bytes());
+    (ext::SCALED_UI_AMOUNT, v)
+}
+
+/// Write an initialized Token-2022 mint with the given raw TLV extensions
+/// (mint authority = `authority`). The bundled Token-2022 program (v8) runs
+/// it; only the pinned host crate (v6) can't build these extensions.
+pub fn crafted_mint(
+    svm: &mut LiteSVM,
+    authority: &Pubkey,
+    decimals: u8,
+    extensions: &[(u16, Vec<u8>)],
+) -> Pubkey {
+    use anchor_lang::solana_program::program_option::COption;
+    let mint = Keypair::new().pubkey();
+    let mut data = vec![0u8; spl_token_2022::state::Mint::LEN];
+    spl_token_2022::state::Mint {
+        mint_authority: COption::Some(*authority),
+        supply: 0,
+        decimals,
+        is_initialized: true,
+        freeze_authority: COption::None,
+    }
+    .pack_into_slice(&mut data);
+    if !extensions.is_empty() {
+        data.resize(165, 0);
+        data.push(1); // AccountType::Mint
+        for (ty, v) in extensions {
+            data.extend_from_slice(&ty.to_le_bytes());
+            data.extend_from_slice(&(v.len() as u16).to_le_bytes());
+            data.extend_from_slice(v);
+        }
+    }
+    let lamports = svm.minimum_balance_for_rent_exemption(data.len());
+    svm.set_account(
+        mint,
+        Account {
+            lamports,
+            data,
+            owner: spl_token_2022::ID,
+            executable: false,
+            rent_epoch: 0,
+        },
+    )
+    .unwrap();
+    mint
+}
+
+/// A plain 165-byte Token-2022 account for a crafted mint (no account
+/// extensions are required by the ones we allow), initialized by the program.
+pub fn plain_token_account(
+    svm: &mut LiteSVM,
+    payer: &Keypair,
+    mint: &Pubkey,
+    owner: &Pubkey,
+) -> Pubkey {
+    let acct = Keypair::new();
+    let space = spl_token_2022::state::Account::LEN;
+    let lamports = svm.minimum_balance_for_rent_exemption(space);
+    let ixs = vec![
+        anchor_lang::solana_program::system_instruction::create_account(
+            &payer.pubkey(),
+            &acct.pubkey(),
+            lamports,
+            space as u64,
+            &spl_token_2022::ID,
+        ),
+        spl_token_2022::instruction::initialize_account3(
+            &spl_token_2022::ID,
+            &acct.pubkey(),
+            mint,
+            owner,
+        )
+        .unwrap(),
+    ];
+    assert_ok(send(svm, &ixs, payer, &[&acct]));
+    acct.pubkey()
+}
+
+/// xStock-like collateral params: 8 decimals, priced by `feed`.
+pub fn xstock_params(feed: [u8; 32], haircut_bps: u32) -> kryon_perps::CollateralParams {
+    kryon_perps::CollateralParams {
+        haircut_bps,
+        pyth_feed_id: feed,
+        pyth_shard_id: 0,
+        max_oracle_age_secs: 70,
+        max_oracle_confidence_bps: 100,
+        deposit_cap: u64::MAX,
+        is_settlement: false,
+        closed_haircut_bps: 0,
+        max_closed_age_secs: 0,
+    }
+}
+
+/// `[Collateral, PriceUpdateV2, Mint]` risk accounts for `asset`.
+pub fn collateral_risk(asset: &Asset, price: Pubkey) -> Vec<anchor_lang::prelude::AccountMeta> {
+    vec![
+        meta(collateral_pda(&asset.mint), false),
+        meta(price, false),
+        meta(asset.mint, false),
+    ]
 }

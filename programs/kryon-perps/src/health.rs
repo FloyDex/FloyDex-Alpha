@@ -8,10 +8,12 @@
 //! 1. for each distinct market in the user's position slots (slot order),
 //!    except a market the instruction already has loaded: `[Market, PriceUpdateV2]`
 //! 2. for each non-settlement balance slot with a non-zero amount (slot
-//!    order): `[Collateral, PriceUpdateV2]`
+//!    order): `[Collateral, PriceUpdateV2, Mint]`. The mint carries the
+//!    Token-2022 scaled-UI multiplier (splits and dividends, `06` §7): a
+//!    raw token is worth `multiplier × price`.
 
 use crate::error::{CoreResultExt, KryonError};
-use crate::oracle::{read_pyth, read_pyth_checked};
+use crate::oracle::read_pyth;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use protocol_core::{
@@ -212,30 +214,65 @@ pub fn load_risk_inputs<'info>(
         if b.amount.get() == 0 || b.collateral_index == settlement_index {
             continue;
         }
-        let pair = take(accs, 2)?;
+        let triple = take(accs, 3)?;
         require_keys_eq!(
-            *pair[0].owner,
+            *triple[0].owner,
             crate::ID,
             KryonError::InvalidRemainingAccounts
         );
-        let c = Collateral::try_deserialize(&mut &pair[0].try_borrow_data()?[..])
+        let c = Collateral::try_deserialize(&mut &triple[0].try_borrow_data()?[..])
             .map_err(|_| error!(KryonError::InvalidRemainingAccounts))?;
         require!(
             c.index == b.collateral_index,
             KryonError::InvalidRemainingAccounts
         );
-        let guard = OracleGuard {
-            max_age_secs: c.max_oracle_age_secs,
-            max_confidence_bps: c.max_oracle_confidence_bps,
-        };
-        let snap = read_pyth_checked(&pair[1], &c.pyth_feed_id, c.pyth_shard_id, now, &guard)?;
-        prices.push(CollateralPrice {
-            index: c.index,
-            price: snap.price,
-            haircut_bps: c.haircut_bps,
-        });
+        require_keys_eq!(
+            triple[2].key(),
+            c.mint,
+            KryonError::InvalidRemainingAccounts
+        );
+        prices.push(collateral_price(&c, &triple[1], &triple[2], now)?);
     }
     Ok(RiskInputs { markets, prices })
+}
+
+/// One non-settlement collateral's price per raw token, and its haircut.
+///
+/// - A fresh, tight price: `multiplier × price` at `haircut_bps`.
+/// - Stale, but no older than `max_closed_age_secs`: the underlying's market
+///   is closed (or its feed is out), so the last price is used with
+///   `closed_haircut_bps` on top (`06` §6; decided 2026-09-26: staleness is
+///   the signal, so an outage in session is covered the same way).
+/// - Older than that: `StaleOracle`.
+pub fn collateral_price(
+    c: &Collateral,
+    price_ai: &AccountInfo,
+    mint_ai: &AccountInfo,
+    now: u64,
+) -> Result<CollateralPrice> {
+    let snap = read_pyth(price_ai, &c.pyth_feed_id, c.pyth_shard_id)?;
+    let fresh = OracleGuard {
+        max_age_secs: c.max_oracle_age_secs,
+        max_confidence_bps: c.max_oracle_confidence_bps,
+    };
+    let haircut_bps = match snap.validate(now, &fresh) {
+        Ok(()) => c.haircut_bps,
+        Err(protocol_core::CoreError::StaleOracle) if c.max_closed_age_secs > 0 => {
+            let closed = OracleGuard {
+                max_age_secs: c.max_closed_age_secs,
+                max_confidence_bps: c.max_oracle_confidence_bps,
+            };
+            snap.validate(now, &closed).core()?;
+            core::cmp::min(c.haircut_bps.saturating_add(c.closed_haircut_bps), 10_000)
+        }
+        Err(e) => return Err(error!(KryonError::from(e))),
+    };
+    let multiplier = crate::token_ext::ui_multiplier(mint_ai, now as i64)?;
+    Ok(CollateralPrice {
+        index: c.index,
+        price: mul_div_floor(snap.price, multiplier, PRECISION).core()?,
+        haircut_bps,
+    })
 }
 
 /// Positions and valued collateral from the user's current state.

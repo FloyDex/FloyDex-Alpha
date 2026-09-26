@@ -31,7 +31,13 @@ pub struct Collateral {
     pub fees_accrued: i128,
     pub bump: u8,
     pub vault_bump: u8,
-    pub _reserved: [u8; 32],
+    /// Extra haircut while the price is from a closed market (`06` §6: the
+    /// feed is past `max_oracle_age_secs` but within `max_closed_age_secs`).
+    pub closed_haircut_bps: u32,
+    /// How old a price may be and still value this collateral, at the closed
+    /// haircut. 0 = never: a stale price blocks valuation.
+    pub max_closed_age_secs: u64,
+    pub _reserved: [u8; 20],
 }
 
 impl Collateral {

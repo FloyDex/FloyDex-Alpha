@@ -17,6 +17,7 @@ pub mod oracle;
 pub mod order;
 pub mod position;
 pub mod state;
+pub mod token_ext;
 
 pub use constants::MAX_OPERATORS;
 pub use instructions::*;

@@ -129,6 +129,8 @@ async function bootstrap(domain: Uint8Array) {
       maxOracleConfidenceBps: 0,
       depositCap: bn(1_000_000n * USDC),
       isSettlement: true,
+      closedHaircutBps: 0,
+      maxClosedAgeSecs: bn(0),
     })
     .accountsStrict({ exchange: exchangePda, admin: admin.publicKey, mint: usdc, collateral, vault, tokenProgram: TOKEN_PROGRAM_ID, systemProgram: SystemProgram.programId })
     .instruction();

@@ -4,12 +4,11 @@ use crate::constants::*;
 use crate::error::KryonError;
 use crate::events::CollateralAdded;
 use crate::state::*;
+use crate::token_ext::check_mint_extensions;
 use anchor_lang::prelude::*;
-use anchor_spl::token_2022::spl_token_2022::{
-    self,
-    extension::{BaseStateWithExtensions, ExtensionType, StateWithExtensions},
-};
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use anchor_lang::system_program;
+use anchor_spl::token_2022;
+use anchor_spl::token_interface::{Mint, TokenInterface};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct CollateralParams {
@@ -23,6 +22,10 @@ pub struct CollateralParams {
     /// Max net deposits, in token base units.
     pub deposit_cap: u64,
     pub is_settlement: bool,
+    /// Extra haircut while the underlying's market is closed (`06` §6).
+    pub closed_haircut_bps: u32,
+    /// Oldest price that may still value it (at the closed haircut); 0 = none.
+    pub max_closed_age_secs: u64,
 }
 
 #[derive(Accounts)]
@@ -41,66 +44,73 @@ pub struct AddCollateral<'info> {
         bump,
     )]
     pub collateral: Account<'info, Collateral>,
-    #[account(
-        init,
-        payer = admin,
-        seeds = [VAULT_SEED, mint.key().as_ref()],
-        bump,
-        token::mint = mint,
-        token::authority = collateral,
-        token::token_program = token_program,
-    )]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
+    /// Created in the handler, after the extension check: Anchor's `init`
+    /// sizes Token-2022 accounts with the pinned spl-token-2022 v6, which
+    /// fails on extensions it doesn't know (e.g. the scaled-UI amount).
+    /// CHECK: the PDA is checked by seeds; it must not exist yet.
+    #[account(mut, seeds = [VAULT_SEED, mint.key().as_ref()], bump)]
+    pub vault: UncheckedAccount<'info>,
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
 
-/// Token-2022 extensions a collateral mint may carry. Everything else is
-/// refused: transfer fees and hooks break exact vault accounting, permanent
-/// delegates and pausable mints let the issuer move or freeze vault funds,
-/// and scaled/interest-bearing amounts need valuation support (Phase 2).
-const ALLOWED_MINT_EXTENSIONS: &[ExtensionType] = &[
-    ExtensionType::MetadataPointer,
-    ExtensionType::TokenMetadata,
-    ExtensionType::GroupPointer,
-    ExtensionType::TokenGroup,
-    ExtensionType::GroupMemberPointer,
-    ExtensionType::TokenGroupMember,
-    ExtensionType::MintCloseAuthority,
-];
-
-pub fn check_mint_extensions(mint: &AccountInfo) -> Result<()> {
-    if *mint.owner != spl_token_2022::ID {
-        return Ok(()); // legacy SPL Token: no extensions
-    }
-    let data = mint.try_borrow_data()?;
-    let state = StateWithExtensions::<spl_token_2022::state::Mint>::unpack(&data)
-        .map_err(|_| error!(KryonError::UnsupportedMintExtension))?;
-    let types = state
-        .get_extension_types()
-        .map_err(|_| error!(KryonError::UnsupportedMintExtension))?;
-    for t in types {
-        require!(
-            ALLOWED_MINT_EXTENSIONS.contains(&t),
-            KryonError::UnsupportedMintExtension
-        );
-    }
-    Ok(())
+/// Create the vault token account at its PDA, owned by the collateral PDA,
+/// sized by the token program itself (it knows every extension it runs).
+fn create_vault(ctx: &Context<AddCollateral>) -> Result<()> {
+    let vault = ctx.accounts.vault.to_account_info();
+    require!(vault.lamports() == 0, KryonError::InvalidConfig);
+    let token_program = ctx.accounts.token_program.to_account_info();
+    let space = token_2022::get_account_data_size(
+        CpiContext::new(
+            token_program.clone(),
+            token_2022::GetAccountDataSize {
+                mint: ctx.accounts.mint.to_account_info(),
+            },
+        ),
+        &[],
+    )?;
+    let mint_key = ctx.accounts.mint.key();
+    let seeds: &[&[u8]] = &[VAULT_SEED, mint_key.as_ref(), &[ctx.bumps.vault]];
+    system_program::create_account(
+        CpiContext::new_with_signer(
+            ctx.accounts.system_program.to_account_info(),
+            system_program::CreateAccount {
+                from: ctx.accounts.admin.to_account_info(),
+                to: vault.clone(),
+            },
+            &[seeds],
+        ),
+        Rent::get()?.minimum_balance(space as usize),
+        space,
+        token_program.key,
+    )?;
+    token_2022::initialize_account3(CpiContext::new(
+        token_program,
+        token_2022::InitializeAccount3 {
+            account: vault,
+            mint: ctx.accounts.mint.to_account_info(),
+            authority: ctx.accounts.collateral.to_account_info(),
+        },
+    ))
 }
 
 pub fn handle_add_collateral(ctx: Context<AddCollateral>, p: CollateralParams) -> Result<()> {
+    check_mint_extensions(&ctx.accounts.mint.to_account_info())?;
+    create_vault(&ctx)?;
     let ex = &mut ctx.accounts.exchange;
     let decimals = ctx.accounts.mint.decimals;
     require!(decimals <= MAX_DECIMALS, KryonError::InvalidConfig);
     require!(p.haircut_bps <= 10_000, KryonError::InvalidConfig);
-    check_mint_extensions(&ctx.accounts.mint.to_account_info())?;
     if p.is_settlement {
         require!(
             ex.settlement_mint == Pubkey::default(),
             KryonError::SettlementCollateralExists
         );
         require!(
-            p.pyth_feed_id == [0; 32] && p.haircut_bps == 0,
+            p.pyth_feed_id == [0; 32]
+                && p.haircut_bps == 0
+                && p.closed_haircut_bps == 0
+                && p.max_closed_age_secs == 0,
             KryonError::InvalidConfig
         );
         ex.settlement_mint = ctx.accounts.mint.key();
@@ -109,7 +119,10 @@ pub fn handle_add_collateral(ctx: Context<AddCollateral>, p: CollateralParams) -
         require!(
             p.pyth_feed_id != [0; 32]
                 && p.max_oracle_age_secs > 0
-                && p.max_oracle_confidence_bps <= 10_000,
+                && p.max_oracle_confidence_bps <= 10_000
+                && p.haircut_bps.saturating_add(p.closed_haircut_bps) <= 10_000
+                && (p.max_closed_age_secs == 0 || p.max_closed_age_secs > p.max_oracle_age_secs)
+                && p.max_closed_age_secs <= MAX_CLOSED_PRICE_AGE_SECS,
             KryonError::InvalidConfig
         );
     }
@@ -132,6 +145,8 @@ pub fn handle_add_collateral(ctx: Context<AddCollateral>, p: CollateralParams) -
     c.deposit_cap = p.deposit_cap;
     c.total_deposited = 0;
     c.fees_accrued = 0;
+    c.closed_haircut_bps = p.closed_haircut_bps;
+    c.max_closed_age_secs = p.max_closed_age_secs;
     c.bump = ctx.bumps.collateral;
     c.vault_bump = ctx.bumps.vault;
     emit!(CollateralAdded {

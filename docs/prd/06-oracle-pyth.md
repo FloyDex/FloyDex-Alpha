@@ -135,6 +135,38 @@ later. It's a policy change, not a code change.
 - Holder restrictions: xStocks are not for US persons. This lines up with our
   geofence (`10`).
 
+**Built (decided 2026-09-26):**
+- **Allow-list, read from raw TLV** (`token_ext.rs`). The pinned
+  `spl-token-2022` v6 (held back by the rustc 1.79 SBF toolchain) predates
+  the scaled-UI-amount (type 25) and pausable (26) extensions, and its
+  `get_extension_types` fails on any type it doesn't know. So the program
+  walks the TLV entries itself. Allowed: mint close authority,
+  metadata/group pointers and data, and the scaled-UI amount. Everything
+  else is refused, including a type number from the future: transfer hook,
+  permanent delegate, pausable, transfer fee, interest-bearing,
+  non-transferable, default account state and confidential mints.
+- `add_collateral` creates the vault token account itself, after the
+  check. Anchor's `init` sizes Token-2022 accounts with the same v6 crate
+  and failed on scaled-UI mints; the token program (v8 on-chain) now reports
+  the size through `GetAccountDataSize`.
+- **Multiplier in valuation.** Health takes `[Collateral, PriceUpdateV2,
+  Mint]` per non-settlement collateral. A raw token is worth
+  `multiplier × price`, where the multiplier is the mint's current one, or
+  its scheduled `new_multiplier` once its timestamp has passed. That way a
+  split is valued correctly from the second it takes effect, with no keeper
+  in between. The `f64` is decoded from its bits with integer math
+  (`protocol_core::f64_bits_to_precision`, exact, rounded down); no floats
+  on-chain.
+- **Closed-market haircut.** `Collateral.closed_haircut_bps` (≤ 100% with
+  the base haircut) and `max_closed_age_secs` (0 = off, else above the fresh
+  age and at most 5 days). A price past its fresh age but inside the closed
+  age values the collateral at `haircut + closed_haircut`; older is
+  `StaleOracle`. Staleness is the signal, not the calendar, so an in-session
+  feed outage is covered the same way (conservative), and collateral needs
+  no market account.
+- Tests build the extensions with crafted mint bytes run by LiteSVM's
+  bundled Token-2022 v8 program.
+
 ## 8. Zero-cost path (MVP before there's budget)
 
 What is still **free** as of 2026-09-26:
