@@ -99,6 +99,19 @@ effect.
    margin) after the fill ≥ before. Stellar required initial margin on every
    fill, which trapped accounts below the requirement (e.g. when margin
    doubles at the close) until liquidation.
+   **Tightened for liquidatable accounts (decided 2026-09-26):** if the side
+   was liquidatable before the fill (session-scaled maintenance) and still
+   misses initial margin after it, the fill price must be at or better than
+   the mark for that side (a seller at ≥ mark, a buyer at ≤ mark), else
+   `LiquidatableReduceOffMark`. Without it, an accomplice could buy a
+   near-bankrupt position below the mark: the margin a reduce releases
+   outweighs the equity it gives away, so health "improves" while the
+   account goes negative and the insurance fund pays the accomplice. Chosen
+   over "equity may fall by at most the fee" because the two are the same
+   rule (the equity change of a reduce is `−fee + size·(price − mark)·dir`),
+   and the price form is exact where the equity form needs a rounding
+   tolerance (realized PnL floors, unrealized truncates). A side that meets
+   initial margin after the fill keeps positive equity, so it is unaffected.
 7. Create or update `OrderRecord` (the operator pays rent).
 
 `reclaim_order_state(owner, nonce)`: after `max(expiry, tombstone)`, close the

@@ -91,6 +91,8 @@ pub enum KryonError {
     InvalidSessionWindow,
     #[msg("User still has open positions or balances")]
     AccountNotEmpty,
+    #[msg("A liquidatable account may only reduce at or better than the mark")]
+    LiquidatableReduceOffMark,
 }
 
 impl From<CoreError> for KryonError {

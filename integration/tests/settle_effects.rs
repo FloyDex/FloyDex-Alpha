@@ -109,6 +109,63 @@ fn below_initial_margin_a_flip_gets_no_relief() {
     );
 }
 
+/// Alice long / Bob short 100 @ $250 on 10k each; then TSLA falls to $151.
+/// Alice: equity 10,000 − 9,900 − fees ≈ 95 < maintenance 1,510 → liquidatable.
+fn alice_nearly_bankrupt() -> Book {
+    let mut b = Book::new();
+    assert_ok(b.trade(true, 100 * W, PX));
+    let now = b.w.now();
+    mock_usd(&mut b.w.svm, FEED_TSLA, 151.0, now);
+    b
+}
+
+#[test]
+fn a_liquidatable_account_cannot_sell_below_mark_to_an_accomplice() {
+    let mut b = alice_nearly_bankrupt();
+    let before = b.w.user(&b.alice).balance(0);
+    // The collusive reduce: Alice dumps 99 to Bob 1% below the $151 mark.
+    // Her equity goes to ≈ −55 (Bob pockets 149.5, the insurance fund would
+    // eat the deficit), yet free collateral rises from ≈ −2,925 to ≈ −85
+    // because the reduce releases 2,990 of margin: the plain "health did not
+    // worsen" relief lets it through.
+    assert_err(
+        b.trade(false, 99 * W, 14_949 * W / 100),
+        KryonError::LiquidatableReduceOffMark,
+    );
+    // Slightly off-mark is fine when she still meets initial margin after the
+    // fill: her equity stays positive, so nobody but Alice pays for it.
+    // Partial reduces at the mark, and above it, go through: her equity falls
+    // by the fee only, never by a transfer to the counterparty.
+    assert_ok(b.trade(false, 50 * W, 151 * W));
+    assert_ok(b.trade(false, 10 * W, 152 * W));
+    assert_eq!(b.position(&b.alice).unwrap().size.get(), 40 * P);
+    let fees = (50 * 151 + 10 * 152) * P * 2 / 10_000; // maker 2 bps
+    let realized = -(50 * 99 + 10 * 98) * P;
+    assert_eq!(b.w.user(&b.alice).balance(0) - before, realized - fees);
+}
+
+#[test]
+fn a_liquidatable_short_cannot_buy_above_mark() {
+    let mut b = Book::new();
+    assert_ok(b.trade(false, 100 * W, PX)); // Alice short 100 @ 250
+    let now = b.w.now();
+    mock_usd(&mut b.w.svm, FEED_TSLA, 349.0, now); // −9,900: liquidatable
+    assert_err(
+        b.trade(true, 99 * W, 35_249 * W / 100),
+        KryonError::LiquidatableReduceOffMark,
+    );
+    assert_ok(b.trade(true, 50 * W, 349 * W));
+    assert_eq!(b.position(&b.alice).unwrap().size.get(), 50 * P);
+}
+
+#[test]
+fn below_initial_but_not_liquidatable_keeps_the_health_relief_off_mark() {
+    // After the close Alice is under initial (40%) but above maintenance
+    // (20%): the existing relief still applies below the mark.
+    let mut b = below_initial_margin_after_the_close();
+    assert_ok(b.trade(false, W, 249 * W));
+}
+
 #[test]
 fn halted_markets_are_reduce_only() {
     let mut b = Book::new();

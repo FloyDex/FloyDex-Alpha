@@ -323,11 +323,10 @@ fn settle_one<'info>(
     };
     let maker_markets = markets_for(&maker_inputs);
     let taker_markets = markets_for(&taker_inputs);
-    // Free collateral (equity − session-scaled initial margin) before the
-    // fill, the yardstick for reduce-only relief below.
-    let free_before = [
-        health(&*sides[0].user.load()?, &maker_inputs, &maker_markets)?.free_collateral,
-        health(&*sides[1].user.load()?, &taker_inputs, &taker_markets)?.free_collateral,
+    // Health before the fill, the yardstick for reduce-only relief below.
+    let before = [
+        health(&*sides[0].user.load()?, &maker_inputs, &maker_markets)?,
+        health(&*sides[1].user.load()?, &taker_inputs, &taker_markets)?,
     ];
 
     // --- 5. position effects, 6. fees ---
@@ -403,6 +402,12 @@ fn settle_one<'info>(
     // (free collateral after >= before), so an account caught below the
     // requirement, e.g. when margin doubles at the close, can still de-risk
     // through the book (decided 2026-09-26).
+    //
+    // A liquidatable side gets that relief only at or better than the mark
+    // (decided 2026-09-26, `05` §2): its equity then falls by at most the fee.
+    // Otherwise a colluding counterparty could buy its position below mark,
+    // because the margin a reduce releases outweighs the equity it gives away,
+    // and the insurance fund would eat the difference at liquidation.
     let inputs = [
         (&maker_inputs, &maker_markets),
         (&taker_inputs, &taker_markets),
@@ -411,11 +416,21 @@ fn settle_one<'info>(
         let (i, m) = inputs[k];
         let h = health(&*s.user.load()?, i, m)?;
         let meets_initial = h.equity >= h.initial_margin_required;
-        let reduce_ok = !outcomes[k].increased && h.free_collateral >= free_before[k];
+        let reduce_ok = !outcomes[k].increased && h.free_collateral >= before[k].free_collateral;
         require!(
             meets_initial || reduce_ok,
             KryonError::InsufficientCollateral
         );
+        if !meets_initial && before[k].liquidatable {
+            // The side sold if it is short the fill, bought if long.
+            let sold = s.order.flags & FLAG_IS_LONG == 0;
+            let at_or_better = if sold {
+                fill_price >= view.mark
+            } else {
+                fill_price <= view.mark
+            };
+            require!(at_or_better, KryonError::LiquidatableReduceOffMark);
+        }
     }
 
     // --- 7. order records ---
