@@ -29,7 +29,7 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 ## Phase 2 — Risk completeness (Weeks 5–8: 10-26 → 11-22)
 - [x] Session calendar + `post_session_calendar`; closed mark EMA; margin ramp (+ `post_mark`, grace, reopen)
 - [x] update_funding (premium-based, elapsed cap)
-- [ ] liquidate (partial, capped reward) → insurance → bad debt → ADL (liquidate → insurance → bad debt done; ADL next)
+- [x] liquidate (partial, capped reward) → insurance → bad debt → ADL (position transfer; OI capped against the fund)
 - [x] Insurance staking (shares, cooldown, retire on wipe)
 - [ ] xStocks collateral: haircut, multiplier, extension allow-list
 - [ ] Fuzzing (Trident / proptest) for the invariants in `05` §7

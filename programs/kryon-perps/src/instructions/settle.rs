@@ -24,8 +24,8 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as ix_sysvar;
 use anchor_lang::system_program;
 use protocol_core::{
-    apply_bps, checked_add, checked_sub, wire_to_precision, OrderMsg, FLAGS_KNOWN, FLAG_IS_LONG,
-    FLAG_REDUCE_ONLY,
+    apply_bps, checked_add, checked_sub, mul_div, notional, wire_to_precision, OrderMsg,
+    BPS_DENOMINATOR, FLAGS_KNOWN, FLAG_IS_LONG, FLAG_REDUCE_ONLY,
 };
 use risk_engine::{may_increase_exposure, MarketSession};
 
@@ -78,6 +78,9 @@ pub struct SettleFills<'info> {
     #[account(address = ix_sysvar::ID)]
     pub instructions: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
+    /// Needed when the market caps OI against the fund (`oi_policy_bps > 0`).
+    #[account(seeds = [INSURANCE_SEED], bump = insurance.bump)]
+    pub insurance: Option<Box<Account<'info, Insurance>>>,
 }
 
 /// One side of a fill after signature checks.
@@ -355,6 +358,24 @@ fn settle_one<'info>(
                 } else {
                     error!(KryonError::OpenInterestExceeded)
                 });
+            }
+            // Stellar `require_insurance_headroom` (KRY-Q4/Q11): new exposure
+            // must stay within `oi_policy_bps` of what the fund can stand
+            // behind, net of recorded bad debt. Exits are never blocked.
+            if m.oi_policy_bps > 0 {
+                let ins = ctx
+                    .accounts
+                    .insurance
+                    .as_ref()
+                    .ok_or(KryonError::InsuranceNotInitialized)?;
+                let backing = checked_sub(ins.fund, ins.bad_debt).core()?.max(0);
+                let cap = mul_div(backing, i128::from(m.oi_policy_bps), BPS_DENOMINATOR).core()?;
+                let oi_notional = if long > 0 {
+                    notional(long, view.mark).core()?
+                } else {
+                    0
+                };
+                require!(oi_notional <= cap, KryonError::InsuranceFundInsufficient);
             }
         }
     }

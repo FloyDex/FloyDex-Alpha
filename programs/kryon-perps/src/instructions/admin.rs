@@ -152,6 +152,19 @@ pub fn handle_set_fee_config(ctx: Context<AdminOnly>, fee_config: FeeConfig) -> 
     Ok(())
 }
 
+/// KRY-Q11: the ceiling on the sum of every market's `oi_policy_bps`. It may
+/// not drop below the sum already committed.
+pub fn handle_set_max_total_oi_policy_bps(ctx: Context<AdminOnly>, max_total: u32) -> Result<()> {
+    let ex = &mut ctx.accounts.exchange;
+    require!(max_total <= 1_000_000, KryonError::InvalidConfig);
+    require!(
+        max_total >= ex.total_oi_policy_bps,
+        KryonError::AggregateOiPolicyExceeded
+    );
+    ex.max_total_oi_policy_bps = max_total;
+    Ok(())
+}
+
 pub fn handle_unpause(ctx: Context<AdminOnly>) -> Result<()> {
     let ex = &mut ctx.accounts.exchange;
     ex.paused = false;

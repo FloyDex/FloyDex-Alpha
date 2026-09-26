@@ -182,3 +182,18 @@ pub struct BadDebt {
     pub written_off: i128,
     pub total_bad_debt: i128,
 }
+
+#[event]
+pub struct Adl {
+    pub winner: Pubkey,
+    pub winner_sub_id: u8,
+    pub counterparty: Pubkey,
+    pub counterparty_sub_id: u8,
+    pub market_id: u16,
+    pub size: i128,
+    pub price: i128,
+    /// Cut from the winner's realized PnL; pays down bad debt.
+    pub haircut: i128,
+    pub bad_debt_before: i128,
+    pub bad_debt_after: i128,
+}

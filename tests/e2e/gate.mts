@@ -272,7 +272,7 @@ async function main() {
       .settleFills([{ maker: arg(orders[0]), taker: arg(orders[1]), fillSize: bn(size), fillPrice: bn(price), makerSig: { ixIndex: 1, sigIndex: 0 }, takerSig: { ixIndex: 1, sigIndex: 1 } }])
       .accountsStrict({
         exchange: exchangePda, operator: operator.publicKey, market: marketPda, priceUpdate, settlementCollateral,
-        instructions: SYSVAR_INSTRUCTIONS_PUBKEY, systemProgram: SystemProgram.programId, eventAuthority, program: PROGRAM_ID,
+        instructions: SYSVAR_INSTRUCTIONS_PUBKEY, systemProgram: SystemProgram.programId, insurance: null, eventAuthority, program: PROGRAM_ID,
       })
       .remainingAccounts(remaining)
       .instruction();

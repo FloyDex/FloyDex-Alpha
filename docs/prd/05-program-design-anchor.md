@@ -174,6 +174,28 @@ liquidated owner) takes the slice at the mark, like a fill:
 
 Measured: 155k CU with one position on each side (LiteSVM).
 
+**`adl(winner_position_id, counterparty_position_id)` as built (decided
+2026-09-26, with the owner).** Refused unless `Insurance.bad_debt > 0`
+(Stellar Q4, `11` L12), while paused, or while the market is Halted. The
+keeper names a position in trade profit at the mark and an opposite
+position in the same market (in another account). Both close against each
+other at the mark, so OI stays two-sided. The size is capped at
+`⌈bad_debt / profit per unit⌉`, so a bad target costs at most one bounded
+call. The winner's realized PnL (funding included) is cut by
+`min(pnl, bad_debt)`, which pays the debt down; the counterparty closes at
+the mark, which costs it nothing against the mark. Stellar instead credited
+the winner in full and reduced `bad_debt` by the same amount, which moved the
+shortfall between ledgers without closing it.
+
+**OI against the fund (Stellar `require_insurance_headroom`, Q11).** A market
+with `oi_policy_bps > 0` refuses any fill that adds exposure once
+`notional(oi, mark) > (fund − bad_debt) · oi_policy_bps / 10⁴`
+(`InsuranceFundInsufficient`); exits are never blocked. `settle_fills` takes
+the `Insurance` account as an optional account for this. The aggregate
+`Σ oi_policy_bps ≤ max_total_oi_policy_bps` is checked at `create_market`,
+and `set_max_total_oi_policy_bps` may not set the ceiling below what markets
+have already committed.
+
 **`plan_liquidation` sizing fixed (decided 2026-09-26, with the owner).**
 The Stellar formula closed notional equal to the shortfall. Closing at the
 mark only releases `maintenance_bps − fee_bps` of each unit, so a step

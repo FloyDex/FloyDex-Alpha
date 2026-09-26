@@ -65,6 +65,10 @@ pub mod kryon_perps {
         instructions::admin::handle_set_fee_config(ctx, fee_config)
     }
 
+    pub fn set_max_total_oi_policy_bps(ctx: Context<AdminOnly>, max_total: u32) -> Result<()> {
+        instructions::admin::handle_set_max_total_oi_policy_bps(ctx, max_total)
+    }
+
     pub fn pause(ctx: Context<Pause>) -> Result<()> {
         instructions::admin::handle_pause(ctx)
     }
@@ -157,6 +161,15 @@ pub mod kryon_perps {
         position_id: u64,
     ) -> Result<()> {
         instructions::liquidate::handle_liquidate(ctx, position_id)
+    }
+
+    /// Auto-deleveraging against recorded bad debt (`05` §2).
+    pub fn adl(
+        ctx: Context<AutoDeleverage>,
+        winner_position_id: u64,
+        counterparty_position_id: u64,
+    ) -> Result<()> {
+        instructions::adl::handle_adl(ctx, winner_position_id, counterparty_position_id)
     }
 
     // --- user ---

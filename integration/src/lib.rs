@@ -1002,6 +1002,10 @@ impl World {
             settlement_collateral: collateral_pda(&self.exchange().settlement_mint),
             instructions: anchor_lang::solana_program::sysvar::instructions::ID,
             system_program: anchor_lang::system_program::ID,
+            insurance: self
+                .svm
+                .get_account(&insurance_pda())
+                .map(|_| insurance_pda()),
             event_authority: event_authority(),
             program: kryon_perps::ID,
         }
@@ -1418,5 +1422,41 @@ impl World {
             assert_ok(self.deposit(&t, usdc, &wallet, dollars * 1_000_000));
         }
         t
+    }
+}
+
+impl World {
+    /// `adl` by a fresh keeper.
+    pub fn adl(
+        &mut self,
+        winner: &Trader,
+        winner_position_id: u64,
+        counterparty: &Trader,
+        counterparty_position_id: u64,
+        market_id: u16,
+    ) -> TxResult {
+        let keeper = funded(&mut self.svm);
+        let m = self.market(market_id);
+        let i = ix(
+            ka::AutoDeleverage {
+                exchange: exchange_pda(),
+                insurance: insurance_pda(),
+                keeper: keeper.pubkey(),
+                winner_account: winner.user,
+                counterparty_account: counterparty.user,
+                market: market_pda(market_id),
+                price_update: kryon_perps::oracle::push_feed_address(
+                    m.pyth_shard_id,
+                    &m.pyth_feed_id,
+                ),
+                event_authority: event_authority(),
+                program: kryon_perps::ID,
+            },
+            ki::Adl {
+                winner_position_id,
+                counterparty_position_id,
+            },
+        );
+        send(&mut self.svm, &[compute_budget(400_000), i], &keeper, &[])
     }
 }
