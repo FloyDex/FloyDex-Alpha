@@ -15,16 +15,16 @@ fn zero_copy_sizes_are_pinned() {
     assert_eq!(size_of::<UserAccount>(), 1_376);
     assert_eq!(size_of::<Market>(), 824);
     // 05 §1 targets: UserAccount ~2.2 KB, Market ~1.5 KB.
-    assert!(8 + size_of::<UserAccount>() <= 2_300);
-    assert!(8 + size_of::<Market>() <= 1_536);
+    const _: () = assert!(8 + size_of::<UserAccount>() <= 2_300);
+    const _: () = assert!(8 + size_of::<Market>() <= 1_536);
 }
 
 #[test]
 fn borsh_account_sizes_fit_the_targets() {
     use anchor_lang::Space;
-    assert!(8 + Exchange::INIT_SPACE < 1_024);
-    assert!(8 + Collateral::INIT_SPACE < 300);
-    assert!(8 + OrderRecord::INIT_SPACE <= 80);
+    const _: () = assert!(8 + Exchange::INIT_SPACE < 1_024);
+    const _: () = assert!(8 + Collateral::INIT_SPACE < 300);
+    const _: () = assert!(8 + OrderRecord::INIT_SPACE <= 80);
 }
 
 #[test]

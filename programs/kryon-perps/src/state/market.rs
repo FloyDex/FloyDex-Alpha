@@ -73,7 +73,9 @@ pub struct Market {
     pub max_execution_deviation_bps: u32,
     pub active: u8,
     pub bump: u8,
-    pub _pad0: [u8; 6],
+    /// Last session observed by `settle_fills`, as `SESSION_* + 1` (0 = none).
+    pub last_session: u8,
+    pub _pad0: [u8; 5],
     pub pyth_feed_id: [u8; 32],
     pub session_policy: SessionPolicyPod,
     pub calendar: [SessionWindowPod; CALENDAR_LEN],

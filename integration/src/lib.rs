@@ -860,3 +860,290 @@ impl World {
         send(&mut self.svm, &[i], &t.kp, &[])
     }
 }
+
+// --- orders, Ed25519, settle ---
+
+pub use kryon_perps::ed25519::SigRef;
+pub use kryon_perps::{FillArgs, OrderArgs};
+
+pub const ED25519_ID: Pubkey =
+    anchor_lang::solana_program::pubkey!("Ed25519SigVerify111111111111111111111111111");
+
+pub fn order_args(
+    market_id: u16,
+    is_long: bool,
+    size: u64,
+    limit_price: u64,
+    nonce: u64,
+    expiry_ts: u64,
+) -> OrderArgs {
+    OrderArgs {
+        market_id,
+        flags: if is_long {
+            protocol_core::FLAG_IS_LONG
+        } else {
+            0
+        },
+        size,
+        limit_price,
+        nonce,
+        expiry_ts,
+    }
+}
+
+/// The 108 bytes a key signs for `o`, as trader `t` (owner + sub-account).
+pub fn order_message(domain: [u8; 32], t: &Trader, o: &OrderArgs) -> Vec<u8> {
+    protocol_core::OrderMsg {
+        domain,
+        owner: t.key().to_bytes(),
+        sub_id: t.sub_id,
+        market_id: o.market_id,
+        flags: o.flags,
+        size: o.size,
+        limit_price: o.limit_price,
+        nonce: o.nonce,
+        expiry_ts: o.expiry_ts,
+    }
+    .encode()
+    .to_vec()
+}
+
+/// One entry of an Ed25519 instruction, before layout.
+#[derive(Clone)]
+pub struct SigEntry {
+    pub pubkey: [u8; 32],
+    pub signature: [u8; 64],
+    pub message: Vec<u8>,
+    /// Instruction indexes to write into the offsets (u16::MAX = this one).
+    pub sig_ix: u16,
+    pub pk_ix: u16,
+    pub msg_ix: u16,
+}
+
+impl SigEntry {
+    pub fn sign(signer: &Keypair, message: &[u8]) -> Self {
+        let signature: [u8; 64] = signer.sign_message(message).into();
+        SigEntry {
+            pubkey: signer.pubkey().to_bytes(),
+            signature,
+            message: message.to_vec(),
+            sig_ix: u16::MAX,
+            pk_ix: u16::MAX,
+            msg_ix: u16::MAX,
+        }
+    }
+}
+
+/// Lay out an Ed25519 program instruction the way `@solana/web3.js` does:
+/// `[count, pad, offsets…]` then, per signature, pubkey ‖ signature ‖ message.
+pub fn ed25519_ix(entries: &[SigEntry]) -> Instruction {
+    let header = 2 + 14 * entries.len();
+    let mut body = Vec::new();
+    let mut offsets = Vec::new();
+    for e in entries {
+        let pk = (header + body.len()) as u16;
+        body.extend_from_slice(&e.pubkey);
+        let sig = (header + body.len()) as u16;
+        body.extend_from_slice(&e.signature);
+        let msg = (header + body.len()) as u16;
+        body.extend_from_slice(&e.message);
+        for v in [
+            sig,
+            e.sig_ix,
+            pk,
+            e.pk_ix,
+            msg,
+            e.message.len() as u16,
+            e.msg_ix,
+        ] {
+            offsets.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    let mut data = vec![entries.len() as u8, 0];
+    data.extend(offsets);
+    data.extend(body);
+    Instruction {
+        program_id: ED25519_ID,
+        accounts: vec![],
+        data,
+    }
+}
+
+/// Everything one fill needs besides the signatures.
+#[derive(Clone)]
+pub struct FillPlan<'a> {
+    pub maker: &'a Trader,
+    pub taker: &'a Trader,
+    pub maker_order: OrderArgs,
+    pub taker_order: OrderArgs,
+    pub size: u64,
+    pub price: u64,
+    /// Remaining accounts for each side's other markets / collateral.
+    pub maker_risk: Vec<anchor_lang::prelude::AccountMeta>,
+    pub taker_risk: Vec<anchor_lang::prelude::AccountMeta>,
+}
+
+impl World {
+    pub fn settle_accounts(&self, market_id: u16, operator: &Pubkey) -> ka::SettleFills {
+        let m = self.market(market_id);
+        ka::SettleFills {
+            exchange: exchange_pda(),
+            operator: *operator,
+            market: market_pda(market_id),
+            price_update: kryon_perps::oracle::push_feed_address(m.pyth_shard_id, &m.pyth_feed_id),
+            settlement_collateral: collateral_pda(&self.exchange().settlement_mint),
+            instructions: anchor_lang::solana_program::sysvar::instructions::ID,
+            system_program: anchor_lang::system_program::ID,
+            event_authority: event_authority(),
+            program: kryon_perps::ID,
+        }
+    }
+
+    /// `settle_fills` for `plans`, referencing signatures in instruction 1
+    /// (instruction 0 is the compute budget): fill k uses signatures 2k
+    /// (maker) and 2k+1 (taker).
+    pub fn settle_ix(&self, market_id: u16, plans: &[FillPlan]) -> Instruction {
+        let mut fills = Vec::new();
+        let mut extra = Vec::new();
+        for (k, p) in plans.iter().enumerate() {
+            fills.push(FillArgs {
+                maker: p.maker_order,
+                taker: p.taker_order,
+                fill_size: p.size,
+                fill_price: p.price,
+                maker_sig: SigRef {
+                    ix_index: 1,
+                    sig_index: (2 * k) as u8,
+                },
+                taker_sig: SigRef {
+                    ix_index: 1,
+                    sig_index: (2 * k + 1) as u8,
+                },
+            });
+            extra.push(meta(p.maker.user, true));
+            extra.push(meta(p.taker.user, true));
+            extra.push(meta(
+                order_pda(&p.maker.key(), p.maker.sub_id, p.maker_order.nonce),
+                true,
+            ));
+            extra.push(meta(
+                order_pda(&p.taker.key(), p.taker.sub_id, p.taker_order.nonce),
+                true,
+            ));
+            extra.extend(p.maker_risk.iter().cloned());
+            extra.extend(p.taker_risk.iter().cloned());
+        }
+        ix_with(
+            self.settle_accounts(market_id, &self.operator.pubkey()),
+            ki::SettleFills { fills },
+            extra,
+        )
+    }
+
+    /// Sign each order with the given key and settle, as the operator.
+    pub fn settle(
+        &mut self,
+        market_id: u16,
+        plans: &[FillPlan],
+        signers: &[(&Keypair, &Keypair)],
+    ) -> TxResult {
+        let mut entries = Vec::new();
+        for (p, (ms, ts)) in plans.iter().zip(signers) {
+            entries.push(SigEntry::sign(
+                ms,
+                &order_message(DOMAIN, p.maker, &p.maker_order),
+            ));
+            entries.push(SigEntry::sign(
+                ts,
+                &order_message(DOMAIN, p.taker, &p.taker_order),
+            ));
+        }
+        self.settle_with(market_id, plans, ed25519_ix(&entries))
+    }
+
+    pub fn settle_with(&mut self, market_id: u16, plans: &[FillPlan], ed: Instruction) -> TxResult {
+        let settle = self.settle_ix(market_id, plans);
+        let op = self.operator.insecure_clone();
+        send(
+            &mut self.svm,
+            &[compute_budget(1_400_000), ed, settle],
+            &op,
+            &[],
+        )
+    }
+}
+
+// --- conservation (05 §7.1, decided 2026-09-26) ---
+
+/// Liabilities in the settlement asset, PRECISION-scaled: user balances +
+/// fees + what every open position would realize if closed at `price`
+/// (rounded toward −∞, exactly as the program would pay it), plus pending
+/// funding. Only market `market_id` is considered.
+pub fn settlement_liabilities(w: &World, users: &[&Trader], market_id: u16, price: i128) -> i128 {
+    let ex = w.exchange();
+    let c: kryon_perps::state::Collateral = fetch(&w.svm, &collateral_pda(&ex.settlement_mint));
+    let m = w.market(market_id);
+    let mut total = c.fees_accrued;
+    for t in users {
+        let u = w.user(t);
+        total += u.balance(ex.settlement_collateral_index);
+        for p in u
+            .positions
+            .iter()
+            .filter(|p| p.in_use != 0 && p.market_id == market_id)
+        {
+            let size = p.size.get();
+            let per_unit = if p.is_long != 0 {
+                price - p.entry_price.get()
+            } else {
+                p.entry_price.get() - price
+            };
+            total += protocol_core::mul_div_floor(size, per_unit, P).unwrap();
+            let index = m.funding_index(p.is_long != 0);
+            total +=
+                protocol_core::mul_div_floor(-size, index - p.last_funding_index.get(), P).unwrap();
+        }
+    }
+    total
+}
+
+/// Solvency: the vault covers every liability; any dust is the protocol's.
+#[track_caller]
+pub fn assert_solvent(
+    w: &World,
+    usdc: &Asset,
+    users: &[&Trader],
+    market_id: u16,
+    price: i128,
+) -> i128 {
+    let c = w.collateral(usdc);
+    let vault = i128::from(token_balance(&w.svm, &vault_pda(&usdc.mint))) * c.scale();
+    let liabilities = settlement_liabilities(w, users, market_id, price);
+    let slack = vault - liabilities;
+    assert!(slack >= 0, "insolvent by {} wei at price {price}", -slack);
+    slack
+}
+
+/// Strict when flat: with no open positions, the vault equals balances +
+/// fees in token base units (the sub-unit remainder is protocol dust).
+#[track_caller]
+pub fn assert_conserved_flat(w: &World, usdc: &Asset, users: &[&Trader]) {
+    for t in users {
+        assert!(
+            w.user(t).positions.iter().all(|p| p.in_use == 0),
+            "not flat"
+        );
+    }
+    let c = w.collateral(usdc);
+    let vault = i128::from(token_balance(&w.svm, &vault_pda(&usdc.mint))) * c.scale();
+    let sum: i128 = users
+        .iter()
+        .map(|t| w.user(t).balance(c.index))
+        .sum::<i128>()
+        + c.fees_accrued;
+    let dust = vault - sum;
+    assert!(
+        (0..c.scale()).contains(&dust),
+        "vault {vault} vs balances+fees {sum}: dust {dust}"
+    );
+}

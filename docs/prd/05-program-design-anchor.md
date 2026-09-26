@@ -178,6 +178,17 @@ Request 400k CU per transaction plus a priority fee. `mul_div` uses `ethnum`
 I256; benchmark it in Solana BPF during week 1. If it's heavy, replace it
 with `u128` mul-div with overflow checks (inputs are bounded).
 
+### Measured: `settle_fills` (LiteSVM, 2026-09-26)
+
+| Path | CU | Tx size |
+|---|---|---|
+| 1 fill, fresh positions, creates both `OrderRecord`s | 131,470 | 1,150 B legacy (limit 1,232) |
+| 1 fill, maker also holds a second market | 141,269 | — |
+| 2 fills in one instruction | 224,226 | needs an address lookup table |
+
+One fill per legacy transaction fits. Two fills per transaction need a v0
+transaction with an address lookup table (matcher, Phase 3).
+
 ### Measured: `mul_div` in SBF (2026-09-26)
 
 Measured in LiteSVM 0.7.1 on platform-tools v1.43, release build, one call

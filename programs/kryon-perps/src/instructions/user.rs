@@ -4,7 +4,7 @@
 use crate::constants::*;
 use crate::error::{CoreResultExt, KryonError};
 use crate::events::{Deposit as DepositEvent, Withdraw as WithdrawEvent};
-use crate::health::{has_risk, load_user_risk, validate_withdrawal};
+use crate::health::{has_risk, load_risk_inputs, validate_withdrawal};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
@@ -149,7 +149,7 @@ pub fn handle_withdraw<'info>(
             // Paused: only idle collateral may leave (05 §7.6, decided 2026-09-26).
             require!(!ex.paused, KryonError::Paused);
             let mut accs: &'info [AccountInfo<'info>] = ctx.remaining_accounts;
-            let risk = load_user_risk(&u, &mut accs, ex.settlement_collateral_index, &[], now)?;
+            let risk = load_risk_inputs(&u, &mut accs, ex.settlement_collateral_index, &[], now)?;
             require!(accs.is_empty(), KryonError::InvalidRemainingAccounts);
             let price = risk
                 .price_of(index)

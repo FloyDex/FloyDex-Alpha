@@ -3,12 +3,14 @@ use anchor_lang::prelude::*;
 declare_id!("2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB");
 
 pub mod constants;
+pub mod ed25519;
 pub mod error;
 pub mod events;
 pub mod health;
 pub mod instructions;
 pub mod oracle;
 pub mod order;
+pub mod position;
 pub mod state;
 
 pub use constants::MAX_OPERATORS;
@@ -96,6 +98,39 @@ pub mod kryon_perps {
 
     pub fn revoke_delegate(ctx: Context<OwnerOnly>) -> Result<()> {
         instructions::delegate::handle_revoke_delegate(ctx)
+    }
+
+    pub fn cancel_order(
+        ctx: Context<CancelOrder>,
+        sub_id: u8,
+        nonce: u64,
+        expiry_ts: u64,
+    ) -> Result<()> {
+        instructions::orders::handle_cancel_order(ctx, sub_id, nonce, expiry_ts)
+    }
+
+    pub fn cancel_all(ctx: Context<OwnerOnly>, below_nonce: u64) -> Result<()> {
+        instructions::orders::handle_cancel_all(ctx, below_nonce)
+    }
+
+    /// Permissionless.
+    pub fn reclaim_order_state(
+        ctx: Context<ReclaimOrderState>,
+        owner: Pubkey,
+        sub_id: u8,
+        nonce: u64,
+    ) -> Result<()> {
+        instructions::orders::handle_reclaim_order_state(ctx, owner, sub_id, nonce)
+    }
+
+    // --- operator ---
+
+    /// Remaining accounts: see `instructions::settle`.
+    pub fn settle_fills<'info>(
+        ctx: Context<'_, '_, 'info, 'info, SettleFills<'info>>,
+        fills: Vec<FillArgs>,
+    ) -> Result<()> {
+        instructions::settle::handle_settle_fills(ctx, fills)
     }
 
     /// Remaining accounts: see `health` (only needed with positions or debt).

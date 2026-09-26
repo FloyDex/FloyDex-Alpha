@@ -94,23 +94,29 @@ pub fn market_view(m: &Market, price_ai: &AccountInfo, now: u64) -> Result<Marke
     })
 }
 
-/// Everything `risk-engine` needs about one user, loaded from accounts.
-pub struct UserRisk {
-    pub positions: Vec<Position>,
-    pub collateral: Vec<CollateralBalance>,
-    /// Market snapshots for every position except those in `known` markets,
-    /// which the caller supplies.
-    pub markets: Vec<MarketSnapshot>,
-    /// PRECISION price per collateral index seen (settlement = 1.0).
-    pub prices: Vec<(u8, i128)>,
+/// A collateral price seen while loading risk inputs.
+#[derive(Clone, Copy, Debug)]
+pub struct CollateralPrice {
+    pub index: u8,
+    pub price: i128,
+    pub haircut_bps: u32,
 }
 
-impl UserRisk {
+/// Prices and market snapshots a user's health needs, loaded once from
+/// accounts. Health itself is recomputed from the user's *current* state,
+/// so settlement can check it again after mutating positions and balances.
+pub struct RiskInputs {
+    /// Snapshots for every position market except `known` ones.
+    pub markets: Vec<MarketSnapshot>,
+    pub prices: Vec<CollateralPrice>,
+}
+
+impl RiskInputs {
     pub fn price_of(&self, collateral_index: u8) -> Option<i128> {
         self.prices
             .iter()
-            .find(|(i, _)| *i == collateral_index)
-            .map(|(_, p)| *p)
+            .find(|p| p.index == collateral_index)
+            .map(|p| p.price)
     }
 }
 
@@ -125,20 +131,18 @@ fn take<'info>(
     Ok(head)
 }
 
-/// Load a user's risk inputs, consuming their remaining accounts from `accs`.
-/// Markets whose id is in `known` are skipped (no accounts consumed); the
-/// caller adds their snapshots.
-pub fn load_user_risk<'info>(
+/// Load a user's risk inputs, consuming their remaining accounts from `accs`
+/// in the order documented at the top of this module. Markets whose id is in
+/// `known` consume nothing; the caller supplies their snapshots.
+pub fn load_risk_inputs<'info>(
     user: &UserAccount,
     accs: &mut &'info [AccountInfo<'info>],
     settlement_index: u8,
     known: &[u16],
     now: u64,
-) -> Result<UserRisk> {
-    let mut positions = Vec::with_capacity(MAX_POSITIONS);
+) -> Result<RiskInputs> {
     let mut markets: Vec<MarketSnapshot> = Vec::with_capacity(4);
     for slot in user.positions.iter().filter(|p| p.in_use != 0) {
-        positions.push(slot.to_position(&user.owner));
         let id = slot.market_id;
         if known.contains(&id) || markets.iter().any(|s| s.config.market_id == u32::from(id)) {
             continue;
@@ -151,51 +155,72 @@ pub fn load_user_risk<'info>(
         markets.push(market_view(&m, &pair[1], now)?.snapshot);
     }
 
-    let mut collateral = Vec::with_capacity(crate::constants::MAX_BALANCES);
     let mut prices = Vec::with_capacity(crate::constants::MAX_BALANCES);
+    prices.push(CollateralPrice {
+        index: settlement_index,
+        price: PRECISION,
+        haircut_bps: 0,
+    });
+    for b in user.balances.iter().filter(|b| b.in_use != 0) {
+        if b.amount.get() == 0 || b.collateral_index == settlement_index {
+            continue;
+        }
+        let pair = take(accs, 2)?;
+        require_keys_eq!(
+            *pair[0].owner,
+            crate::ID,
+            KryonError::InvalidRemainingAccounts
+        );
+        let c = Collateral::try_deserialize(&mut &pair[0].try_borrow_data()?[..])
+            .map_err(|_| error!(KryonError::InvalidRemainingAccounts))?;
+        require!(
+            c.index == b.collateral_index,
+            KryonError::InvalidRemainingAccounts
+        );
+        let guard = OracleGuard {
+            max_age_secs: c.max_oracle_age_secs,
+            max_confidence_bps: c.max_oracle_confidence_bps,
+        };
+        let snap = read_pyth_checked(&pair[1], &c.pyth_feed_id, c.pyth_shard_id, now, &guard)?;
+        prices.push(CollateralPrice {
+            index: c.index,
+            price: snap.price,
+            haircut_bps: c.haircut_bps,
+        });
+    }
+    Ok(RiskInputs { markets, prices })
+}
+
+/// Positions and valued collateral from the user's current state.
+fn snapshot_parts(
+    user: &UserAccount,
+    inputs: &RiskInputs,
+) -> Result<(Vec<Position>, Vec<CollateralBalance>)> {
+    let mut positions = Vec::with_capacity(MAX_POSITIONS);
+    for slot in user.positions.iter().filter(|p| p.in_use != 0) {
+        positions.push(slot.to_position(&user.owner));
+    }
+    let mut collateral = Vec::with_capacity(crate::constants::MAX_BALANCES);
     for b in user.balances.iter().filter(|b| b.in_use != 0) {
         let amount = b.amount.get();
         if amount == 0 {
             continue;
         }
-        let (price, haircut_bps) = if b.collateral_index == settlement_index {
-            (PRECISION, 0)
-        } else {
-            let pair = take(accs, 2)?;
-            require_keys_eq!(
-                *pair[0].owner,
-                crate::ID,
-                KryonError::InvalidRemainingAccounts
-            );
-            let c = Collateral::try_deserialize(&mut &pair[0].try_borrow_data()?[..])
-                .map_err(|_| error!(KryonError::InvalidRemainingAccounts))?;
-            require!(
-                c.index == b.collateral_index,
-                KryonError::InvalidRemainingAccounts
-            );
-            let guard = OracleGuard {
-                max_age_secs: c.max_oracle_age_secs,
-                max_confidence_bps: c.max_oracle_confidence_bps,
-            };
-            let snap = read_pyth_checked(&pair[1], &c.pyth_feed_id, c.pyth_shard_id, now, &guard)?;
-            (snap.price, c.haircut_bps)
-        };
-        // Value rounds toward −∞, so both assets and debts are counted conservatively.
-        let value = mul_div_floor(amount, price, PRECISION).core()?;
+        let p = inputs
+            .prices
+            .iter()
+            .find(|p| p.index == b.collateral_index)
+            .ok_or(KryonError::InvalidRemainingAccounts)?;
+        // Value rounds toward −∞, so assets and debts are both counted conservatively.
+        let value = mul_div_floor(amount, p.price, PRECISION).core()?;
         collateral.push(CollateralBalance {
             asset: [b.collateral_index; 32],
             amount,
             value,
-            haircut_bps,
+            haircut_bps: p.haircut_bps,
         });
-        prices.push((b.collateral_index, price));
     }
-    Ok(UserRisk {
-        positions,
-        collateral,
-        markets,
-        prices,
-    })
+    Ok((positions, collateral))
 }
 
 /// True if the user has an open position or owes anything.
@@ -207,29 +232,46 @@ pub fn has_risk(user: &UserAccount) -> bool {
             .any(|b| b.in_use != 0 && b.amount.get() < 0)
 }
 
+/// Health of the user's current state. `markets` must cover every position.
 pub fn health(
     user: &UserAccount,
-    risk: &UserRisk,
+    inputs: &RiskInputs,
     markets: &[MarketSnapshot],
 ) -> Result<AccountHealth> {
+    let (positions, collateral) = snapshot_parts(user, inputs)?;
     let snapshot = AccountSnapshot {
         owner: user.owner.to_bytes(),
-        collateral: &risk.collateral,
-        positions: &risk.positions,
+        collateral: &collateral,
+        positions: &positions,
     };
     risk_engine::account_health(&snapshot, markets).core()
 }
 
+/// Equity must cover the (session-scaled) initial margin.
+pub fn require_initial_margin(
+    user: &UserAccount,
+    inputs: &RiskInputs,
+    markets: &[MarketSnapshot],
+) -> Result<AccountHealth> {
+    let h = health(user, inputs, markets)?;
+    require!(
+        h.equity >= h.initial_margin_required,
+        KryonError::InsufficientCollateral
+    );
+    Ok(h)
+}
+
 pub fn validate_withdrawal(
     user: &UserAccount,
-    risk: &UserRisk,
+    inputs: &RiskInputs,
     markets: &[MarketSnapshot],
     withdrawal_value: i128,
 ) -> Result<AccountHealth> {
+    let (positions, collateral) = snapshot_parts(user, inputs)?;
     let snapshot = AccountSnapshot {
         owner: user.owner.to_bytes(),
-        collateral: &risk.collateral,
-        positions: &risk.positions,
+        collateral: &collateral,
+        positions: &positions,
     };
     risk_engine::validate_withdrawal(&snapshot, markets, withdrawal_value).core()
 }
