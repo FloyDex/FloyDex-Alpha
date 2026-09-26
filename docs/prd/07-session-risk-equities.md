@@ -132,7 +132,7 @@ close was first *observed*, which can only make the band narrower
 | Class | Base IM / MM | Max lev (Regular) | Closed band max | Closed OI cap |
 |---|---|---|---|---|
 | Index ETFs (SPY, QQQ) | 10% / 5% | 10x | 10% | 50% |
-| Mega-cap (AAPL, MSFT, NVDA, META, AMZN) | 12.5% / 6% | 8x | 15% | 40% |
+| Mega-cap (AAPL, MSFT, NVDA, META, AMZN) | 12.5% / 7% | 8x | 15% | 40% |
 | High-vol (TSLA, COIN, MSTR) | 20% / 10% | 5x | 20% | 30% |
 | Crypto (SOL, BTC, ETH) | 5% / 2.5% | 20x | n/a (always Regular) | n/a |
 

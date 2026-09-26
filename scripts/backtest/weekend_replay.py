@@ -36,7 +36,7 @@ import urllib.request
 # 07 §7: class → (IM, MM, closed band max, closed OI cap), fractions.
 CLASSES = {
     "index": (0.10, 0.05, 0.10, 0.50),
-    "mega": (0.125, 0.06, 0.15, 0.40),
+    "mega": (0.125, 0.07, 0.15, 0.40),
     "highvol": (0.20, 0.10, 0.20, 0.30),
 }
 TICKERS = {
