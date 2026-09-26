@@ -36,6 +36,8 @@ pub struct Exchange {
     pub total_oi_policy_bps: u32,
     /// Mint of the settlement collateral (USDC). Default until added.
     pub settlement_mint: Pubkey,
+    /// `Collateral.index` of the settlement asset (valid once it is added).
+    pub settlement_collateral_index: u8,
     /// Collaterals added so far; the next one gets this index.
     pub collateral_count: u8,
     pub bump: u8,

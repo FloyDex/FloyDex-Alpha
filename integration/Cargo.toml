@@ -17,6 +17,7 @@ bytemuck = "1"
 kryon-perps = { path = "../programs/kryon-perps", features = ["no-entrypoint", "bench"] }
 litesvm = "0.7.1"
 protocol-core = { path = "../crates/protocol-core" }
+pyth-solana-receiver-sdk = "=1.0.1"
 risk-engine = { path = "../crates/risk-engine" }
 solana-account = "2.2"
 solana-keypair = "2.2"

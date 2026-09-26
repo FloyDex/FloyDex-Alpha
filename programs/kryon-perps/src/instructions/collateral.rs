@@ -17,6 +17,9 @@ pub struct CollateralParams {
     /// Required for everything except the settlement asset, which must pass
     /// zeros: it is valued at par.
     pub pyth_feed_id: [u8; 32],
+    pub pyth_shard_id: u16,
+    pub max_oracle_age_secs: u64,
+    pub max_oracle_confidence_bps: u32,
     /// Max net deposits, in token base units.
     pub deposit_cap: u64,
     pub is_settlement: bool,
@@ -101,8 +104,14 @@ pub fn handle_add_collateral(ctx: Context<AddCollateral>, p: CollateralParams) -
             KryonError::InvalidConfig
         );
         ex.settlement_mint = ctx.accounts.mint.key();
+        ex.settlement_collateral_index = ex.collateral_count;
     } else {
-        require!(p.pyth_feed_id != [0; 32], KryonError::InvalidConfig);
+        require!(
+            p.pyth_feed_id != [0; 32]
+                && p.max_oracle_age_secs > 0
+                && p.max_oracle_confidence_bps <= 10_000,
+            KryonError::InvalidConfig
+        );
     }
     let index = ex.collateral_count;
     ex.collateral_count = index.checked_add(1).ok_or(KryonError::InvalidConfig)?;
@@ -117,6 +126,9 @@ pub fn handle_add_collateral(ctx: Context<AddCollateral>, p: CollateralParams) -
     c.active = true;
     c.haircut_bps = p.haircut_bps;
     c.pyth_feed_id = p.pyth_feed_id;
+    c.pyth_shard_id = p.pyth_shard_id;
+    c.max_oracle_age_secs = p.max_oracle_age_secs;
+    c.max_oracle_confidence_bps = p.max_oracle_confidence_bps;
     c.deposit_cap = p.deposit_cap;
     c.total_deposited = 0;
     c.fees_accrued = 0;

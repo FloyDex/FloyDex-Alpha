@@ -337,6 +337,8 @@ pub fn token_balance(svm: &LiteSVM, account: &Pubkey) -> u64 {
 // --- fixture ---
 
 pub const DOMAIN: [u8; 32] = [7u8; 32];
+/// 2026-09-28T13:30:00Z, a Monday regular-session open.
+pub const GENESIS_TS: i64 = 1_790_602_200;
 pub const FEED_TSLA: [u8; 32] = [0x75; 32];
 
 pub struct World {
@@ -385,6 +387,10 @@ impl World {
     /// VM + program (upgrade authority = admin), exchange not yet initialized.
     pub fn bare() -> Self {
         let mut svm = LiteSVM::new();
+        // LiteSVM starts at unix time 0; use a realistic 2026 clock.
+        let mut clock = svm.get_sysvar::<anchor_lang::solana_program::clock::Clock>();
+        clock.unix_timestamp = GENESIS_TS;
+        svm.set_sysvar(&clock);
         let admin = funded(&mut svm);
         load_upgradeable(&mut svm, &admin.pubkey());
         let guardian = funded(&mut svm);
@@ -508,7 +514,318 @@ pub fn settlement_params() -> kryon_perps::CollateralParams {
     kryon_perps::CollateralParams {
         haircut_bps: 0,
         pyth_feed_id: [0; 32],
+        pyth_shard_id: 0,
+        max_oracle_age_secs: 0,
+        max_oracle_confidence_bps: 0,
         deposit_cap: u64::MAX,
         is_settlement: true,
     }
+}
+
+// --- mocked Pyth ---
+
+/// Write a fully verified `PriceUpdateV2` at the push-feed address for
+/// `(shard, feed)`, owned by the Pyth receiver program: exactly what the
+/// program reads on mainnet, minus the Wormhole posting.
+pub fn mock_price(
+    svm: &mut LiteSVM,
+    shard: u16,
+    feed: [u8; 32],
+    price: i64,
+    conf: u64,
+    expo: i32,
+    publish_time: i64,
+) -> Pubkey {
+    use anchor_lang::AccountSerialize;
+    use pyth_solana_receiver_sdk::price_update::{
+        PriceFeedMessage, PriceUpdateV2, VerificationLevel,
+    };
+    mock_price_with(
+        svm,
+        kryon_perps::oracle::push_feed_address(shard, &feed),
+        pyth_solana_receiver_sdk::ID,
+        {
+            let u = PriceUpdateV2 {
+                write_authority: Pubkey::default(),
+                verification_level: VerificationLevel::Full,
+                price_message: PriceFeedMessage {
+                    feed_id: feed,
+                    price,
+                    conf,
+                    exponent: expo,
+                    publish_time,
+                    prev_publish_time: publish_time - 1,
+                    ema_price: price,
+                    ema_conf: conf,
+                },
+                posted_slot: 0,
+            };
+            let mut data = Vec::new();
+            u.try_serialize(&mut data).unwrap();
+            data
+        },
+    )
+}
+
+pub fn mock_price_with(svm: &mut LiteSVM, address: Pubkey, owner: Pubkey, data: Vec<u8>) -> Pubkey {
+    let lamports = svm.minimum_balance_for_rent_exemption(data.len());
+    svm.set_account(
+        address,
+        Account {
+            lamports,
+            data,
+            owner,
+            executable: false,
+            rent_epoch: 0,
+        },
+    )
+    .unwrap();
+    address
+}
+
+/// USD price in whole dollars at expo -8, 0.01% confidence.
+pub fn mock_usd(svm: &mut LiteSVM, feed: [u8; 32], dollars: f64, publish_time: i64) -> Pubkey {
+    let price = (dollars * 1e8).round() as i64;
+    mock_price(
+        svm,
+        0,
+        feed,
+        price,
+        (price / 10_000) as u64,
+        -8,
+        publish_time,
+    )
+}
+
+/// Edit a zero-copy account in place (test-only state surgery).
+pub fn patch_zc<T: bytemuck::Pod>(svm: &mut LiteSVM, key: &Pubkey, f: impl FnOnce(&mut T)) {
+    let mut acc = svm.get_account(key).unwrap();
+    f(bytemuck::from_bytes_mut::<T>(
+        &mut acc.data[8..8 + core::mem::size_of::<T>()],
+    ));
+    svm.set_account(*key, acc).unwrap();
+}
+
+pub fn event_authority() -> Pubkey {
+    Pubkey::find_program_address(&[b"__event_authority"], &kryon_perps::ID).0
+}
+
+pub fn meta(key: Pubkey, writable: bool) -> anchor_lang::prelude::AccountMeta {
+    if writable {
+        anchor_lang::prelude::AccountMeta::new(key, false)
+    } else {
+        anchor_lang::prelude::AccountMeta::new_readonly(key, false)
+    }
+}
+
+// --- traders ---
+
+pub struct Asset {
+    pub mint: Pubkey,
+    pub token_program: Pubkey,
+}
+
+pub struct Trader {
+    pub kp: Keypair,
+    pub sub_id: u8,
+    pub user: Pubkey,
+}
+
+impl Trader {
+    pub fn key(&self) -> Pubkey {
+        self.kp.pubkey()
+    }
+}
+
+impl World {
+    /// Settlement USDC (6 decimals, legacy SPL Token) with the given cap.
+    pub fn add_usdc(&mut self, cap: u64) -> Asset {
+        let admin = self.admin.insecure_clone();
+        let mint = create_mint(&mut self.svm, &admin, spl_token::ID, 6, &[], |_| vec![]);
+        let mut p = settlement_params();
+        p.deposit_cap = cap;
+        let i = self.add_collateral_ix(&mint, spl_token::ID, p);
+        assert_ok(self.admin_send(&[i]));
+        Asset {
+            mint,
+            token_program: spl_token::ID,
+        }
+    }
+
+    /// A Token-2022 xStock-like collateral (8 decimals) priced by `feed`.
+    pub fn add_xstock(&mut self, feed: [u8; 32], haircut_bps: u32) -> Asset {
+        let admin = self.admin.insecure_clone();
+        let mint = create_mint(
+            &mut self.svm,
+            &admin,
+            spl_token_2022::ID,
+            8,
+            &[],
+            |_| vec![],
+        );
+        let p = kryon_perps::CollateralParams {
+            haircut_bps,
+            pyth_feed_id: feed,
+            pyth_shard_id: 0,
+            max_oracle_age_secs: 70,
+            max_oracle_confidence_bps: 100,
+            deposit_cap: u64::MAX,
+            is_settlement: false,
+        };
+        let i = self.add_collateral_ix(&mint, spl_token_2022::ID, p);
+        assert_ok(self.admin_send(&[i]));
+        Asset {
+            mint,
+            token_program: spl_token_2022::ID,
+        }
+    }
+
+    pub fn trader(&mut self, sub_id: u8) -> Trader {
+        let kp = funded(&mut self.svm);
+        let user = user_pda(&kp.pubkey(), sub_id);
+        let i = ix(
+            ka::InitUser {
+                owner: kp.pubkey(),
+                user_account: user,
+                system_program: anchor_lang::system_program::ID,
+            },
+            ki::InitUser { sub_id },
+        );
+        assert_ok(send(&mut self.svm, &[i], &kp, &[]));
+        Trader { kp, sub_id, user }
+    }
+
+    /// The trader's token account for `asset`, created and funded on first use.
+    pub fn wallet(&mut self, t: &Trader, asset: &Asset, mint_amount: u64) -> Pubkey {
+        let admin = self.admin.insecure_clone();
+        let acct = create_token_account(
+            &mut self.svm,
+            &admin,
+            asset.token_program,
+            &asset.mint,
+            &t.key(),
+        );
+        if mint_amount > 0 {
+            mint_to(
+                &mut self.svm,
+                &admin,
+                asset.token_program,
+                &asset.mint,
+                &acct,
+                mint_amount,
+            );
+        }
+        acct
+    }
+
+    pub fn move_accounts(
+        &self,
+        owner: &Pubkey,
+        user: &Pubkey,
+        asset: &Asset,
+        user_token: &Pubkey,
+    ) -> ka::MoveCollateral {
+        ka::MoveCollateral {
+            exchange: exchange_pda(),
+            owner: *owner,
+            user_account: *user,
+            collateral: collateral_pda(&asset.mint),
+            mint: asset.mint,
+            vault: vault_pda(&asset.mint),
+            user_token: *user_token,
+            token_program: asset.token_program,
+            event_authority: event_authority(),
+            program: kryon_perps::ID,
+        }
+    }
+
+    pub fn deposit(&mut self, t: &Trader, asset: &Asset, from: &Pubkey, amount: u64) -> TxResult {
+        let i = ix(
+            self.move_accounts(&t.key(), &t.user, asset, from),
+            ki::Deposit { amount },
+        );
+        send(&mut self.svm, &[i], &t.kp, &[])
+    }
+
+    pub fn withdraw(
+        &mut self,
+        t: &Trader,
+        asset: &Asset,
+        to: &Pubkey,
+        amount: u64,
+        extra: Vec<anchor_lang::prelude::AccountMeta>,
+    ) -> TxResult {
+        let i = ix_with(
+            self.move_accounts(&t.key(), &t.user, asset, to),
+            ki::Withdraw { amount },
+            extra,
+        );
+        send(&mut self.svm, &[compute_budget(1_400_000), i], &t.kp, &[])
+    }
+
+    pub fn user(&self, t: &Trader) -> kryon_perps::state::UserAccount {
+        fetch_zc(&self.svm, &t.user)
+    }
+
+    pub fn collateral(&self, asset: &Asset) -> kryon_perps::state::Collateral {
+        fetch(&self.svm, &collateral_pda(&asset.mint))
+    }
+
+    pub fn market(&self, id: u16) -> kryon_perps::state::Market {
+        fetch_zc(&self.svm, &market_pda(id))
+    }
+
+    /// Market with a Regular window around now and a fresh oracle.
+    pub fn open_market(&mut self, id: u16, dollars: f64) -> Pubkey {
+        let i = self.create_market_ix(id, default_market_params());
+        assert_ok(self.admin_send(&[i]));
+        let now = self.now();
+        self.post_regular_window(id, now - 3_600, now + 7 * 86_400);
+        mock_usd(
+            &mut self.svm,
+            default_market_params().pyth_feed_id,
+            dollars,
+            now,
+        )
+    }
+
+    /// Write a Regular window directly into the market (until
+    /// `post_session_calendar` lands, and for surgical tests after).
+    pub fn post_regular_window(&mut self, id: u16, start: i64, end: i64) {
+        patch_zc::<kryon_perps::state::Market>(&mut self.svm, &market_pda(id), |m| {
+            m.calendar[0] = kryon_perps::state::SessionWindowPod {
+                start: start as u64,
+                end: end as u64,
+                session: kryon_perps::state::SESSION_REGULAR,
+                _pad: [0; 7],
+            };
+        });
+    }
+}
+
+/// Put an open position straight into a user account (test-only), for
+/// exercising health before `settle_fills` exists.
+pub fn inject_position(
+    svm: &mut LiteSVM,
+    user: &Pubkey,
+    market_id: u16,
+    is_long: bool,
+    size: i128,
+    entry: i128,
+) {
+    patch_zc::<kryon_perps::state::UserAccount>(svm, user, |u| {
+        let i = u.positions.iter().position(|p| p.in_use == 0).unwrap();
+        u.positions[i] = kryon_perps::state::PositionSlot {
+            position_id: u.next_position_id,
+            size: size.into(),
+            entry_price: entry.into(),
+            last_funding_index: 0.into(),
+            market_id,
+            is_long: is_long as u8,
+            in_use: 1,
+            _pad: [0; 4],
+        };
+        u.next_position_id += 1;
+        u.open_positions += 1;
+    });
 }

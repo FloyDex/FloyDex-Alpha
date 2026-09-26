@@ -325,6 +325,7 @@ fn non_settlement_collateral_needs_a_feed() {
     let i = w.add_collateral_ix(&x, spl_token_2022::ID, p.clone());
     assert_err(w.admin_send(&[i]), KryonError::InvalidConfig);
     p.pyth_feed_id = FEED_TSLA;
+    p.max_oracle_age_secs = 70;
     p.haircut_bps = 1_500;
     let i = w.add_collateral_ix(&x, spl_token_2022::ID, p);
     assert_ok(w.admin_send(&[i]));
@@ -359,6 +360,7 @@ fn token_2022_mints_with_unsupported_extensions_are_refused() {
     let mut p = settlement_params();
     p.is_settlement = false;
     p.pyth_feed_id = FEED_TSLA;
+    p.max_oracle_age_secs = 70;
     let i = w.add_collateral_ix(&fee_mint, spl_token_2022::ID, p.clone());
     assert_err(w.admin_send(&[i]), KryonError::UnsupportedMintExtension);
 

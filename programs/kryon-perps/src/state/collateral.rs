@@ -19,6 +19,10 @@ pub struct Collateral {
     pub haircut_bps: u32,
     /// Pyth feed for non-settlement collateral. Zero for the settlement asset.
     pub pyth_feed_id: [u8; 32],
+    /// Pyth push-feed shard for `pyth_feed_id` (0 = sponsored feeds).
+    pub pyth_shard_id: u16,
+    pub max_oracle_age_secs: u64,
+    pub max_oracle_confidence_bps: u32,
     /// Max `total_deposited`, in token base units.
     pub deposit_cap: u64,
     /// Deposits net of withdrawals, in token base units. Drives the cap.

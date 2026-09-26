@@ -5,7 +5,9 @@ declare_id!("2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB");
 pub mod constants;
 pub mod error;
 pub mod events;
+pub mod health;
 pub mod instructions;
+pub mod oracle;
 pub mod state;
 
 pub use constants::MAX_OPERATORS;
@@ -75,6 +77,24 @@ pub mod kryon_perps {
 
     pub fn add_collateral(ctx: Context<AddCollateral>, params: CollateralParams) -> Result<()> {
         instructions::collateral::handle_add_collateral(ctx, params)
+    }
+
+    // --- user ---
+
+    pub fn init_user(ctx: Context<InitUser>, sub_id: u8) -> Result<()> {
+        instructions::user::handle_init_user(ctx, sub_id)
+    }
+
+    pub fn deposit(ctx: Context<MoveCollateral>, amount: u64) -> Result<()> {
+        instructions::user::handle_deposit(ctx, amount)
+    }
+
+    /// Remaining accounts: see `health` (only needed with positions or debt).
+    pub fn withdraw<'info>(
+        ctx: Context<'_, '_, 'info, 'info, MoveCollateral<'info>>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::user::handle_withdraw(ctx, amount)
     }
 
     /// Compute-unit benchmark for `protocol_core::mul_div`. Only compiled with

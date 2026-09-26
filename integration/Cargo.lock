@@ -1692,6 +1692,7 @@ dependencies = [
  "kryon-perps",
  "litesvm",
  "protocol-core",
+ "pyth-solana-receiver-sdk",
  "risk-engine",
  "solana-account",
  "solana-keypair",
