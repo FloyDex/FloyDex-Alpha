@@ -19,7 +19,7 @@ use crate::error::{CoreResultExt, KryonError};
 use crate::events::{Adl, PositionChanged};
 use crate::health::market_view;
 use crate::mark::observe;
-use crate::position::{apply_side, SideOutcome};
+use crate::position::{apply_side, to_whole_units, SideOutcome};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use protocol_core::{checked_add, checked_sub, mul_div_ceil, PRECISION};
@@ -108,7 +108,7 @@ pub fn handle_adl(
     require!(per_unit > 0, KryonError::PositionNotInProfit);
     // Never close more than the debt needs.
     let needed = mul_div_ceil(bad_debt, PRECISION, per_unit).core()?;
-    let size = w.size.get().min(c.size.get()).min(needed);
+    let size = to_whole_units(needed, w.size.get().min(c.size.get()));
     require!(size > 0, KryonError::NoBadDebtToOffset);
 
     let (fl, fs) = {

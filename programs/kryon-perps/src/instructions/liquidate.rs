@@ -29,7 +29,7 @@ use crate::events::{BadDebt, Liquidated, PositionChanged, SharesRetired};
 use crate::health::{health, load_risk_inputs, market_view, plan_liquidation, CollateralPrice};
 use crate::instructions::insurance::cover_deficit;
 use crate::mark::observe;
-use crate::position::{apply_side, SideOutcome};
+use crate::position::{apply_side, to_whole_units, SideOutcome};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use protocol_core::{
@@ -153,9 +153,21 @@ pub fn handle_liquidate<'info>(
         )?;
         (slot.is_long != 0, plan)
     };
-    let size = plan.close_size;
+    let position_size = {
+        let u = ctx.accounts.user_account.load()?;
+        u.positions
+            .iter()
+            .find(|p| p.in_use != 0 && p.position_id == position_id)
+            .map_or(0, |p| p.size.get())
+    };
+    let size = to_whole_units(plan.close_size, position_size);
     require!(size > 0, KryonError::InvalidAmount);
-    let penalty = plan.penalty;
+    // The penalty on the slice actually closed (same rule as the plan's).
+    let penalty = apply_bps(
+        notional(size, mark).core()?,
+        ctx.accounts.market.load()?.liquidation_fee_bps,
+    )
+    .core()?;
     let reward = penalty.min(apply_bps(notional(size, mark).core()?, ex.max_reward_bps).core()?);
     let to_fund = checked_sub(penalty, reward).core()?;
 

@@ -261,9 +261,11 @@ fn create_market_rejects_every_bad_config() {
             p.funding_imbalance_coeff = -1
         }),
         ("zero funding cap", 3, |p| p.funding_max_rate_per_hour = 0),
-        ("liquidation fee at maintenance: never liquidatable", 3, |p| {
-            p.liquidation_fee_bps = p.maintenance_margin_bps
-        }),
+        (
+            "liquidation fee at maintenance: never liquidatable",
+            3,
+            |p| p.liquidation_fee_bps = p.maintenance_margin_bps,
+        ),
         ("margin ramp over 4 hours", 3, |p| {
             p.session_policy.close_ramp_secs = 4 * 3_600 + 1
         }),

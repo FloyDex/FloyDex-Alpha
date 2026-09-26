@@ -71,7 +71,10 @@ fn a_partial_liquidation_transfers_the_minimum_slice_at_the_mark() {
     // the penalty, shortfall / (165 · (10% − 0.5%)), never the 50% cap (L9).
     let shortfall = 1_650 * P - 1_495 * P;
     let per_unit = mul_div(165 * P, 950, 10_000).unwrap();
-    let size = protocol_core::mul_div_ceil(shortfall, P, per_unit).unwrap();
+    let exact = protocol_core::mul_div_ceil(shortfall, P, per_unit).unwrap();
+    // Rounded up to whole order units (1e-9 share) so it stays closable.
+    let size = kryon_perps::position::to_whole_units(exact, 100 * P);
+    assert!(size >= exact && size - exact < 1_000_000_000);
     assert!(size < 50 * P);
     let n = notional(size, 165 * P).unwrap();
     let penalty = apply_bps(n, 50).unwrap();

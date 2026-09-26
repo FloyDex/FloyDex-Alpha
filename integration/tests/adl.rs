@@ -39,7 +39,10 @@ fn adl_cuts_the_winner_just_enough_and_clears_the_bad_debt() {
     let bob0 = b.w.user(&b.bob).balance(0);
     let carol0 = b.w.user(&carol).balance(0);
     // Bob's short from 250 makes 110 a share at 140: close ⌈debt / 110⌉.
-    let size = protocol_core::mul_div_ceil(debt, P, 110 * P).unwrap();
+    let size = kryon_perps::position::to_whole_units(
+        protocol_core::mul_div_ceil(debt, P, 110 * P).unwrap(),
+        100 * P,
+    );
     assert_ok(b.w.adl(&b.bob, bob_id, &carol, carol_id, 1));
     assert_eq!(b.w.insurance().bad_debt, 0);
     assert_eq!(b.position(&b.bob).unwrap().size.get(), 100 * P - size);

@@ -358,3 +358,28 @@ five cases above.
 6. Pause blocks deposit, settle and withdraw-with-positions; it never blocks
    withdrawing idle collateral once the timelock expires (an escape hatch —
    decide explicitly).
+
+**How they are fuzzed (decided 2026-09-26):**
+- Crates (proptest, `crates/risk-engine/tests/invariants.rs`): a
+  liquidation step strictly shrinks the shortfall (5), never exceeds the
+  position or (when partial) the per-step cap, and restores maintenance
+  when the cap doesn't bind; withdrawals never leave equity below initial
+  margin (4 for withdrawals); funding is zero-sum and capped (1 with 3);
+  the mark EMA, the closed mark and the margin ramp stay in their bounds.
+  These found that a market with `liquidation_fee_bps ≥
+  maintenance_margin_bps` can never be liquidated; `create_market` now
+  requires fee < maintenance.
+- Program (a randomized LiteSVM harness, `integration/tests/fuzz_program.rs`,
+  chosen over Trident: it reuses the test harness and runs in CI in about
+  20 s): 6 traders, a keeper and a staker; random fills, price walks and
+  ±40% gaps followed by liquidation sweeps, warps, `post_mark`,
+  `update_funding`, `adl`, stake/unstake, and Closed/reopen. After every op:
+  OI long == OI short == Σ open sizes (3), solvency with the insurance fund
+  and bad debt at three prices with only dust as slack (1), and no negative
+  fund or bad debt. At the end: every `OrderRecord` has filled ≤ size (2),
+  everyone is flattened at the mark, and conservation holds strictly (1).
+  It found that liquidation and ADL slices computed at 1e18 left positions
+  with sub-order-unit dust that no signed order could close. **Every slice is
+  now rounded up to whole order units (1e-9 share, the wire scale), capped
+  at the position** (decided 2026-09-26), so positions only ever change by
+  whole units.

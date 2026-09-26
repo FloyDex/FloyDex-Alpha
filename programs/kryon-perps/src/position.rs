@@ -206,6 +206,16 @@ fn open(
     Ok(())
 }
 
+/// Round a PRECISION size up to whole order units (1e-9 of a share, the
+/// wire scale), capped at `max`. Positions only ever change by whole units,
+/// so every position stays closable by a signed order; a liquidation or ADL
+/// slice computed at 1e18 would otherwise leave dust no order can express.
+pub fn to_whole_units(size: i128, max: i128) -> i128 {
+    let unit = crate::constants::WIRE_TO_PRECISION;
+    let whole = size.checked_add(unit - 1).map_or(max, |v| v / unit * unit);
+    whole.min(max)
+}
+
 /// Trading fee on `size` at `price`, rounded up.
 pub fn trade_fee(size: i128, price: i128, fee_bps: u32) -> Result<i128> {
     if fee_bps == 0 {
@@ -331,6 +341,16 @@ mod tests {
         let o = apply_side(&mut u, 1, true, false, P, 100 * P, P / 2, -P / 2).unwrap();
         assert_eq!(o.pnl, -P);
         assert_eq!(u.positions[0].last_funding_index.get(), P / 2);
+    }
+
+    #[test]
+    fn slices_round_up_to_whole_order_units() {
+        let u = 1_000_000_000;
+        assert_eq!(to_whole_units(1, 10 * P), u);
+        assert_eq!(to_whole_units(u, 10 * P), u);
+        assert_eq!(to_whole_units(u + 1, 10 * P), 2 * u);
+        assert_eq!(to_whole_units(10 * P - 1, 10 * P), 10 * P, "capped");
+        assert_eq!(to_whole_units(i128::MAX, 10 * P), 10 * P);
     }
 
     #[test]
