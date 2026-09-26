@@ -1,0 +1,141 @@
+{
+  "spec": "docs/prd/05-program-design-anchor.md \u00a74",
+  "version": 1,
+  "length": 108,
+  "vectors": [
+    {
+      "name": "typical long",
+      "order": {
+        "domain": "187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f",
+        "owner": "7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d5",
+        "sub_id": 0,
+        "market_id": 1,
+        "flags": 1,
+        "size": "1500000000",
+        "limit_price": "250120000000",
+        "nonce": "1",
+        "expiry_ts": "1790602200"
+      },
+      "hex": "4b52594f4e763100187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d500010001002f6859000000000052503c3a0000000100000000000000d86bba6a00000000"
+    },
+    {
+      "name": "typical short reduce-only",
+      "order": {
+        "domain": "187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f",
+        "owner": "7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d5",
+        "sub_id": 0,
+        "market_id": 7,
+        "flags": 2,
+        "size": "2000000000",
+        "limit_price": "249000000000",
+        "nonce": "2",
+        "expiry_ts": "1790605800"
+      },
+      "hex": "4b52594f4e763100187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d5000700020094357700000000007a8ef9390000000200000000000000e879ba6a00000000"
+    },
+    {
+      "name": "post-only long, sub-account 3",
+      "order": {
+        "domain": "187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f",
+        "owner": "7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d5",
+        "sub_id": 3,
+        "market_id": 2,
+        "flags": 5,
+        "size": "10000000",
+        "limit_price": "99990000000",
+        "nonce": "1234567890123",
+        "expiry_ts": "1791207000"
+      },
+      "hex": "4b52594f4e763100187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d50302000580969800000000008051de4717000000cb04fb711f01000058a6c36a00000000"
+    },
+    {
+      "name": "all flags",
+      "order": {
+        "domain": "187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f",
+        "owner": "7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d5",
+        "sub_id": 1,
+        "market_id": 1,
+        "flags": 7,
+        "size": "1",
+        "limit_price": "1",
+        "nonce": "3",
+        "expiry_ts": "1"
+      },
+      "hex": "4b52594f4e763100187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d5010100070100000000000000010000000000000003000000000000000100000000000000"
+    },
+    {
+      "name": "zero numbers",
+      "order": {
+        "domain": "0000000000000000000000000000000000000000000000000000000000000000",
+        "owner": "0000000000000000000000000000000000000000000000000000000000000000",
+        "sub_id": 0,
+        "market_id": 0,
+        "flags": 0,
+        "size": "0",
+        "limit_price": "0",
+        "nonce": "0",
+        "expiry_ts": "0"
+      },
+      "hex": "4b52594f4e76310000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "max numbers",
+      "order": {
+        "domain": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "owner": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "sub_id": 255,
+        "market_id": 65535,
+        "flags": 7,
+        "size": "18446744073709551615",
+        "limit_price": "18446744073709551615",
+        "nonce": "18446744073709551615",
+        "expiry_ts": "18446744073709551615"
+      },
+      "hex": "4b52594f4e763100ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "name": "byte order: distinct bytes",
+      "order": {
+        "domain": "187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f",
+        "owner": "7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d5",
+        "sub_id": 127,
+        "market_id": 258,
+        "flags": 1,
+        "size": "578437695752307201",
+        "limit_price": "1157159078456920585",
+        "nonce": "1735880461161533969",
+        "expiry_ts": "2314601843866147353"
+      },
+      "hex": "4b52594f4e763100187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d57f0201010102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+    },
+    {
+      "name": "market id high byte only",
+      "order": {
+        "domain": "187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f",
+        "owner": "7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d5",
+        "sub_id": 0,
+        "market_id": 256,
+        "flags": 0,
+        "size": "1",
+        "limit_price": "1",
+        "nonce": "0",
+        "expiry_ts": "0"
+      },
+      "hex": "4b52594f4e763100187f52efc12692474806f74c3a3e93e1cb1bad7ae9e63d35365abc04dfc1fb0f7f38186e6accd8f1ae26451b460ef1b9b9549577d4a68d418e8085fbb72c92d5000001000100000000000000010000000000000000000000000000000000000000000000"
+    }
+  ],
+  "domains": [
+    {
+      "name": "mainnet-beta genesis + placeholder program",
+      "genesis_hash": "4c4d55e5c2538cf3adaf8b7d9053e17f3333ac87bc1679b066a14418652f298f",
+      "program_id": "134c20ac499a84d31d778694555cea35457d4b89dadbeb388056d0a175fdda58",
+      "domain": "04f5f0945811300e43d6124c5b3701129d9eae564a92e5a12db9302006a9f603"
+    },
+    {
+      "name": "zeros",
+      "genesis_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "program_id": "0000000000000000000000000000000000000000000000000000000000000000",
+      "domain": "f5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b"
+    }
+  ]
+}

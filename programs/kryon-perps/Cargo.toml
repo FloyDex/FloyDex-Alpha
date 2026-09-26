@@ -29,5 +29,8 @@ protocol-core = { workspace = true }
 risk-engine = { workspace = true }
 bytemuck = { version = "1", features = ["derive", "min_const_generics"] }
 
+[dev-dependencies]
+serde_json = "1"
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))', 'cfg(feature, values("custom-heap", "custom-panic", "anchor-debug"))'] }

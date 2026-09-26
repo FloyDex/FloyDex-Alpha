@@ -8,6 +8,7 @@ pub mod events;
 pub mod health;
 pub mod instructions;
 pub mod oracle;
+pub mod order;
 pub mod state;
 
 pub use constants::MAX_OPERATORS;

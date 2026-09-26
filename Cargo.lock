@@ -880,6 +880,7 @@ dependencies = [
  "protocol-core",
  "pyth-solana-receiver-sdk",
  "risk-engine",
+ "serde_json",
 ]
 
 [[package]]
@@ -1213,6 +1214,7 @@ version = "0.1.0"
 dependencies = [
  "ethnum",
  "proptest",
+ "serde_json",
 ]
 
 [[package]]
