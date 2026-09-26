@@ -60,6 +60,55 @@ fn a_fill_that_breaks_initial_margin_is_refused() {
     assert_ok(b.trade(true, 199 * W, PX));
 }
 
+/// Alice long / Bob short 100 @ $250 on 10k each, then the market closes:
+/// margin doubles to 40%, so both need 10,000 and are just below it.
+fn below_initial_margin_after_the_close() -> Book {
+    let mut b = Book::new();
+    assert_ok(b.trade(true, 100 * W, PX));
+    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
+        m.calendar = Default::default()
+    });
+    b
+}
+
+#[test]
+fn below_initial_margin_a_reduce_that_improves_health_goes_through() {
+    let mut b = below_initial_margin_after_the_close();
+    // Adding is refused…
+    assert_err(b.trade(true, W, PX), KryonError::InsufficientCollateral);
+    // …a small reduce is fine even though the account stays below initial margin.
+    assert_ok(b.trade(false, W, PX));
+    assert_eq!(b.position(&b.alice).unwrap().size.get(), 99 * P);
+}
+
+#[test]
+fn below_initial_margin_a_reduce_that_worsens_health_is_refused() {
+    let mut b = below_initial_margin_after_the_close();
+    // Widen the band so a terrible price is otherwise acceptable.
+    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
+        m.max_execution_deviation_bps = 5_000
+    });
+    // Alice sells 1 at $140 while the mark is $250: she realizes −110 and
+    // frees only 100 of margin (40% of 250), so her health falls.
+    assert_err(
+        b.trade(false, W, 140 * W),
+        KryonError::InsufficientCollateral,
+    );
+    // At $200 she loses 50 and frees 100: health improves, allowed.
+    assert_ok(b.trade(false, W, 200 * W));
+}
+
+#[test]
+fn below_initial_margin_a_flip_gets_no_relief() {
+    let mut b = below_initial_margin_after_the_close();
+    // Selling 201 closes the long and opens 101 short, which needs 10,100 of
+    // margin: new exposure gets no reduce-only relief.
+    assert_err(
+        b.trade(false, 201 * W, PX),
+        KryonError::InsufficientCollateral,
+    );
+}
+
 #[test]
 fn halted_markets_are_reduce_only() {
     let mut b = Book::new();

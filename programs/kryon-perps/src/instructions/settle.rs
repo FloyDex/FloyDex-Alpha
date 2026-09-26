@@ -16,7 +16,7 @@ use crate::constants::*;
 use crate::ed25519::{verified_signer, SigRef};
 use crate::error::{CoreResultExt, KryonError};
 use crate::events::{FillSettled, PositionChanged, SessionChanged};
-use crate::health::{load_risk_inputs, market_view, require_initial_margin, MarketView};
+use crate::health::{health, load_risk_inputs, market_view, MarketView};
 use crate::position::{apply_side, trade_fee, SideOutcome};
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -316,6 +316,19 @@ fn settle_one<'info>(
         load_risk_inputs(&*sides[0].user.load()?, accs, settlement_index, &known, now)?;
     let taker_inputs =
         load_risk_inputs(&*sides[1].user.load()?, accs, settlement_index, &known, now)?;
+    let markets_for = |inputs: &crate::health::RiskInputs| {
+        let mut m = inputs.markets.clone();
+        m.push(view.snapshot);
+        m
+    };
+    let maker_markets = markets_for(&maker_inputs);
+    let taker_markets = markets_for(&taker_inputs);
+    // Free collateral (equity − session-scaled initial margin) before the
+    // fill, the yardstick for reduce-only relief below.
+    let free_before = [
+        health(&*sides[0].user.load()?, &maker_inputs, &maker_markets)?.free_collateral,
+        health(&*sides[1].user.load()?, &taker_inputs, &taker_markets)?.free_collateral,
+    ];
 
     // --- 5. position effects, 6. fees ---
     let (funding_long, funding_short) = {
@@ -385,10 +398,24 @@ fn settle_one<'info>(
     }
 
     // --- session-scaled initial margin for each side, after the fill ---
-    for (s, inputs) in sides.iter().zip([&maker_inputs, &taker_inputs]) {
-        let mut markets = inputs.markets.clone();
-        markets.push(view.snapshot);
-        require_initial_margin(&*s.user.load()?, inputs, &markets)?;
+    // A side that opened, grew or flipped exposure must meet initial margin.
+    // A side that only reduced may also pass if its health did not worsen
+    // (free collateral after >= before), so an account caught below the
+    // requirement, e.g. when margin doubles at the close, can still de-risk
+    // through the book (decided 2026-09-26).
+    let inputs = [
+        (&maker_inputs, &maker_markets),
+        (&taker_inputs, &taker_markets),
+    ];
+    for (k, s) in sides.iter().enumerate() {
+        let (i, m) = inputs[k];
+        let h = health(&*s.user.load()?, i, m)?;
+        let meets_initial = h.equity >= h.initial_margin_required;
+        let reduce_ok = !outcomes[k].increased && h.free_collateral >= free_before[k];
+        require!(
+            meets_initial || reduce_ok,
+            KryonError::InsufficientCollateral
+        );
     }
 
     // --- 7. order records ---

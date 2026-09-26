@@ -277,14 +277,9 @@ fn sessions_follow_the_posted_calendar() {
     );
     assert_ok(b.trade(true, 10 * W, PX));
     // After the last window: Closed at the last trusted price, margin ×2
-    // (40%). 110 shares need 11,000 > equity, and 05 §2 step 6 requires
-    // initial margin after every fill, reduces included: a small reduce that
-    // stays above the requirement is refused, a big enough one goes through.
+    // (40%). 110 shares need 11,000 > equity, yet a small reduce goes
+    // through because it does not worsen health.
     b.w.warp_to(now + 8_000);
-    assert_err(
-        b.trade(false, 10 * W, PX),
-        KryonError::InsufficientCollateral,
-    );
-    assert_ok(b.trade(false, 60 * W, PX));
+    assert_ok(b.trade(false, 10 * W, PX));
     assert_ne!(b.w.market(1).closed_since, 0);
 }

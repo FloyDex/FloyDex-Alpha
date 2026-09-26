@@ -93,6 +93,12 @@ effect.
    none → open.
 6. Fees; update OI; update `mark_ema` if Closed; require **session-scaled
    initial margin** for each side (`session_margin_bps`).
+   **Reduce-only relief (decided 2026-09-26):** a side whose fill only
+   reduced its exposure (no open, increase or flip) also passes if its
+   health did not worsen: free collateral (equity − session-scaled initial
+   margin) after the fill ≥ before. Stellar required initial margin on every
+   fill, which trapped accounts below the requirement (e.g. when margin
+   doubles at the close) until liquidation.
 7. Create or update `OrderRecord` (the operator pays rent).
 
 `reclaim_order_state(owner, nonce)`: after `max(expiry, tombstone)`, close the
@@ -182,9 +188,13 @@ with `u128` mul-div with overflow checks (inputs are bounded).
 
 | Path | CU | Tx size |
 |---|---|---|
-| 1 fill, fresh positions, creates both `OrderRecord`s | 131,470 | 1,150 B legacy (limit 1,232) |
-| 1 fill, maker also holds a second market | 141,269 | — |
-| 2 fills in one instruction | 224,226 | needs an address lookup table |
+| 1 fill, fresh positions, creates both `OrderRecord`s | 131,864 | 1,150 B legacy (limit 1,232) |
+| 1 fill, maker also holds a second market | 162,612 | — |
+| 2 fills in one instruction | 272,682 | needs an address lookup table |
+
+The SBF heap is a 32 KB bump allocator that never frees, so health code
+sizes every allocation exactly; more than 2 fills per instruction is
+untested against the heap limit.
 
 One fill per legacy transaction fits. Two fills per transaction need a v0
 transaction with an address lookup table (matcher, Phase 3).

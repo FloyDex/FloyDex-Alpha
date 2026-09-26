@@ -10,7 +10,6 @@
 //! 2. for each non-settlement balance slot with a non-zero amount (slot
 //!    order): `[Collateral, PriceUpdateV2]`
 
-use crate::constants::MAX_POSITIONS;
 use crate::error::{CoreResultExt, KryonError};
 use crate::oracle::{read_pyth, read_pyth_checked};
 use crate::state::*;
@@ -141,7 +140,7 @@ pub fn load_risk_inputs<'info>(
     known: &[u16],
     now: u64,
 ) -> Result<RiskInputs> {
-    let mut markets: Vec<MarketSnapshot> = Vec::with_capacity(4);
+    let mut markets: Vec<MarketSnapshot> = Vec::with_capacity(usize::from(user.open_positions) + 1);
     for slot in user.positions.iter().filter(|p| p.in_use != 0) {
         let id = slot.market_id;
         if known.contains(&id) || markets.iter().any(|s| s.config.market_id == u32::from(id)) {
@@ -155,7 +154,7 @@ pub fn load_risk_inputs<'info>(
         markets.push(market_view(&m, &pair[1], now)?.snapshot);
     }
 
-    let mut prices = Vec::with_capacity(crate::constants::MAX_BALANCES);
+    let mut prices = Vec::with_capacity(user.balances.iter().filter(|b| b.in_use != 0).count() + 1);
     prices.push(CollateralPrice {
         index: settlement_index,
         price: PRECISION,
@@ -196,11 +195,14 @@ fn snapshot_parts(
     user: &UserAccount,
     inputs: &RiskInputs,
 ) -> Result<(Vec<Position>, Vec<CollateralBalance>)> {
-    let mut positions = Vec::with_capacity(MAX_POSITIONS);
+    // Exact capacities: the SBF heap is a 32 KB bump allocator that never frees.
+    let open = user.positions.iter().filter(|p| p.in_use != 0).count();
+    let mut positions = Vec::with_capacity(open);
     for slot in user.positions.iter().filter(|p| p.in_use != 0) {
         positions.push(slot.to_position(&user.owner));
     }
-    let mut collateral = Vec::with_capacity(crate::constants::MAX_BALANCES);
+    let held = user.balances.iter().filter(|b| b.in_use != 0).count();
+    let mut collateral = Vec::with_capacity(held);
     for b in user.balances.iter().filter(|b| b.in_use != 0) {
         let amount = b.amount.get();
         if amount == 0 {
@@ -245,20 +247,6 @@ pub fn health(
         positions: &positions,
     };
     risk_engine::account_health(&snapshot, markets).core()
-}
-
-/// Equity must cover the (session-scaled) initial margin.
-pub fn require_initial_margin(
-    user: &UserAccount,
-    inputs: &RiskInputs,
-    markets: &[MarketSnapshot],
-) -> Result<AccountHealth> {
-    let h = health(user, inputs, markets)?;
-    require!(
-        h.equity >= h.initial_margin_required,
-        KryonError::InsufficientCollateral
-    );
-    Ok(h)
 }
 
 pub fn validate_withdrawal(

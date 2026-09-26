@@ -22,7 +22,7 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 - [x] `post_session_calendar` (pulled forward from Phase 2 so markets are not always Closed)
 - [x] Tests: each validate_fill rule, each ed25519 tampering case, conservation invariant
 - **Gate:** a local-validator end-to-end run: two users, session keys, 1,000 random fills, conservation holds
-  - ✅ Passed 2026-09-26 (`scripts/e2e-local.sh`): 1,000 fills in 65 s, median 127k CU,
+  - ✅ Passed 2026-09-26 (`scripts/e2e-local.sh`): 1,000 fills in 65 s, median 158k CU (with reduce-only relief),
     solvent at 5 marks every 100 fills, strict equality when flat, USDC conserved to the
     base unit after full withdrawals. Not yet in CI (`11` L1).
 
