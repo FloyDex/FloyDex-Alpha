@@ -8,7 +8,8 @@
     "e2e": "scripts/e2e-local.sh",
     "test:sdk": "cd sdk && node --test \"test/**/*.test.ts\"",
     "test:program": "cargo test --manifest-path integration/Cargo.toml",
-    "backtest": "scripts/backtest/weekend_replay.py --out docs/backtest/weekend-replay.md"
+    "backtest": "scripts/backtest/weekend_replay.py --out docs/backtest/weekend-replay.md",
+    "devnet:gate": "scripts/devnet-gate.sh"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",

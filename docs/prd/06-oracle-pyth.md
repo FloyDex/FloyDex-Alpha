@@ -196,3 +196,13 @@ How to run v1 on the free sponsored feeds:
 6. Upgrade to a paid Pyth plan with our own pusher shard (§2 option 1) when
    volume justifies ~$500/mo. That's a config change, not a code change.
 
+**Devnet gate (decided 2026-09-26):** `yarn devnet:gate`
+(`scripts/devnet-gate.sh` → `tests/e2e/devnet.mts`) lists a SOL-PERP market on
+the sponsored shard-0 SOL/USD push feed (`7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE`,
+the shard-0 PDA of feed `ef0d8b6f…b56d`) with `max_oracle_age_secs = 120`.
+Before trading it refuses a feed that is missing, not owned by the Pyth
+receiver, not fully verified, or older than 120 s (`11` L2). The run writes
+`deployments/devnet.json` only when the cluster's genesis hash is devnet's
+(`11` L3). A rehearsal on a local validator with the feed mocked at the same
+address passes.
+
