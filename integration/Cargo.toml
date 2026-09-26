@@ -24,3 +24,7 @@ solana-keypair = "2.2"
 solana-message = "2.2"
 solana-signer = "2.2"
 solana-transaction = "2.2"
+
+# `TxResult` is LiteSVM's own (large) error type; boxing it buys nothing in tests.
+[lints.clippy]
+result_large_err = "allow"

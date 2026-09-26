@@ -383,6 +383,12 @@ pub fn default_market_params() -> kryon_perps::MarketParams {
     }
 }
 
+impl Default for World {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl World {
     /// VM + program (upgrade authority = admin), exchange not yet initialized.
     pub fn bare() -> Self {

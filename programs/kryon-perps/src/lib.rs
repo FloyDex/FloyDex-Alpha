@@ -1,3 +1,7 @@
+// Anchor 0.31's generated dispatcher calls the deprecated `AccountInfo::realloc`,
+// and the call is expanded at crate level, outside the `#[program]` module.
+#![allow(deprecated)]
+
 use anchor_lang::prelude::*;
 
 declare_id!("2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB");
@@ -20,8 +24,6 @@ pub use state::FeeConfig;
 #[cfg(feature = "bench")]
 pub mod bench;
 
-// Anchor 0.31's generated dispatcher calls the deprecated `AccountInfo::realloc`.
-#[allow(deprecated)]
 #[program]
 pub mod kryon_perps {
     use super::*;

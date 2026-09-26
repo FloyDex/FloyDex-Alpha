@@ -263,7 +263,7 @@ fn order_records_are_reclaimed_only_after_expiry() {
     b.w.warp_to(mo.expiry_ts as i64 + 1);
     assert_ok(reclaim(&mut b));
     assert!(
-        b.w.svm.get_account(&rec).map_or(true, |a| a.lamports == 0),
+        b.w.svm.get_account(&rec).is_none_or(|a| a.lamports == 0),
         "record closed"
     );
     assert!(
@@ -324,7 +324,7 @@ fn conservation_holds_across_random_fills() {
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
     let mut settled = 0;
     for _ in 0..120 {
-        let alice_long = rng.next() % 2 == 0;
+        let alice_long = rng.next().is_multiple_of(2);
         let size = rng.range(1, 40) * W / 10 + rng.range(0, 999); // odd sizes
         let price = rng.range(248 * 100, 252 * 100) * W / 100 + rng.range(0, 999);
         if b.trade(alice_long, size, price).is_ok() {

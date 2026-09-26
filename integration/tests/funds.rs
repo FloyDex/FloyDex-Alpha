@@ -170,7 +170,7 @@ fn paused_blocks_deposits_but_not_idle_withdrawals() {
     let wallet = w.wallet(&t, &usdc, 100 * USDC);
     assert_ok(w.deposit(&t, &usdc, &wallet, 50 * USDC));
     pause(&mut w);
-    assert_err(w.deposit(&t, &usdc, &wallet, 1 * USDC), KryonError::Paused);
+    assert_err(w.deposit(&t, &usdc, &wallet, USDC), KryonError::Paused);
     // Escape hatch: idle collateral can always leave (05 §7.6).
     assert_ok(w.withdraw(&t, &usdc, &wallet, 50 * USDC, vec![]));
 }

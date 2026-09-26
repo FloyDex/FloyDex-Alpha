@@ -18,7 +18,9 @@ done
 chmod 400 "$E2E"/keys/*.json
 
 test -f target/deploy/kryon_perps.so || { echo "build first: yarn build"; exit 1; }
-PROGRAM_ID=$(solana-keygen pubkey target/deploy/kryon_perps-keypair.json)
+# The declared id, from the IDL: the validator loads the .so at this address,
+# so no program keypair is needed (CI never has one; it is never committed).
+PROGRAM_ID=$(node -p 'JSON.parse(require("fs").readFileSync("target/idl/kryon_perps.json", "utf8")).address')
 
 # Mocked Pyth TSLA/USD at $250.00, 0.01% conf, published now.
 NOW=$(date +%s)
