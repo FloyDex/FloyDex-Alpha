@@ -4,11 +4,11 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 **phase gates are not optional**. Don't move on with a gate red.
 
 ## Phase 0 — Foundation (Week 1: 09-28 → 10-04)
-- [ ] `git init` Kryon-sol (new repo, e.g. `Kryon-Protocol/kryon-sol`) and push
+- [x] `git init` Kryon-sol and push (github.com/SamyaDeb/kryon-sol)
 - [x] Port `protocol-core` + `risk-engine` off Soroban (done, 25 tests)
 - [x] `session.rs` session-aware risk (done)
-- [ ] `anchor init` inside the workspace and add `programs/kryon-perps` (README step 2)
-- [ ] Benchmark `mul_div` (I256) compute units in BPF; decide on keeping it or a u128 path
+- [x] Benchmark `mul_div` (I256) compute units in BPF; decide on keeping it or a u128 path (u64-limb path adopted, `05` §6)
+- [x] `anchor init` equivalent: `programs/kryon-perps` builds for SBF
 - [ ] Choose RPC (Helius/Triton), sign up for Pyth (API key), create a devnet USDC mint we control
 - **Gate:** program builds; the crates compile to `sbf`; CU numbers written down
 
@@ -19,6 +19,7 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 - [ ] `settle_fills` with Ed25519 introspection + full `validate_fill` table
 - [ ] position effects (open/increase/reduce/close), fees, OI
 - [ ] Pyth read → OracleSnapshot → guard; execution-deviation band
+- [ ] `post_session_calendar` (pulled forward from Phase 2 so markets are not always Closed)
 - [ ] Tests: each validate_fill rule, each ed25519 tampering case, conservation invariant
 - **Gate:** a local-validator end-to-end run: two users, session keys, 1,000 random fills, conservation holds
 

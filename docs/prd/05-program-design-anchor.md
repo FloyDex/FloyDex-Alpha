@@ -12,7 +12,7 @@ Token-2022). One program, internal modules. Big accounts use zero-copy
 | `Market` (zero-copy) | `["market", market_id: u16]` | `MarketConfig` fields; `pyth_feed_id: [u8; 32]`; `SessionPolicy`; `calendar: [SessionWindow; 16]` ring; `FundingConfig`, `FundingState`; `oi_long`, `oi_short`; `last_oracle_price`, `last_oracle_publish_time`; `closed_since`; `mark_ema`, `mark_ema_updated`; `oi_policy_bps`; `max_execution_deviation_bps` | ~1.5 KB |
 | `Collateral` | `["collateral", mint]` | `mint`, `token_program`, `vault` (token account PDA `["vault", mint]`), `decimals`, `haircut_bps`, `pyth_feed_id`, `deposit_cap`, `total_deposited`, `active` | < 300 B |
 | `UserAccount` (zero-copy) | `["user", owner, sub_id: u8]` | `owner`, `delegate`, `delegate_expiry`, `balances: [Balance; 8]` (collateral index + `i128` amount), `positions: [PositionSlot; 16]`, `cancel_all_below_nonce: u64`, `next_position_id`, counters | ~2.2 KB |
-| `OrderRecord` | `["order", owner, nonce: u64 LE]` | `filled: i128`, `cancelled_until: u64` (tombstone), `expiry_ts`, `payer` | 80 B, closed on reclaim |
+| `OrderRecord` | `["order", owner, sub_id: u8, nonce: u64 LE]` | `filled: i128`, `cancelled_until: u64` (tombstone), `expiry_ts`, `payer` | 80 B, closed on reclaim |
 | `Insurance` | `["insurance"]` | `usdc_vault`, `total_shares`, `bad_debt`, `unstake_cooldown_secs` | < 300 B |
 | `StakePosition` | `["stake", owner]` | `shares`, `pending_unstake_shares`, `unlock_ts` | < 200 B |
 
@@ -26,6 +26,15 @@ Notes:
   the `Market` account and Pyth `PriceUpdateV2` for each open position.
   Validate each against `Market.pyth_feed_id`, then build `MarketSnapshot`s
   (a slice, which implements `MarketLookup`).
+- **Settlement collateral at par (decided 2026-09-26).** Exactly one
+  `Collateral` is flagged as the settlement asset (USDC). Realized PnL, fees
+  and funding settle in it, and it is valued at exactly 1.0 with no oracle, so
+  a missing USDC feed can never block settlement (`11` L2). Every other
+  collateral must carry a Pyth feed id, checked at `add_collateral`.
+- **Rounding against the user (decided 2026-09-26).** Realized PnL rounds
+  toward −∞ and fees round up, so dust always stays with the protocol. This
+  lives in the program; `protocol-core` gained `mul_div_floor`/`mul_div_ceil`
+  alongside the unchanged truncating `mul_div`.
 - Fixed-point: `protocol_core::PRECISION = 1e18` for prices and sizes, exactly
   as on Stellar. Convert token amounts (USDC 6 decimals, xStocks ~8 decimals,
   **verify per mint**) at the vault edge only.
@@ -44,6 +53,10 @@ Notes:
 the admin did both.
 
 ### Calendar authority (keeper key, admin-assigned)
+Pulled into Phase 1 (decided 2026-09-26): without a posted calendar every
+market resolves to Closed. While Closed and before the Phase 2 mark EMA, the
+mark is `closed_mark_price(last_oracle, last_oracle)`.
+
 `post_session_calendar(market, windows[])`: only future windows, only
 append/replace ahead of now. It can never rewrite the window currently in
 effect.
@@ -105,19 +118,27 @@ survive log truncation.
 
 ## 4. Order message (what the session key signs)
 
-A compact binary layout, Borsh, little-endian, **107 bytes**:
+A compact binary layout, Borsh, little-endian, **108 bytes**:
 
 ```
 0   8  magic        "KRYONv1\0"
 8  32  domain       sha256(genesis_hash || program_id)   // blocks cross-cluster/cross-deploy replay
 40 32  owner        user wallet pubkey (NOT the delegate)
-72  2  market_id    u16
-74  1  flags        bit0 is_long, bit1 reduce_only, bit2 post_only
-75  8  size         u64 (base units, 1e9 scale — narrowed from i128 on the wire)
-83  8  limit_price  u64 (1e9 scale)
-91  8  nonce        u64
-99  8  expiry_ts    u64 (unix secs)
+72  1  sub_id       u8, the UserAccount the order trades from
+73  2  market_id    u16
+75  1  flags        bit0 is_long, bit1 reduce_only, bit2 post_only; other bits must be 0
+76  8  size         u64 (base units, 1e9 scale — narrowed from i128 on the wire)
+84  8  limit_price  u64 (1e9 scale)
+92  8  nonce        u64
+100 8  expiry_ts    u64 (unix secs)
 ```
+
+`sub_id` was added on 2026-09-26 (it was 107 bytes). Without it, the operator
+could settle an order signed for one sub-account against another sub-account
+of the same wallet. The self-trade check still compares wallet owners.
+A program can't read the genesis hash, so `domain` is computed off-chain, stored
+in `Exchange.domain` at `initialize_exchange`, and checked by the deploy
+script (`11` L3).
 Rules:
 - **Golden test:** TS `encodeOrder()` and Rust `OrderMsg::try_to_vec()` must
   produce identical bytes for fixed vectors. This is the same discipline as
@@ -186,8 +207,14 @@ five cases above.
 
 ## 7. Invariants to fuzz (Trident or proptest on `risk-engine`)
 
-1. Conservation: sum of user balances + insurance + fee vault == token vault
-   balances (per mint), up to rounding in the protocol's favor.
+1. Conservation (decided 2026-09-26), per mint. Realized PnL is paid out of
+   the pool while the counterparty's loss is still unrealized, so a plain
+   balance sum can't match the vault while positions are open. Instead:
+   - **Solvency, always:** user balances + fees + insurance + Σ unrealized PnL
+     of every open position (one common price) ≤ vault tokens, and short of
+     it by at most a few base units per fill (rounding goes to the protocol).
+   - **Strict, when flat:** once every position is closed, user balances +
+     fees + insurance == vault tokens, in token base units.
 2. `filled(order) <= size`, always.
 3. OI long == OI short per market (every fill is two-sided).
 4. A fill never leaves either side below session-scaled initial margin.
