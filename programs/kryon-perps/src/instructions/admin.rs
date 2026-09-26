@@ -190,6 +190,8 @@ pub struct SessionPolicyArgs {
     pub closed_band_per_hour_bps: u32,
     pub closed_band_max_bps: u32,
     pub closed_oi_cap_bps: u32,
+    pub close_ramp_secs: u32,
+    pub close_grace_secs: u32,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
@@ -240,7 +242,9 @@ pub fn validate_market_params(market_id: u16, p: &MarketParams) -> Result<()> {
         && s.closed_margin_mult_bps >= 10_000
         && s.closed_band_base_bps <= s.closed_band_max_bps
         && s.closed_band_max_bps <= 10_000
-        && s.closed_oi_cap_bps <= 10_000;
+        && s.closed_oi_cap_bps <= 10_000
+        && s.close_ramp_secs <= MAX_CLOSE_RAMP_SECS
+        && s.close_grace_secs <= MAX_CLOSE_GRACE_SECS;
     require!(session_ok, KryonError::InvalidConfig);
     Ok(())
 }
@@ -304,6 +308,8 @@ pub fn handle_create_market(
         closed_band_per_hour_bps: s.closed_band_per_hour_bps,
         closed_band_max_bps: s.closed_band_max_bps,
         closed_oi_cap_bps: s.closed_oi_cap_bps,
+        close_ramp_secs: s.close_ramp_secs,
+        close_grace_secs: s.close_grace_secs,
     };
     // Sanity: the policy must round-trip into the risk-engine type.
     let _: SessionPolicy = m.session_policy.into();

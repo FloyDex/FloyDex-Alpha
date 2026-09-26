@@ -62,7 +62,11 @@ pub struct UserAccount {
     pub bump: u8,
     pub open_positions: u8,
     pub _pad: [u8; 5],
-    pub _reserved: [u8; 64],
+    /// When a fill last opened or grew exposure. An account that has not
+    /// added exposure since a close's margin ramp began gets the grace
+    /// window at liquidation (`07` §2).
+    pub last_increase_ts: u64,
+    pub _reserved: [u8; 56],
 }
 
 impl UserAccount {

@@ -1,7 +1,8 @@
 # 07 — Equity-perp risk: sessions, gaps, corporate actions
 
-Code: `crates/risk-engine/src/session.rs` (done, 7 tests). This document is the
-spec for it and for the parts still to build.
+Code: `crates/risk-engine/src/session.rs` (resolution, band, ramp, grace,
+EMA, closed premium) and the program's `health::market_view`, `mark.rs` and
+`post_mark`. This document is the spec for them.
 
 ## 1. The problem
 
@@ -38,6 +39,24 @@ window: they can't add exposure, but they aren't liquidated by the multiplier
 alone for N minutes. Build this as `session_margin_bps_at(now, window)`, the
 next function to add to `session.rs`.
 
+**Built (decided 2026-09-26):**
+- `session_margin_bps_at(base, windows, now, session, policy)`: in a
+  Regular/Extended window whose *next* scheduled session has a higher
+  multiplier (a window starting exactly at its end, else Closed), the
+  multiplier ramps linearly from the window's own to the next one's over
+  `SessionPolicy.close_ramp_secs` (default 3,600) before the window ends.
+  Regular → Extended ramps ×1 → ×1.5; Extended → Closed ×1.5 → ×2;
+  back-to-back Regular windows don't ramp. Halted is never ramped (it is
+  already ×2). The multiplier and the scaled bps round up.
+- Grace: from the start of the ramp until `close_grace_secs` (default 1,800)
+  after the window ends, **liquidation** evaluates maintenance at the
+  pre-close multiplier for an account whose `UserAccount.last_increase_ts`
+  (set by every fill that opens or grows exposure) is before the ramp began.
+  Tracked per account, not per position, which is stricter: adding exposure
+  anywhere during the ramp forfeits the grace. Initial margin (adding
+  exposure, withdrawals, the reduce relief) always uses the ramped value.
+  Both fields are capped at 4 h by `create_market`.
+
 ## 3. The calendar
 
 - The program **never computes time zones.** A keeper posts
@@ -60,6 +79,26 @@ next function to add to `session.rs`.
   so weekend longs pay if the book is rich. This is the incentive that keeps
   the weekend book honest.
 
+**Built (decided 2026-09-26):**
+- One EMA, `Market.mark_ema`, fed by **every fill in every session** (not
+  only while Closed), so funding in session has a perp price to compare with
+  the oracle (`update_funding`). Half-life 300 s. The weight is
+  `1 − 2^(−Δt/half-life)`, computed without floats (a 1/16-half-life table
+  with interpolation, < 3e-4 relative error), so fills in the same second
+  move it no more than one fill would. The first sample seeds it.
+- Every update (fill or post) moves it at most `MARK_MAX_STEP_BPS` = 50 bps.
+  Fills are already inside the 1% execution band around the mark; the step
+  bound also stops a single print after a long quiet gap from resetting it.
+- `post_mark(market, mid)`: operators only, at most once per
+  `POST_MARK_MIN_INTERVAL_SECS` = 10 s per market, refused while Halted and
+  while paused. The mid is clamped to the band first: Closed → the widening
+  band around the last close; in session → the execution band around the
+  oracle. `mid` is u64 at 1e9, like order prices.
+- The Closed mark is `closed_mark_price(last_close, ema, secs_closed)` (the
+  last close until the EMA is seeded). The execution band follows it.
+- Rate limit, step bound and half-life are program constants, not per-market
+  config, until tuning on devnet says otherwise.
+
 ## 5. The reopen
 
 At the first valid Regular or Extended Pyth price after Closed:
@@ -68,6 +107,16 @@ At the first valid Regular or Extended Pyth price after Closed:
    should have absorbed a gap of up to ~1/(2 × base margin).
 3. Funding re-anchors to the oracle index.
 4. Emit `SessionChanged` so the UI and indexer know.
+
+**Built (decided 2026-09-26):** every instruction that reads a market
+(`settle_fills`, `post_mark`, `update_funding`, `liquidate`, `adl`) runs
+`mark::observe`: the first in-session observation after a close snaps
+`mark_ema` to the oracle price, clears `closed_since` and records the
+oracle as the new last close; `SessionChanged` fires on any change. The
+snap means neither the mark nor funding carries the weekend book into the
+new session; the premium rebuilds from fills. `closed_since` is when the
+close was first *observed*, which can only make the band narrower
+(conservative) if nobody touched the market at the bell.
 
 ## 6. Corporate actions
 

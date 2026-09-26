@@ -26,4 +26,15 @@ pub const MAX_DECIMALS: u8 = 18;
 /// Order sizes and prices travel as u64 at 1e9; widen by this to reach 1e18.
 pub const WIRE_TO_PRECISION: i128 = 1_000_000_000;
 
+/// Longest margin ramp before a close, and grace after it, a market may set.
+pub const MAX_CLOSE_RAMP_SECS: u32 = 4 * 3_600;
+pub const MAX_CLOSE_GRACE_SECS: u32 = 4 * 3_600;
+
+/// Largest move of the mark EMA per update, from a fill or a posted mid.
+pub const MARK_MAX_STEP_BPS: u32 = 50;
+/// `post_mark` rate limit per market.
+pub const POST_MARK_MIN_INTERVAL_SECS: u64 = 10;
+/// Funding treats an EMA older than this as no premium (no recent book).
+pub const MARK_EMA_MAX_AGE_SECS: u64 = 900;
+
 const _: () = assert!(MAX_POSITIONS <= risk_engine::MAX_POSITIONS_PER_ACCOUNT);

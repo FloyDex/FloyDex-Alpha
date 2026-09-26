@@ -155,6 +155,8 @@ async function bootstrap(domain: Uint8Array) {
         closedBandPerHourBps: 25,
         closedBandMaxBps: 1_500,
         closedOiCapBps: 5_000,
+        closeRampSecs: 3_600,
+        closeGraceSecs: 1_800,
       },
       fundingImbalanceCoeff: bn(P),
       fundingMaxRatePerHour: bn(P / 1_000n),

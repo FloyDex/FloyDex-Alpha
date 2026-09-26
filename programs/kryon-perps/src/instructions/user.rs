@@ -149,7 +149,14 @@ pub fn handle_withdraw<'info>(
             // Paused: only idle collateral may leave (05 §7.6, decided 2026-09-26).
             require!(!ex.paused, KryonError::Paused);
             let mut accs: &'info [AccountInfo<'info>] = ctx.remaining_accounts;
-            let risk = load_risk_inputs(&u, &mut accs, ex.settlement_collateral_index, &[], now)?;
+            let risk = load_risk_inputs(
+                &u,
+                &mut accs,
+                ex.settlement_collateral_index,
+                &[],
+                now,
+                false,
+            )?;
             require!(accs.is_empty(), KryonError::InvalidRemainingAccounts);
             let price = risk
                 .price_of(index)

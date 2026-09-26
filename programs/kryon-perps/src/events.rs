@@ -106,3 +106,11 @@ pub struct SessionChanged {
     pub market_id: u16,
     pub session: u8,
 }
+
+#[event]
+pub struct MarkPosted {
+    pub market_id: u16,
+    /// The posted mid after clamping to the band.
+    pub mid: i128,
+    pub mark_ema: i128,
+}

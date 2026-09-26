@@ -19,8 +19,8 @@ use protocol_core::{
     Position, PRECISION,
 };
 use risk_engine::{
-    closed_mark_price, resolve_session, session_margin_bps, AccountHealth, MarketSession,
-    SessionWindow,
+    close_grace, closed_mark_price, resolve_session, scale_margin_bps, session_margin_bps_at,
+    AccountHealth, MarketSession, SessionWindow,
 };
 
 /// A market as the risk engine sees it right now.
@@ -32,15 +32,37 @@ pub struct MarketView {
     pub mark: i128,
     /// The fresh, validated oracle reading, when the session has one.
     pub oracle: Option<OracleSnapshot>,
-    /// Snapshot with session-scaled margins, priced at `mark`.
+    /// Snapshot with session-scaled (and ramped) margins, priced at `mark`.
     pub snapshot: MarketSnapshot,
+    /// Inside a close's grace window: the maintenance bps at the pre-close
+    /// multiplier, and when the ramp began (`07` §2). Liquidation only.
+    pub grace: Option<(u32, u64)>,
+}
+
+impl MarketView {
+    /// The snapshot liquidation should use for an account that last added
+    /// exposure at `last_increase_ts`: inside the grace window, and with no
+    /// exposure added since the ramp began, maintenance stays at the
+    /// pre-close multiplier, so the multiplier alone cannot liquidate it.
+    pub fn liquidation_snapshot(&self, last_increase_ts: u64) -> MarketSnapshot {
+        let mut s = self.snapshot;
+        if let Some((bps, ramp_start)) = self.grace {
+            if last_increase_ts < ramp_start && bps < s.config.maintenance_margin_bps {
+                s.config.maintenance_margin_bps = bps;
+            }
+        }
+        s
+    }
 }
 
 /// Resolve a market's session and mark from its account and its Pyth feed.
 ///
 /// - Regular / Extended: the oracle must be fresh and tight; mark = oracle.
-/// - Closed: mark = `closed_mark_price(last_oracle, last_oracle, t)` until the
-///   Phase 2 book EMA exists (`05` §2); the feed may be stale.
+///   Margins ramp up over the hour before a scheduled close (`07` §2).
+/// - Closed: mark = `closed_mark_price(last_oracle, mark_ema, t)`: the book
+///   EMA clamped to a band around the last close (`07` §4); the feed may be
+///   stale. Before any fill or posted mid the EMA is unset and the mark is
+///   the last close.
 /// - Halted: mark = last valid oracle price; reduce-only is enforced by the
 ///   caller through `may_increase_exposure`.
 pub fn market_view(m: &Market, price_ai: &AccountInfo, now: u64) -> Result<MarketView> {
@@ -52,7 +74,8 @@ pub fn market_view(m: &Market, price_ai: &AccountInfo, now: u64) -> Result<Marke
         session: MarketSession::Closed,
     }; crate::constants::CALENDAR_LEN];
     let n = m.windows(&mut windows);
-    let session = resolve_session(&windows[..n], now, raw.publish_time, m.max_oracle_age_secs);
+    let windows = &windows[..n];
+    let session = resolve_session(windows, now, raw.publish_time, m.max_oracle_age_secs);
     let policy = m.session_policy();
     let (mark, oracle) = match session {
         MarketSession::Regular | MarketSession::Extended => {
@@ -66,13 +89,10 @@ pub fn market_view(m: &Market, price_ai: &AccountInfo, now: u64) -> Result<Marke
         MarketSession::Closed => {
             let last = m.last_oracle_price.get();
             require!(last > 0, KryonError::StaleOracle);
-            let secs_closed = if m.closed_since == 0 {
-                0
-            } else {
-                now.saturating_sub(m.closed_since)
-            };
+            let ema = m.mark_ema.get();
+            let book = if ema > 0 { ema } else { last };
             (
-                closed_mark_price(last, last, secs_closed, &policy).core()?,
+                closed_mark_price(last, book, secs_closed(m, now), &policy).core()?,
                 None,
             )
         }
@@ -82,15 +102,34 @@ pub fn market_view(m: &Market, price_ai: &AccountInfo, now: u64) -> Result<Marke
             (last, None)
         }
     };
-    let initial = session_margin_bps(m.initial_margin_bps, session, &policy).core()?;
-    let maintenance = session_margin_bps(m.maintenance_margin_bps, session, &policy).core()?;
+    let initial =
+        session_margin_bps_at(m.initial_margin_bps, windows, now, session, &policy).core()?;
+    let maintenance =
+        session_margin_bps_at(m.maintenance_margin_bps, windows, now, session, &policy).core()?;
+    let grace = match close_grace(windows, now, &policy) {
+        Some((mult, ramp_start)) => Some((
+            scale_margin_bps(m.maintenance_margin_bps, mult).core()?,
+            ramp_start,
+        )),
+        None => None,
+    };
     Ok(MarketView {
         market_id: m.market_id,
         session,
         mark,
         oracle,
         snapshot: m.snapshot(mark, initial, maintenance),
+        grace,
     })
+}
+
+/// Seconds since the market was first seen Closed (0 if not closed).
+pub fn secs_closed(m: &Market, now: u64) -> u64 {
+    if m.closed_since == 0 {
+        0
+    } else {
+        now.saturating_sub(m.closed_since)
+    }
 }
 
 /// A collateral price seen while loading risk inputs.
@@ -133,12 +172,16 @@ fn take<'info>(
 /// Load a user's risk inputs, consuming their remaining accounts from `accs`
 /// in the order documented at the top of this module. Markets whose id is in
 /// `known` consume nothing; the caller supplies their snapshots.
+///
+/// `for_liquidation` applies each market's close grace window to this
+/// account (see [`MarketView::liquidation_snapshot`]).
 pub fn load_risk_inputs<'info>(
     user: &UserAccount,
     accs: &mut &'info [AccountInfo<'info>],
     settlement_index: u8,
     known: &[u16],
     now: u64,
+    for_liquidation: bool,
 ) -> Result<RiskInputs> {
     let mut markets: Vec<MarketSnapshot> = Vec::with_capacity(usize::from(user.open_positions) + 1);
     for slot in user.positions.iter().filter(|p| p.in_use != 0) {
@@ -151,7 +194,12 @@ pub fn load_risk_inputs<'info>(
             .map_err(|_| error!(KryonError::InvalidRemainingAccounts))?;
         let m = loader.load()?;
         require!(m.market_id == id, KryonError::InvalidRemainingAccounts);
-        markets.push(market_view(&m, &pair[1], now)?.snapshot);
+        let view = market_view(&m, &pair[1], now)?;
+        markets.push(if for_liquidation {
+            view.liquidation_snapshot(user.last_increase_ts)
+        } else {
+            view.snapshot
+        });
     }
 
     let mut prices = Vec::with_capacity(user.balances.iter().filter(|b| b.in_use != 0).count() + 1);

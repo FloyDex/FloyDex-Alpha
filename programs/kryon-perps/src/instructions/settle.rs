@@ -15,8 +15,9 @@
 use crate::constants::*;
 use crate::ed25519::{verified_signer, SigRef};
 use crate::error::{CoreResultExt, KryonError};
-use crate::events::{FillSettled, PositionChanged, SessionChanged};
+use crate::events::{FillSettled, PositionChanged};
 use crate::health::{health, load_risk_inputs, market_view, MarketView};
+use crate::mark::{fold_mark, observe};
 use crate::position::{apply_side, trade_fee, SideOutcome};
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -107,8 +108,8 @@ pub fn handle_settle_fills<'info>(
         let m = ctx.accounts.market.load()?;
         market_view(&m, &ctx.accounts.price_update, now)?
     };
-    record_market_observation(&ctx.accounts.market, &view, now)?;
-    if let Some(changed) = session_change(&ctx.accounts.market, &view)? {
+    let changed = observe(&mut *ctx.accounts.market.load_mut()?, &view, now);
+    if let Some(changed) = changed {
         emit_cpi!(changed);
     }
 
@@ -116,6 +117,7 @@ pub fn handle_settle_fills<'info>(
     let mut fees = 0i128;
     for fill in fills.iter() {
         let (event, maker_change, taker_change) = settle_one(&ctx, fill, &view, now, &mut accs)?;
+        fold_mark(&mut *ctx.accounts.market.load_mut()?, event.price, now)?;
         fees = checked_add(fees, checked_add(event.maker_fee, event.taker_fee).core()?).core()?;
         emit_cpi!(event);
         emit_cpi!(maker_change);
@@ -125,60 +127,6 @@ pub fn handle_settle_fills<'info>(
     let c = &mut ctx.accounts.settlement_collateral;
     c.fees_accrued = checked_add(c.fees_accrued, fees).core()?;
     Ok(())
-}
-
-/// Keep the last trusted oracle price (the anchor for Closed and Halted
-/// marks) and when the market closed.
-fn record_market_observation(
-    market: &AccountLoader<Market>,
-    view: &MarketView,
-    now: u64,
-) -> Result<()> {
-    let mut m = market.load_mut()?;
-    match view.session {
-        MarketSession::Regular | MarketSession::Extended => {
-            if let Some(o) = view.oracle {
-                if o.publish_time >= m.last_oracle_publish_time {
-                    m.last_oracle_price.set(o.price);
-                    m.last_oracle_publish_time = o.publish_time;
-                }
-            }
-            m.closed_since = 0;
-        }
-        MarketSession::Closed => {
-            if m.closed_since == 0 {
-                m.closed_since = now;
-            }
-        }
-        MarketSession::Halted => {}
-    }
-    Ok(())
-}
-
-fn session_code(s: MarketSession) -> u8 {
-    match s {
-        MarketSession::Regular => SESSION_REGULAR,
-        MarketSession::Extended => SESSION_EXTENDED,
-        MarketSession::Closed => SESSION_CLOSED,
-        MarketSession::Halted => SESSION_HALTED,
-    }
-}
-
-fn session_change(
-    market: &AccountLoader<Market>,
-    view: &MarketView,
-) -> Result<Option<SessionChanged>> {
-    let mut m = market.load_mut()?;
-    // `last_session` stores code + 1 so a fresh market (0) always reports.
-    let code = session_code(view.session);
-    if m.last_session == code + 1 {
-        return Ok(None);
-    }
-    m.last_session = code + 1;
-    Ok(Some(SessionChanged {
-        market_id: m.market_id,
-        session: code,
-    }))
 }
 
 fn next<'info>(accs: &mut &'info [AccountInfo<'info>]) -> Result<&'info AccountInfo<'info>> {
@@ -312,10 +260,22 @@ fn settle_one<'info>(
     // --- risk inputs for each side's *other* markets, before any mutation ---
     let settlement_index = ex.settlement_collateral_index;
     let known = [view.market_id];
-    let maker_inputs =
-        load_risk_inputs(&*sides[0].user.load()?, accs, settlement_index, &known, now)?;
-    let taker_inputs =
-        load_risk_inputs(&*sides[1].user.load()?, accs, settlement_index, &known, now)?;
+    let maker_inputs = load_risk_inputs(
+        &*sides[0].user.load()?,
+        accs,
+        settlement_index,
+        &known,
+        now,
+        false,
+    )?;
+    let taker_inputs = load_risk_inputs(
+        &*sides[1].user.load()?,
+        accs,
+        settlement_index,
+        &known,
+        now,
+        false,
+    )?;
     let markets_for = |inputs: &crate::health::RiskInputs| {
         let mut m = inputs.markets.clone();
         m.push(view.snapshot);
@@ -358,6 +318,9 @@ fn settle_one<'info>(
         };
         let fee = trade_fee(fill_size, fill_price, bps)?;
         u.apply_balance(settlement_index, checked_sub(o.pnl, fee).core()?)?;
+        if o.increased {
+            u.last_increase_ts = now;
+        }
         outcomes[k] = o;
         fee_amounts[k] = fee;
     }

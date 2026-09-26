@@ -38,6 +38,8 @@ pub struct SessionPolicyPod {
     pub closed_band_per_hour_bps: u32,
     pub closed_band_max_bps: u32,
     pub closed_oi_cap_bps: u32,
+    pub close_ramp_secs: u32,
+    pub close_grace_secs: u32,
 }
 
 impl From<SessionPolicyPod> for SessionPolicy {
@@ -49,6 +51,8 @@ impl From<SessionPolicyPod> for SessionPolicy {
             closed_band_per_hour_bps: p.closed_band_per_hour_bps,
             closed_band_max_bps: p.closed_band_max_bps,
             closed_oi_cap_bps: p.closed_oi_cap_bps,
+            close_ramp_secs: p.close_ramp_secs,
+            close_grace_secs: p.close_grace_secs,
         }
     }
 }
@@ -94,9 +98,12 @@ pub struct Market {
     pub last_oracle_publish_time: u64,
     /// When the market last entered Closed (0 = not closed).
     pub closed_since: u64,
+    /// Time-weighted EMA of fill prices and posted book mids (`07` §4).
     pub mark_ema: PodI128,
     pub mark_ema_updated: u64,
-    pub _reserved: [u8; 128],
+    /// Last accepted `post_mark` (rate limit).
+    pub last_mark_post: u64,
+    pub _reserved: [u8; 112],
 }
 
 impl Market {

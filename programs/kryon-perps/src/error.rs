@@ -93,6 +93,10 @@ pub enum KryonError {
     AccountNotEmpty,
     #[msg("A liquidatable account may only reduce at or better than the mark")]
     LiquidatableReduceOffMark,
+    #[msg("post_mark is rate-limited per market")]
+    PostMarkTooSoon,
+    #[msg("Market is halted: a scheduled session with a stale oracle")]
+    MarketHalted,
 }
 
 impl From<CoreError> for KryonError {

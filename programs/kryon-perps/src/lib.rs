@@ -12,6 +12,7 @@ pub mod error;
 pub mod events;
 pub mod health;
 pub mod instructions;
+pub mod mark;
 pub mod oracle;
 pub mod order;
 pub mod position;
@@ -107,6 +108,11 @@ pub mod kryon_perps {
         windows: Vec<SessionWindowArgs>,
     ) -> Result<()> {
         instructions::market_ops::handle_post_session_calendar(ctx, windows)
+    }
+
+    /// Operator (matcher): the book mid when there are no fills.
+    pub fn post_mark(ctx: Context<PostMark>, mid: u64) -> Result<()> {
+        instructions::market_ops::handle_post_mark(ctx, mid)
     }
 
     // --- user ---

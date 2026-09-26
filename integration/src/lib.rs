@@ -377,6 +377,8 @@ pub fn default_market_params() -> kryon_perps::MarketParams {
             closed_band_per_hour_bps: 25,
             closed_band_max_bps: 1_500,
             closed_oi_cap_bps: 5_000,
+            close_ramp_secs: 3_600,
+            close_grace_secs: 1_800,
         },
         funding_imbalance_coeff: P,
         funding_max_rate_per_hour: P / 1_000,
@@ -1178,5 +1180,45 @@ pub fn window(start: i64, end: i64, session: u8) -> kryon_perps::SessionWindowAr
         start: start as u64,
         end: end as u64,
         session,
+    }
+}
+
+impl World {
+    pub fn post_mark_as(&mut self, market_id: u16, mid: u64, operator: &Keypair) -> TxResult {
+        let m = self.market(market_id);
+        let i = ix(
+            ka::PostMark {
+                exchange: exchange_pda(),
+                operator: operator.pubkey(),
+                market: market_pda(market_id),
+                price_update: kryon_perps::oracle::push_feed_address(
+                    m.pyth_shard_id,
+                    &m.pyth_feed_id,
+                ),
+                event_authority: event_authority(),
+                program: kryon_perps::ID,
+            },
+            ki::PostMark { mid },
+        );
+        send(&mut self.svm, &[i], operator, &[])
+    }
+
+    /// `post_mark` as the operator. `mid` is u64 at 1e9.
+    pub fn post_mark(&mut self, market_id: u16, mid: u64) -> TxResult {
+        let op = self.operator.insecure_clone();
+        self.post_mark_as(market_id, mid, &op)
+    }
+
+    /// Advance the clock by `secs`.
+    pub fn warp(&mut self, secs: i64) {
+        let t = self.now() + secs;
+        self.warp_to(t);
+    }
+
+    /// Drop every posted window: the market resolves to Closed.
+    pub fn close_market(&mut self, market_id: u16) {
+        patch_zc::<kryon_perps::state::Market>(&mut self.svm, &market_pda(market_id), |m| {
+            m.calendar = Default::default()
+        });
     }
 }
