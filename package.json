@@ -4,10 +4,15 @@
   "scripts": {
     "build": "RUSTUP_TOOLCHAIN=stable anchor build",
     "build:bench": "cargo build-sbf --manifest-path programs/kryon-perps/Cargo.toml --features bench --sbf-out-dir target/deploy-bench",
-    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "e2e": "scripts/e2e-local.sh",
+    "test:sdk": "cd sdk && node --test \"test/**/*.test.ts\"",
+    "test:program": "cargo test --manifest-path integration/Cargo.toml"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.31.1"
+    "@coral-xyz/anchor": "^0.31.1",
+    "@solana/spl-token": "^0.4.9",
+    "@solana/web3.js": "^1.98.0"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",

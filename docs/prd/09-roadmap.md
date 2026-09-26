@@ -13,15 +13,18 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 - **Gate:** program builds; the crates compile to `sbf`; CU numbers written down
 
 ## Phase 1 — Core program (Weeks 2–5: 10-05 → 11-01)
-- [ ] Accounts: Exchange, Market, Collateral, UserAccount, OrderRecord (`05` §1)
-- [ ] deposit/withdraw (SPL + Token-2022 via `token_interface`), deposit caps, pause
-- [ ] set_delegate / revoke; order message encoder (Rust + TS) + **golden test**
-- [ ] `settle_fills` with Ed25519 introspection + full `validate_fill` table
-- [ ] position effects (open/increase/reduce/close), fees, OI
-- [ ] Pyth read → OracleSnapshot → guard; execution-deviation band
-- [ ] `post_session_calendar` (pulled forward from Phase 2 so markets are not always Closed)
-- [ ] Tests: each validate_fill rule, each ed25519 tampering case, conservation invariant
+- [x] Accounts: Exchange, Market, Collateral, UserAccount, OrderRecord (`05` §1)
+- [x] deposit/withdraw (SPL + Token-2022 via `token_interface`), deposit caps, pause
+- [x] set_delegate / revoke; order message encoder (Rust + TS) + **golden test**
+- [x] `settle_fills` with Ed25519 introspection + full `validate_fill` table
+- [x] position effects (open/increase/reduce/close), fees, OI
+- [x] Pyth read → OracleSnapshot → guard; execution-deviation band
+- [x] `post_session_calendar` (pulled forward from Phase 2 so markets are not always Closed)
+- [x] Tests: each validate_fill rule, each ed25519 tampering case, conservation invariant
 - **Gate:** a local-validator end-to-end run: two users, session keys, 1,000 random fills, conservation holds
+  - ✅ Passed 2026-09-26 (`scripts/e2e-local.sh`): 1,000 fills in 65 s, median 127k CU,
+    solvent at 5 marks every 100 fills, strict equality when flat, USDC conserved to the
+    base unit after full withdrawals. Not yet in CI (`11` L1).
 
 ## Phase 2 — Risk completeness (Weeks 5–8: 10-26 → 11-22)
 - [ ] Session calendar + `post_session_calendar`; closed mark EMA; margin ramp
