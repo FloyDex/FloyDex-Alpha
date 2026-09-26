@@ -2,7 +2,7 @@
   "license": "MIT OR Apache-2.0",
   "private": true,
   "scripts": {
-    "build": "RUSTUP_TOOLCHAIN=stable anchor build",
+    "build": "RUSTUP_TOOLCHAIN=1.96.1 anchor build",
     "build:bench": "cargo build-sbf --manifest-path programs/kryon-perps/Cargo.toml --features bench --sbf-out-dir target/deploy-bench",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "e2e": "scripts/e2e-local.sh",
