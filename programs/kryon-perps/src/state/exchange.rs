@@ -25,7 +25,7 @@ pub struct Exchange {
     pub calendar_authority: Pubkey,
     pub paused: bool,
     pub fee_config: FeeConfig,
-    /// `Insurance` PDA (Phase 2). Default until then.
+    /// `Insurance` PDA, set by `init_insurance`. Default until then.
     pub insurance: Pubkey,
     /// `sha256(genesis_hash || program_id)`, computed off-chain (a program
     /// cannot read the genesis hash). Bound into every signed order.
@@ -41,7 +41,12 @@ pub struct Exchange {
     /// Collaterals added so far; the next one gets this index.
     pub collateral_count: u8,
     pub bump: u8,
-    pub _reserved: [u8; 64],
+    /// Liquidator reward cap, bps of closed notional (≤ 10%, `05` §2). Set
+    /// with the insurance fund; zero means liquidation is not live yet.
+    pub max_reward_bps: u32,
+    /// Share of a position one liquidation step may close (`plan_liquidation`).
+    pub partial_liquidation_bps: u32,
+    pub _reserved: [u8; 56],
 }
 
 impl Exchange {

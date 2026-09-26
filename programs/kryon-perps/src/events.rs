@@ -125,3 +125,60 @@ pub struct FundingUpdated {
     pub long_index: i128,
     pub short_index: i128,
 }
+
+#[event]
+pub struct Staked {
+    pub staker: Pubkey,
+    pub amount: u64,
+    pub shares: i128,
+    pub fund: i128,
+}
+
+#[event]
+pub struct UnstakeRequested {
+    pub staker: Pubkey,
+    pub shares: i128,
+    pub unlock_ts: u64,
+}
+
+#[event]
+pub struct Unstaked {
+    pub staker: Pubkey,
+    pub shares: i128,
+    pub amount: u64,
+    pub fund: i128,
+}
+
+/// A loss took the fund to zero with shares outstanding: they are retired.
+#[event]
+pub struct SharesRetired {
+    pub epoch: u32,
+    pub retired_shares: i128,
+}
+
+#[event]
+pub struct Liquidated {
+    pub owner: Pubkey,
+    pub sub_id: u8,
+    pub liquidator: Pubkey,
+    pub market_id: u16,
+    pub position_id: u64,
+    pub size: i128,
+    pub price: i128,
+    pub penalty: i128,
+    pub reward: i128,
+    pub to_insurance: i128,
+    /// Settlement credit from the user's other collateral, sold to the liquidator.
+    pub seized_credit: i128,
+}
+
+#[event]
+pub struct BadDebt {
+    pub owner: Pubkey,
+    pub sub_id: u8,
+    /// Drawn from the insurance fund.
+    pub covered: i128,
+    /// Beyond the fund: recorded as bad debt.
+    pub written_off: i128,
+    pub total_bad_debt: i128,
+}

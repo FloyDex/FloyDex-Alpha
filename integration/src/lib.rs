@@ -1091,7 +1091,7 @@ pub fn settlement_liabilities(w: &World, users: &[&Trader], market_id: u16, pric
     let ex = w.exchange();
     let c: kryon_perps::state::Collateral = fetch(&w.svm, &collateral_pda(&ex.settlement_mint));
     let m = w.market(market_id);
-    let mut total = c.fees_accrued;
+    let mut total = c.fees_accrued + insurance_fund(w);
     for t in users {
         let u = w.user(t);
         total += u.balance(ex.settlement_collateral_index);
@@ -1115,6 +1115,27 @@ pub fn settlement_liabilities(w: &World, users: &[&Trader], market_id: u16, pric
     total
 }
 
+pub fn insurance_pda() -> Pubkey {
+    Pubkey::find_program_address(&[b"insurance"], &kryon_perps::ID).0
+}
+pub fn stake_pda(owner: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[b"stake", owner.as_ref()], &kryon_perps::ID).0
+}
+
+/// The insurance fund's NAV, 0 before `init_insurance`.
+pub fn insurance_fund(w: &World) -> i128 {
+    w.svm
+        .get_account(&insurance_pda())
+        .map_or(0, |_| w.insurance().fund)
+}
+
+/// Recorded bad debt: the shortfall the vault is allowed to have.
+pub fn bad_debt(w: &World) -> i128 {
+    w.svm
+        .get_account(&insurance_pda())
+        .map_or(0, |_| w.insurance().bad_debt)
+}
+
 /// Solvency: the vault covers every liability; any dust is the protocol's.
 #[track_caller]
 pub fn assert_solvent(
@@ -1127,7 +1148,7 @@ pub fn assert_solvent(
     let c = w.collateral(usdc);
     let vault = i128::from(token_balance(&w.svm, &vault_pda(&usdc.mint))) * c.scale();
     let liabilities = settlement_liabilities(w, users, market_id, price);
-    let slack = vault - liabilities;
+    let slack = vault + bad_debt(w) - liabilities;
     assert!(slack >= 0, "insolvent by {} wei at price {price}", -slack);
     slack
 }
@@ -1148,8 +1169,9 @@ pub fn assert_conserved_flat(w: &World, usdc: &Asset, users: &[&Trader]) {
         .iter()
         .map(|t| w.user(t).balance(c.index))
         .sum::<i128>()
-        + c.fees_accrued;
-    let dust = vault - sum;
+        + c.fees_accrued
+        + insurance_fund(w);
+    let dust = vault + bad_debt(w) - sum;
     assert!(
         (0..c.scale()).contains(&dust),
         "vault {vault} vs balances+fees {sum}: dust {dust}"
@@ -1253,5 +1275,148 @@ impl World {
         self.warp(secs);
         let now = self.now();
         mock_usd(&mut self.svm, FEED_TSLA, dollars, now);
+    }
+}
+
+// --- insurance and liquidation ---
+
+impl World {
+    pub fn insurance(&self) -> kryon_perps::state::Insurance {
+        fetch(&self.svm, &insurance_pda())
+    }
+
+    pub fn stake_position(&self, owner: &Pubkey) -> kryon_perps::state::StakePosition {
+        fetch(&self.svm, &stake_pda(owner))
+    }
+
+    pub fn init_insurance(
+        &mut self,
+        cooldown: u64,
+        max_reward_bps: u32,
+        partial_liquidation_bps: u32,
+    ) -> TxResult {
+        let settlement = self.exchange().settlement_mint;
+        let i = ix(
+            ka::InitInsurance {
+                exchange: exchange_pda(),
+                admin: self.admin.pubkey(),
+                insurance: insurance_pda(),
+                settlement_collateral: collateral_pda(&settlement),
+                system_program: anchor_lang::system_program::ID,
+            },
+            ki::InitInsurance {
+                unstake_cooldown_secs: cooldown,
+                config: kryon_perps::LiquidationConfig {
+                    max_reward_bps,
+                    partial_liquidation_bps,
+                },
+            },
+        );
+        self.admin_send(&[i])
+    }
+
+    fn stake_accounts(&self, staker: &Pubkey, asset: &Asset, token: &Pubkey) -> ka::MoveStake {
+        ka::MoveStake {
+            exchange: exchange_pda(),
+            insurance: insurance_pda(),
+            staker: *staker,
+            stake_position: stake_pda(staker),
+            settlement_collateral: collateral_pda(&asset.mint),
+            mint: asset.mint,
+            vault: vault_pda(&asset.mint),
+            staker_token: *token,
+            token_program: asset.token_program,
+            system_program: anchor_lang::system_program::ID,
+            event_authority: event_authority(),
+            program: kryon_perps::ID,
+        }
+    }
+
+    pub fn stake(
+        &mut self,
+        staker: &Keypair,
+        asset: &Asset,
+        token: &Pubkey,
+        amount: u64,
+    ) -> TxResult {
+        let i = ix(
+            self.stake_accounts(&staker.pubkey(), asset, token),
+            ki::Stake { amount },
+        );
+        send(&mut self.svm, &[i], staker, &[])
+    }
+
+    pub fn request_unstake(&mut self, staker: &Keypair, shares: i128) -> TxResult {
+        let i = ix(
+            ka::RequestUnstake {
+                insurance: insurance_pda(),
+                staker: staker.pubkey(),
+                stake_position: stake_pda(&staker.pubkey()),
+                event_authority: event_authority(),
+                program: kryon_perps::ID,
+            },
+            ki::RequestUnstake { shares },
+        );
+        send(&mut self.svm, &[i], staker, &[])
+    }
+
+    pub fn withdraw_unstaked(
+        &mut self,
+        staker: &Keypair,
+        asset: &Asset,
+        token: &Pubkey,
+    ) -> TxResult {
+        let i = ix(
+            self.stake_accounts(&staker.pubkey(), asset, token),
+            ki::WithdrawUnstaked {},
+        );
+        send(&mut self.svm, &[i], staker, &[])
+    }
+
+    /// `liquidate` by `liquidator` of `user`'s `position_id` in `market_id`.
+    /// `extra` = the user's then the liquidator's risk accounts.
+    pub fn liquidate(
+        &mut self,
+        liquidator: &Trader,
+        user: &Trader,
+        market_id: u16,
+        position_id: u64,
+        extra: Vec<anchor_lang::prelude::AccountMeta>,
+    ) -> TxResult {
+        let m = self.market(market_id);
+        let i = ix_with(
+            ka::Liquidate {
+                exchange: exchange_pda(),
+                insurance: insurance_pda(),
+                liquidator: liquidator.key(),
+                liquidator_account: liquidator.user,
+                user_account: user.user,
+                market: market_pda(market_id),
+                price_update: kryon_perps::oracle::push_feed_address(
+                    m.pyth_shard_id,
+                    &m.pyth_feed_id,
+                ),
+                event_authority: event_authority(),
+                program: kryon_perps::ID,
+            },
+            ki::Liquidate { position_id },
+            extra,
+        );
+        send(
+            &mut self.svm,
+            &[compute_budget(1_400_000), i],
+            &liquidator.kp,
+            &[],
+        )
+    }
+
+    /// A funded trader with `usdc` whole dollars deposited.
+    pub fn funded_trader(&mut self, usdc: &Asset, dollars: u64) -> Trader {
+        let t = self.trader(0);
+        if dollars > 0 {
+            let wallet = self.wallet(&t, usdc, dollars * 1_000_000);
+            assert_ok(self.deposit(&t, usdc, &wallet, dollars * 1_000_000));
+        }
+        t
     }
 }

@@ -27,10 +27,10 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
     base unit after full withdrawals. Not yet in CI (`11` L1).
 
 ## Phase 2 — Risk completeness (Weeks 5–8: 10-26 → 11-22)
-- [ ] Session calendar + `post_session_calendar`; closed mark EMA; margin ramp
-- [ ] update_funding (premium-based, elapsed cap)
-- [ ] liquidate (partial, capped reward) → insurance → bad debt → ADL
-- [ ] Insurance staking (shares, cooldown, retire on wipe)
+- [x] Session calendar + `post_session_calendar`; closed mark EMA; margin ramp (+ `post_mark`, grace, reopen)
+- [x] update_funding (premium-based, elapsed cap)
+- [ ] liquidate (partial, capped reward) → insurance → bad debt → ADL (liquidate → insurance → bad debt done; ADL next)
+- [x] Insurance staking (shares, cooldown, retire on wipe)
 - [ ] xStocks collateral: haircut, multiplier, extension allow-list
 - [ ] Fuzzing (Trident / proptest) for the invariants in `05` §7
 - **Gate:** a liquidation actually executes in tests **and** on devnet. On Stellar it never did (see `11`). Weekend replay backtest passes (`07` §7)

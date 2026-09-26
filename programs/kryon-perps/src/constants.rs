@@ -6,6 +6,8 @@ pub const COLLATERAL_SEED: &[u8] = b"collateral";
 pub const VAULT_SEED: &[u8] = b"vault";
 pub const USER_SEED: &[u8] = b"user";
 pub const ORDER_SEED: &[u8] = b"order";
+pub const INSURANCE_SEED: &[u8] = b"insurance";
+pub const STAKE_SEED: &[u8] = b"stake";
 
 /// Operator keys the matcher may rotate between.
 pub const MAX_OPERATORS: usize = 4;
@@ -25,6 +27,11 @@ pub const MAX_ORDER_TTL_SECS: u64 = 7 * 86_400;
 pub const MAX_DECIMALS: u8 = 18;
 /// Order sizes and prices travel as u64 at 1e9; widen by this to reach 1e18.
 pub const WIRE_TO_PRECISION: i128 = 1_000_000_000;
+
+/// Liquidator reward ceiling (`05` §2: `max_reward_bps` ≤ 10%).
+pub const MAX_REWARD_BPS_CEILING: u32 = 1_000;
+/// Longest unstake cooldown the admin may set.
+pub const MAX_UNSTAKE_COOLDOWN_SECS: u64 = 90 * 86_400;
 
 /// Longest margin ramp before a close, and grace after it, a market may set.
 pub const MAX_CLOSE_RAMP_SECS: u32 = 4 * 3_600;

@@ -13,8 +13,8 @@ Token-2022). One program, internal modules. Big accounts use zero-copy
 | `Collateral` | `["collateral", mint]` | `mint`, `token_program`, `vault` (token account PDA `["vault", mint]`), `decimals`, `haircut_bps`, `pyth_feed_id`, `deposit_cap`, `total_deposited`, `active` | < 300 B |
 | `UserAccount` (zero-copy) | `["user", owner, sub_id: u8]` | `owner`, `delegate`, `delegate_expiry`, `balances: [Balance; 8]` (collateral index + `i128` amount), `positions: [PositionSlot; 16]`, `cancel_all_below_nonce: u64`, `next_position_id`, counters | ~2.2 KB |
 | `OrderRecord` | `["order", owner, sub_id: u8, nonce: u64 LE]` | `filled: i128`, `cancelled_until: u64` (tombstone), `expiry_ts`, `payer` | 80 B, closed on reclaim |
-| `Insurance` | `["insurance"]` | `usdc_vault`, `total_shares`, `bad_debt`, `unstake_cooldown_secs` | < 300 B |
-| `StakePosition` | `["stake", owner]` | `shares`, `pending_unstake_shares`, `unlock_ts` | < 200 B |
+| `Insurance` | `["insurance"]` | `usdc_vault`, `fund`, `total_shares`, `bad_debt`, `epoch`, `unstake_cooldown_secs` | < 300 B |
+| `StakePosition` | `["stake", owner]` | `shares`, `pending_unstake_shares`, `unlock_ts`, `epoch` | < 200 B |
 
 Notes:
 - **`positions: [PositionSlot; 16]`** — `risk-engine` caps a health computation
@@ -142,9 +142,72 @@ insurance fund; bad debt is recorded), `adl(...)` (only when
 `Insurance.bad_debt > 0`, only against profitable positions, the same rules
 as Stellar Q4).
 
+**`liquidate` as built: position transfer (decided 2026-09-26, with the
+owner).** Stellar closed only the distressed side against nobody, which
+leaves OI one-sided (§7.3) and makes the protocol the silent counterparty.
+Here the liquidator's own `UserAccount` (signed by its owner, never the
+liquidated owner) takes the slice at the mark, like a fill:
+1. Refused while paused, while the market is Halted (`07` §2: the mark is
+   stale), before `init_insurance`, and for a healthy account. Maintenance
+   is session-scaled and ramped, except inside a close's grace window for an
+   account that added no exposure since the ramp began (`07` §2).
+2. Size from `plan_liquidation`, per step capped at
+   `Exchange.partial_liquidation_bps`.
+3. The user pays `liquidation_fee_bps` of the closed notional; the
+   liquidator gets `min(penalty, max_reward_bps · notional)`, the rest goes
+   to the insurance fund. `max_reward_bps` must be in (0, 1,000]: zero
+   would switch liquidation off economically.
+4. The user's shortfall (maintenance − equity) must strictly shrink (§7.5).
+5. A negative settlement balance is covered first by the user's other
+   collateral, **sold to the liquidator** at its haircut value, lowest
+   haircut first (Stellar `seize_for_deficit`). Each mint's ledger still
+   balances and no protocol-owned inventory appears; the haircut is the
+   liquidator's discount. A partial take rounds up (against the user) and
+   credits exactly the debt.
+6. If equity is still negative, `min(−equity, −settlement balance)` is
+   covered by the fund, and what the fund can't cover is written off into
+   `Insurance.bad_debt` (Stellar `absorb_bad_debt`). The user's balance
+   returns to zero; it is never covered beyond −equity, since other
+   positions may still be in profit.
+7. The liquidator must meet initial margin afterwards (or only have reduced
+   its own exposure without worsening health), exactly like a fill.
+
+Measured: 155k CU with one position on each side (LiteSVM).
+
+**`plan_liquidation` sizing fixed (decided 2026-09-26, with the owner).**
+The Stellar formula closed notional equal to the shortfall. Closing at the
+mark only releases `maintenance_bps − fee_bps` of each unit, so a step
+cleared about a tenth of the shortfall, liquidations crawled geometrically,
+and a bankrupt account never fully closed. Now a step closes
+`⌈shortfall / (price · (mm − fee))⌉`, the smallest slice that restores
+maintenance after the penalty, still `min`'d with the per-step cap (the L9
+fix stands). It closes in full when that exceeds the position or when
+`fee ≥ mm`. One step now restores a partially underwater account; a
+bankrupt one closes in full.
+
 ### Insurance
 `stake`, `request_unstake`, `withdraw_unstaked`, internal `cover_deficit`, and
 retire shares when a loss wipes the pool.
+
+**As built (decided 2026-09-26):**
+- The fund's tokens sit in the settlement collateral's vault as a ledger
+  entry (`Insurance.fund`, like `fees_accrued`), so conservation stays one
+  equation per mint: `vault + bad_debt ≥ balances + fees + fund + Σ upnl`,
+  with equality (to dust) when flat. `usdc_vault` records that vault.
+- One pool, unlike Stellar's separate staked/operating balances with an
+  admin sweep: `fund` is the stakers' NAV. Penalties grow it and
+  `cover_deficit` draws it down directly. Stellar's explicit sweep existed
+  to keep a new capital source out of hardened paths; here the waterfall is
+  one instruction with its own tests.
+- `stake` mints at NAV before the deposit (1:1 for the first staker or
+  after a wipe). `request_unstake` → `unstake_cooldown_secs` (≤ 90 days) →
+  `withdraw_unstaked` redeems at the NAV at withdrawal, in whole token
+  units (sub-unit dust stays in the fund). Pending shares still absorb
+  losses. One request at a time. `stake` stops while paused; withdrawing a
+  matured request does not.
+- A loss that takes `fund` to zero with shares outstanding bumps `epoch`
+  and zeroes `total_shares` in one write; older positions are worth nothing
+  and are reset on next touch.
 
 ## 3. Events (for the indexer)
 `Deposit`, `Withdraw`, `FillSettled{market, maker, taker, size, price, maker_fee, taker_fee}`,

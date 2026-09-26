@@ -311,3 +311,20 @@ pub fn validate_withdrawal(
     };
     risk_engine::validate_withdrawal(&snapshot, markets, withdrawal_value).core()
 }
+
+/// `risk_engine::plan_liquidation` on the user's current state.
+pub fn plan_liquidation(
+    user: &UserAccount,
+    inputs: &RiskInputs,
+    markets: &[MarketSnapshot],
+    position_id: u64,
+    partial_liquidation_bps: u32,
+) -> Result<risk_engine::LiquidationPlan> {
+    let (positions, collateral) = snapshot_parts(user, inputs)?;
+    let snapshot = AccountSnapshot {
+        owner: user.owner.to_bytes(),
+        collateral: &collateral,
+        positions: &positions,
+    };
+    risk_engine::plan_liquidation(&snapshot, markets, position_id, partial_liquidation_bps).core()
+}

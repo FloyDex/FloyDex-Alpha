@@ -97,6 +97,18 @@ pub enum KryonError {
     PostMarkTooSoon,
     #[msg("Market is halted: a scheduled session with a stale oracle")]
     MarketHalted,
+    #[msg("The insurance fund is not initialized")]
+    InsuranceNotInitialized,
+    #[msg("An unstake request is already pending")]
+    UnstakePending,
+    #[msg("Not enough shares")]
+    InsufficientShares,
+    #[msg("No pending unstake request")]
+    NoPendingUnstake,
+    #[msg("The unstake cooldown has not passed")]
+    UnstakeLocked,
+    #[msg("An owner cannot liquidate their own account")]
+    SelfLiquidation,
 }
 
 impl From<CoreError> for KryonError {

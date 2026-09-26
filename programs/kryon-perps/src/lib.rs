@@ -101,6 +101,35 @@ pub mod kryon_perps {
         )
     }
 
+    pub fn init_insurance(
+        ctx: Context<InitInsurance>,
+        unstake_cooldown_secs: u64,
+        config: LiquidationConfig,
+    ) -> Result<()> {
+        instructions::insurance::handle_init_insurance(ctx, unstake_cooldown_secs, config)
+    }
+
+    pub fn set_liquidation_config(
+        ctx: Context<AdminOnly>,
+        config: LiquidationConfig,
+    ) -> Result<()> {
+        instructions::insurance::handle_set_liquidation_config(ctx, config)
+    }
+
+    // --- insurance stakers ---
+
+    pub fn stake(ctx: Context<MoveStake>, amount: u64) -> Result<()> {
+        instructions::insurance::handle_stake(ctx, amount)
+    }
+
+    pub fn request_unstake(ctx: Context<RequestUnstake>, shares: i128) -> Result<()> {
+        instructions::insurance::handle_request_unstake(ctx, shares)
+    }
+
+    pub fn withdraw_unstaked(ctx: Context<MoveStake>) -> Result<()> {
+        instructions::insurance::handle_withdraw_unstaked(ctx)
+    }
+
     // --- calendar authority (keeper) ---
 
     pub fn post_session_calendar(
@@ -120,6 +149,14 @@ pub mod kryon_perps {
     /// Hourly funding from the book premium (`05` §2).
     pub fn update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
         instructions::funding::handle_update_funding(ctx)
+    }
+
+    /// Position-transfer liquidation. Remaining accounts: see `instructions::liquidate`.
+    pub fn liquidate<'info>(
+        ctx: Context<'_, '_, 'info, 'info, Liquidate<'info>>,
+        position_id: u64,
+    ) -> Result<()> {
+        instructions::liquidate::handle_liquidate(ctx, position_id)
     }
 
     // --- user ---
