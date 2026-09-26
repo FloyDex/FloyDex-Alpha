@@ -30,7 +30,10 @@ pub struct Exchange {
     /// `sha256(genesis_hash || program_id)`, computed off-chain (a program
     /// cannot read the genesis hash). Bound into every signed order.
     pub domain: [u8; 32],
+    /// Ceiling on the sum of every market's `oi_policy_bps` (`11` L11).
     pub max_total_oi_policy_bps: u32,
+    /// Running sum of every market's `oi_policy_bps`.
+    pub total_oi_policy_bps: u32,
     /// Mint of the settlement collateral (USDC). Default until added.
     pub settlement_mint: Pubkey,
     /// Collaterals added so far; the next one gets this index.

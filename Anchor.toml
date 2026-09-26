@@ -4,7 +4,9 @@ solana_version = "2.1.0"
 package_manager = "yarn"
 
 [features]
-resolution = true
+# anchor-syn 0.31.1 mis-parses `mint.key().as_ref()` seeds with the current
+# macro stack; clients pass PDAs explicitly, so auto-resolution is off.
+resolution = false
 skip-lint = false
 
 [programs.localnet]

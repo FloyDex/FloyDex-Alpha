@@ -25,7 +25,9 @@ fn run(svm: &mut LiteSVM, payer: &Keypair, data: Vec<u8>) -> (Vec<String>, u64) 
     let mut cu = vec![2u8];
     cu.extend_from_slice(&1_400_000u32.to_le_bytes());
     let budget = anchor_lang::solana_program::instruction::Instruction {
-        program_id: anchor_lang::solana_program::pubkey!("ComputeBudget111111111111111111111111111111"),
+        program_id: anchor_lang::solana_program::pubkey!(
+            "ComputeBudget111111111111111111111111111111"
+        ),
         accounts: vec![],
         data: cu,
     };
@@ -53,7 +55,12 @@ fn mul_div_compute_units() {
         ("near i128 limit /1e18", i128::MAX / 3, 2 * P, P),
     ];
     for (name, a, b, d) in cases {
-        let i256 = kryon_perps::instruction::BenchMulDiv { a, b, denominator: d }.data();
+        let i256 = kryon_perps::instruction::BenchMulDiv {
+            a,
+            b,
+            denominator: d,
+        }
+        .data();
         let (logs, _) = run(&mut svm, &payer, i256);
         let line = logs.iter().find(|l| l.contains("bench mul_div:")).unwrap();
         println!("{name:<28} {line}");
