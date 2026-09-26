@@ -24,7 +24,8 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 - **Gate:** a local-validator end-to-end run: two users, session keys, 1,000 random fills, conservation holds
   - ✅ Passed 2026-09-26 (`scripts/e2e-local.sh`): 1,000 fills in 65 s, median 158k CU (with reduce-only relief),
     solvent at 5 marks every 100 fills, strict equality when flat, USDC conserved to the
-    base unit after full withdrawals. Not yet in CI (`11` L1).
+    base unit after full withdrawals. In CI on every push since 2026-09-26 (`yarn e2e 200`,
+    `.github/workflows/ci.yml`, `11` L1).
 
 ## Phase 2 — Risk completeness (Weeks 5–8: 10-26 → 11-22)
 - [x] Session calendar + `post_session_calendar`; closed mark EMA; margin ramp (+ `post_mark`, grace, reopen)
