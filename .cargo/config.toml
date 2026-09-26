@@ -1,0 +1,4 @@
+# Pick dependency versions whose declared MSRV fits `rust-version` (1.79, the
+# rustc inside platform-tools v1.43), so `anchor build` keeps working.
+[resolver]
+incompatible-rust-versions = "fallback"

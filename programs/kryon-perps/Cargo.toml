@@ -1,0 +1,29 @@
+[package]
+name = "kryon-perps"
+description = "Kryon tokenized-stock perps: settlement, margin and risk on Solana."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "kryon_perps"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+# Compiles the compute-unit benchmark instructions in. Never enable for a deploy.
+bench = []
+
+[dependencies]
+anchor-lang = "=0.31.1"
+anchor-spl = { version = "=0.31.1", default-features = false, features = ["token", "token_2022", "associated_token"] }
+pyth-solana-receiver-sdk = "=1.0.1"
+protocol-core = { workspace = true }
+risk-engine = { workspace = true }

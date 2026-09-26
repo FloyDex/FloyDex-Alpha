@@ -20,6 +20,9 @@ settlement of user-signed intents, one Anchor program.
 ## Commands
 - `cargo test`, `cargo clippy --all-targets`, `cargo fmt --all`
 - Toolchain on this machine: anchor-cli 0.31.1, solana-cli 2.1.0 (Agave)
+- Build the program with `RUSTUP_TOOLCHAIN=stable anchor build` (`yarn build`). Without it, Anchor builds the IDL on nightly, which breaks `ethnum`.
+- The SBF compiler is rustc 1.79, so the lockfile must stay 1.79-compatible (`rust-version` plus the fallback resolver). Pinned: `ethnum 1.5.2`, `blake3 1.5.5`, `anchor-lang =0.31.1`, `pyth-solana-receiver-sdk =1.0.1`
+- Program tests (LiteSVM) live in `integration/`, a separate workspace: `cargo test --manifest-path integration/Cargo.toml`
 
 ## Commit style
 Commit as the repo owner, in plain English messages, and push often.

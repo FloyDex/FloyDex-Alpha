@@ -3,6 +3,10 @@ resolver = "2"
 members = [
     "crates/protocol-core",
     "crates/risk-engine",
+    "programs/*",
+]
+exclude = [
+    "integration",
 ]
 
 [workspace.package]
@@ -10,8 +14,20 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Kryon Protocol"]
 license = "MIT OR Apache-2.0"
+# platform-tools v1.43 (solana-cli 2.1.0) ships rustc/cargo 1.79.
+rust-version = "1.79"
 
 [workspace.dependencies]
 ethnum = "1.5"
 protocol-core = { path = "crates/protocol-core" }
 risk-engine = { path = "crates/risk-engine" }
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1

@@ -157,6 +157,31 @@ Request 400k CU per transaction plus a priority fee. `mul_div` uses `ethnum`
 I256; benchmark it in Solana BPF during week 1. If it's heavy, replace it
 with `u128` mul-div with overflow checks (inputs are bounded).
 
+### Measured: `mul_div` in SBF (2026-09-26)
+
+Measured in LiteSVM 0.7.1 on platform-tools v1.43, release build, one call
+per measurement via `sol_remaining_compute_units` (`--features bench`,
+`integration/tests/bench.rs`). These are prototypes, not protocol code: the
+crates still use I256.
+
+| Case | I256 (current) | u128 fast path, I256 fallback | 64-bit limbs, u64 denominator |
+|---|---|---|---|
+| bps on 1e18 (`100e18·50/1e4`) | 3,773 | 440 | 1,021 |
+| `mul_precision(2e18, 3e18)` | 4,255 | 824 | 1,404 |
+| notional `1e6e18 · 250e18 / 1e18` | 5,433 | 5,683 (falls back) | 1,562 |
+| negative pnl | 5,305 | 5,551 (falls back) | 1,675 |
+| near the i128 limit / 1e18 | 5,979 | 6,232 (falls back) | 1,776 |
+
+All prototypes return results identical to I256 on these inputs. **Verdict:
+I256 is too heavy.** A health check does about 7–8 `mul_div`s per position,
+so two users with 3 positions each come to ~45 calls × ~5k ≈ 225k CU of math
+alone, against the < 250k `settle_fills` target. A plain u128 path doesn't
+help, because PRECISION × PRECISION products overflow u128. **Proposal
+(pending decision):** a 64-bit-limb `mul_div` with an exact 256-bit product
+and a u64-denominator fast path (PRECISION and BPS), falling back to I256
+otherwise. It gives bit-identical results at ~3.5× less CU and needs a
+differential/proptest against I256 before it lands in `protocol-core`.
+
 ## 7. Invariants to fuzz (Trident or proptest on `risk-engine`)
 
 1. Conservation: sum of user balances + insurance + fee vault == token vault

@@ -1,0 +1,19 @@
+# Host-only program tests (LiteSVM). A separate workspace on purpose: its
+# dependencies must never move the program's lockfile off versions that
+# platform-tools v1.43 (rustc 1.79) can build.
+[workspace]
+
+[package]
+name = "kryon-integration"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+anchor-lang = "=0.31.1"
+kryon-perps = { path = "../programs/kryon-perps", features = ["no-entrypoint", "bench"] }
+litesvm = "0.7.1"
+solana-keypair = "2.2"
+solana-message = "2.2"
+solana-signer = "2.2"
+solana-transaction = "2.2"
