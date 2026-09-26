@@ -236,6 +236,11 @@ pub fn validate_market_params(market_id: u16, p: &MarketParams) -> Result<()> {
         && p.maintenance_margin_bps <= p.initial_margin_bps
         && p.max_leverage_bps > 0
         && p.liquidation_fee_bps <= 1_000
+        // A penalty at or above maintenance would make every liquidation
+        // step raise the shortfall, so `liquidate` could never run (found by
+        // the risk-engine property tests). Session multipliers only raise
+        // maintenance, so the base value is the binding one.
+        && p.liquidation_fee_bps < p.maintenance_margin_bps
         && p.max_open_interest > 0
         && p.max_oracle_age_secs > 0
         && p.max_oracle_confidence_bps <= 10_000
