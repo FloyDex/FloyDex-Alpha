@@ -14,7 +14,7 @@ Solana plan. Details are in `reference/stellar/audits/` and
 | L6 | Mainnet was **silent for weeks** (Neon 402 quota); the monitor had no webhook | Alerts must reach a phone; an external heartbeat; DB quota alarms |
 | L7 | **Admin never handed to governance** on mainnet; the deployer keypair still controls it | Squads multisig + time lock before the first deposit (roadmap gate) |
 | L8 | The OI-imbalance funding formula was **structurally always zero** | Premium-based funding (already ported) + a test that funding is non-zero for a rich perp |
-| L9 | Partial liquidation **over-liquidated** (used max instead of min) | Ported, with its test (`partial_liquidation_does_not_over_liquidate`) |
+| L9 | Partial liquidation **over-liquidated** (used max instead of min) | Ported, with its test (`partial_liquidation_does_not_over_liquidate`). The step size itself under-shot by ~10x (it closed notional equal to the shortfall), fixed 2026-09-26 (`05` §2) |
 | L10 | Isolated margin **promised containment the ledger didn't provide** (KRY-Q5) | Isolated mode is off until a real per-position margin ledger exists |
 | L11 | The insurance cap was checked per market against one shared fund (Q11) | Keep `max_total_oi_policy_bps` aggregate check |
 | L12 | ADL could run with no bad debt (Q4) | ADL requires `bad_debt > 0` and a profitable target |
