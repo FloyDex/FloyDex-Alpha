@@ -1,7 +1,12 @@
 # Local Postgres for the off-chain stack. Not for production — see the
 # services-vm memory / ops docs for the real box. Run:
 #   docker compose up -d
-#   DATABASE_URL=postgresql://kryon:kryon@localhost:5433/kryon yarn db:migrate:dev
+#   DATABASE_URL=postgresql://kryon:kryon@localhost:5433/kryon \
+#   DIRECT_URL=postgresql://kryon:kryon@localhost:5433/kryon \
+#   yarn db:migrate:dev
+#
+# DIRECT_URL is schema.prisma's non-pooled connection for migrations; there's
+# no pooler in front of this Postgres, so it's the same URL as DATABASE_URL.
 services:
   postgres:
     image: postgres:16

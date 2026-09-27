@@ -118,6 +118,9 @@ jobs:
           --health-retries 20
     env:
       DATABASE_URL: postgresql://kryon:kryon@localhost:5433/kryon
+      # No pooler in front of this Postgres, so the direct connection is the
+      # same URL (schema.prisma requires DIRECT_URL for `migrate deploy`).
+      DIRECT_URL: postgresql://kryon:kryon@localhost:5433/kryon
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
