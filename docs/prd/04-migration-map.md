@@ -41,7 +41,7 @@ Legend: ✅ done · ♻️ port (logic survives) · 🔁 rewrite (idea survives,
 | `scripts/oracle-keeper.ts` | 542 | 🔁 | Becomes the **Pyth price pusher** (Hermes, API key → post updates to our shard). Keep the 3-CEX median as a **deviation alarm only**, never a price source |
 | `scripts/keeper-refill.ts` | — | ♻️ | SOL top-ups for operator and keeper wallets |
 | `lib/stellar/*` (client, freighter, invoke, scval, simulate, reflector, settlement, collateral, contracts, oracle) | — | 🗑 → ➕ `lib/solana/*` | New: connection, Anchor program client, tx builder, ALT management, priority fees, PDA helpers |
-| `prisma/schema.prisma` | — | ♻️ | Keep the models. Addresses become base58 pubkeys; `TxJob` gets a tx signature and slot; drop `LedgerCursor` for a `SlotCursor`. **Delete the dead `Position` model** (never written, see Stellar notes) |
+| `prisma/schema.prisma` | — | ✅ ported (`services/db`) | Keep the models. Addresses are base58 pubkeys; `TxJob` gets `signature` + `slot`; `LedgerCursor` → `SlotCursor`; **the dead `Position` model is deleted**. 2026-09-27: also renamed `ledger`→`slot` and `txHash`→`signature` on every other model for Solana's own vocabulary, and re-scaled settlement-asset amounts from Stellar's 1e7 to USDC's native 1e6 (order/fill size and price stay 1e9, matching the wire format; funding indexes stay 1e18). Local Postgres via `services/db/docker-compose.yml`; the schema round-trips against a real Postgres in CI (`services` job) |
 | New: session calendar keeper | — | ➕ | Posts next week's windows (NYSE hours, DST, holidays) to each equity market |
 | New: mark EMA feeder | — | ➕ | Tracks the book mid EMA during Closed sessions; also updated on-chain inside settlement |
 

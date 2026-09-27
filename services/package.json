@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "license": "MIT OR Apache-2.0",
   "workspaces": [
-    "kit"
+    "kit",
+    "db"
   ],
   "scripts": {
     "test": "yarn workspaces run test",

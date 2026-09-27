@@ -103,6 +103,21 @@ jobs:
   services:
     name: services (Part 3 off-chain stack)
     runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kryon
+          POSTGRES_PASSWORD: kryon
+          POSTGRES_DB: kryon
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U kryon"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://kryon:kryon@localhost:5433/kryon
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -110,7 +125,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - run: yarn install --frozen-lockfile
         working-directory: services
+      - run: npx prisma generate
+        working-directory: services/db
       - run: yarn typecheck
         working-directory: services
+      - run: npx prisma migrate deploy
+        working-directory: services/db
       - run: yarn test
         working-directory: services

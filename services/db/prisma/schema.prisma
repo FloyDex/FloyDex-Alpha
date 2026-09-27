@@ -1,0 +1,529 @@
+// Prisma persistence layer for the Kryon-sol off-chain stack: matcher,
+// indexer, keepers, the settlement queue, and the audit/leaderboard/portfolio
+// projections. Ported from `reference/stellar/offchain/prisma/schema.prisma`
+// (see `docs/prd/04-migration-map.md` §2 and `docs/prd/11-lessons-from-stellar.md`
+// for what changed and why). Never import the Stellar schema; this one stands
+// alone.
+//
+// Design decisions from the port (logged here with dates per CLAUDE.md):
+//
+// 2026-09-27: addresses are base58 Solana pubkeys (wallets, mints, the
+//   program) instead of Stellar `G...`/`C...` strings — same `String` column
+//   type, different alphabet, no schema change needed beyond the comment.
+// 2026-09-27: `ledger` -> `slot`, `txHash` -> `signature` everywhere, to use
+//   Solana's own vocabulary instead of carrying Stellar terms into a chain
+//   that doesn't have "ledgers" or "tx hashes" in that sense.
+// 2026-09-27: `LedgerCursor` -> `SlotCursor` (`11` L3): one persisted cursor
+//   per (network, programId) that the indexer resumes from, so a restart
+//   never reprocesses or skips events.
+// 2026-09-27: `TxJob` carries `signature` once submitted and `slot` once
+//   confirmed, and stores base64-encoded serialized transactions
+//   (`unsignedTx`/`signedTx`) instead of Stellar XDR.
+// 2026-09-27: the `Position` model is deleted outright (`11` L13: it was
+//   dead code on Stellar that people kept "fixing"). Positions are read from
+//   chain (`UserAccount`) or from indexed `ProtocolEvent`s only — never from
+//   a DB table a service can drift out of sync with the source of truth.
+// 2026-09-27: settlement-asset amounts (collateral, PnL, fees, deposits/
+//   withdrawals, portfolio) are commented `1e6` (native USDC decimals on
+//   Solana) instead of Stellar's `1e7`. Order/fill size and price stay
+//   `1e9`, matching the signed order-message wire format (`sdk/src/order.ts`,
+//   `05` §4); funding indexes stay `1e18`, matching `protocol_core::PRECISION`
+//   (`05` §2). All of these remain `String` columns, never `Float`, so
+//   fixed-point values round-trip exactly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum TxStatus {
+  QUEUED
+  SUBMITTED
+  CONFIRMED
+  FAILED
+}
+
+enum KeeperActionStatus {
+  PLANNED
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  SKIPPED
+}
+
+enum AuditSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum StatsPeriod {
+  DAY
+  WEEK
+  MONTH
+  ALL
+}
+
+enum PnlEventKind {
+  REALIZED_TRADE
+  FUNDING
+  LIQUIDATION
+  FEE
+}
+
+enum BalanceChangeKind {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+/// One persisted cursor per (network, program), so the indexer resumes from
+/// exactly where it left off after a restart. Replaces Stellar's
+/// `LedgerCursor` (`11` L3).
+model SlotCursor {
+  id        String   @id
+  network   String
+  programId String
+  slot      BigInt
+  /// Opaque resumption token: a Helius webhook cursor or the last processed
+  /// signature for `getSignaturesForAddress` polling.
+  cursor    String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([network, programId])
+  @@index([network, slot])
+}
+
+model ProtocolEvent {
+  id        BigInt   @id @default(autoincrement())
+  network   String
+  slot      BigInt
+  signature String
+  topic     String
+  payload   Json
+  /// Deterministic per (network, slot, signature, topic, event index) so a
+  /// replayed webhook or a re-polled signature never double-inserts.
+  replayKey String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([network, slot])
+  @@index([signature])
+  @@index([topic])
+}
+
+model Market {
+  id                Int      @id
+  symbol            String   @unique
+  /// Base58 mint of the settlement collateral for this market (USDC).
+  settlementMint    String
+  active            Boolean  @default(false)
+  lastPrice         String   @default("0") // 1e9
+  volume            String   @default("0") // 1e6 (USDC notional)
+  longOpenInterest  String   @default("0") // 1e9 (base units)
+  shortOpenInterest String   @default("0") // 1e9
+  fundingLongIndex  String   @default("0") // 1e18
+  fundingShortIndex String   @default("0") // 1e18
+  lastOraclePrice   String   @default("0") // 1e18 (protocol_core::PRECISION, post Pyth normalization)
+  lastOracleSlot    BigInt   @default(0)
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+
+  fills           Fill[]
+  orders          Order[]
+  oracleSnapshots OracleSnapshot[]
+  fundingUpdates  FundingUpdate[]
+  keeperActions   KeeperAction[]
+}
+
+model Account {
+  /// Base58 wallet pubkey — the owner, never a session-key delegate.
+  address         String   @id
+  collateral      Json     @default("{}")
+  cancelledNonces BigInt[] @default([])
+  filledByNonce   Json     @default("{}")
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+
+  orders     Order[]
+  makerFills Fill[] @relation("MakerFills")
+  takerFills Fill[] @relation("TakerFills")
+}
+
+model Order {
+  id         String   @id
+  owner      String
+  marketId   Int
+  isLong     Boolean
+  size       String // 1e9
+  limitPrice String // 1e9
+  reduceOnly Boolean
+  nonce      BigInt
+  expiryTs   BigInt
+  cancelled  Boolean  @default(false)
+  filledSize String   @default("0") // 1e9
+  /// The session key's signature (base64) over the 108-byte order message
+  /// (`sdk/src/order.ts`), stored for settlement replay and audit.
+  signature  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  account Account @relation(fields: [owner], references: [address])
+  // RESTRICT, not CASCADE: de-listing a market must never delete the order
+  // history that settled against it.
+  market  Market  @relation(fields: [marketId], references: [id], onDelete: Restrict)
+
+  // Global per account, NOT per market — see reference/stellar's
+  // lib/market/order-intent.ts, ported as-is on this axis.
+  @@unique([owner, nonce])
+  @@index([marketId, isLong, limitPrice])
+  @@index([expiryTs])
+}
+
+model Fill {
+  id         BigInt   @id @default(autoincrement())
+  network    String
+  marketId   Int
+  maker      String
+  makerNonce BigInt
+  taker      String
+  takerNonce BigInt
+  fillSize   String // 1e9
+  fillPrice  String // 1e9
+  feeMaker   String   @default("0") // 1e6
+  feeTaker   String   @default("0") // 1e6
+  /// The settle_fills transaction signature this fill was confirmed in.
+  signature  String
+  slot       BigInt
+  createdAt  DateTime @default(now())
+
+  market       Market  @relation(fields: [marketId], references: [id])
+  makerAccount Account @relation("MakerFills", fields: [maker], references: [address])
+  takerAccount Account @relation("TakerFills", fields: [taker], references: [address])
+
+  @@unique([network, signature, maker, makerNonce, taker, takerNonce])
+  @@index([marketId, slot])
+  @@index([maker])
+  @@index([taker])
+}
+
+model OracleSnapshot {
+  id          BigInt   @id @default(autoincrement())
+  network     String
+  marketId    Int
+  asset       String
+  /// Always "pyth" for the priced value; a CEX median is a deviation alarm
+  /// only, never a price source (`11` L17), and is never written here.
+  source      String
+  price       String // 1e18
+  confidence  String // 1e18
+  publishTime BigInt // Pyth publish_time, unix seconds
+  writeTime   BigInt // unix seconds this snapshot was written
+  slot        BigInt
+  signature   String
+  createdAt   DateTime @default(now())
+
+  market Market @relation(fields: [marketId], references: [id])
+
+  @@unique([network, asset, publishTime, source])
+  @@index([marketId, slot])
+  @@index([asset, publishTime])
+}
+
+model FundingUpdate {
+  id         BigInt   @id @default(autoincrement())
+  network    String
+  marketId   Int
+  longIndex  String // 1e18
+  shortIndex String // 1e18
+  slot       BigInt
+  signature  String
+  createdAt  DateTime @default(now())
+
+  market Market @relation(fields: [marketId], references: [id])
+
+  @@unique([network, marketId, slot, signature])
+  @@index([marketId, slot])
+}
+
+/// A queued Solana transaction the settlement pipeline or a keeper needs
+/// submitted and confirmed, tracked independently of the matcher so matching
+/// and submission stay separate (`11` L4). `signature` is set once
+/// submitted; `slot` once confirmed.
+model TxJob {
+  id            BigInt    @id @default(autoincrement())
+  network       String
+  kind          String
+  payloadHash   String
+  /// Base64-encoded serialized (unsigned) transaction message.
+  unsignedTx    String?
+  /// Base64-encoded fully-signed transaction, ready to submit/resubmit.
+  signedTx      String?
+  attempts      Int       @default(0)
+  status        TxStatus  @default(QUEUED)
+  lastError     String?
+  /// Set once the transaction is sent to the cluster.
+  signature     String?
+  /// Set once the transaction is confirmed at the configured commitment.
+  slot          BigInt?
+  nextAttemptAt DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([network, kind, payloadHash])
+  @@index([status, nextAttemptAt])
+  @@index([signature])
+}
+
+model KeeperAction {
+  id        BigInt             @id @default(autoincrement())
+  network   String
+  kind      String
+  marketId  Int?
+  account   String?
+  payload   Json
+  status    KeeperActionStatus @default(PLANNED)
+  txJobId   BigInt?
+  slot      BigInt?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  market Market? @relation(fields: [marketId], references: [id])
+
+  @@index([network, kind, status])
+  @@index([marketId])
+}
+
+model DeploymentArtifact {
+  id           String   @id
+  network      String
+  /// Always "kryon_perps" today (`03` A1: one Anchor program, not several
+  /// contracts), kept as a string in case that ever changes.
+  contractName String
+  programId    String
+  /// sha256 of the deployed `.so`, so a redeploy at the same program id is
+  /// still distinguishable from the build that was actually audited.
+  wasmHash     String
+  gitCommit    String
+  manifest     Json
+  createdAt    DateTime @default(now())
+
+  @@unique([network, contractName])
+  @@index([wasmHash])
+}
+
+/// A Squads v4 multisig + timelock proposal (`03` A6, roadmap Phase 7),
+/// tracked here so the app can show pending governance actions without
+/// polling Squads directly on every page load.
+model GovernanceProposal {
+  id        BigInt   @id
+  network   String
+  target    String
+  action    String
+  /// sha256 of the proposed program upgrade buffer, when `action` is an upgrade.
+  wasmHash  String?
+  eta       BigInt
+  executed  Boolean  @default(false)
+  cancelled Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([network, eta])
+}
+
+model AuditFinding {
+  id          String        @id
+  severity    AuditSeverity
+  title       String
+  component   String
+  status      String
+  description String
+  evidence    Json
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([severity, status])
+  @@index([component])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LEADERBOARD
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Rolling aggregated trading stats per trader per period. One row per
+/// (network, address, period); the indexer upserts these as fills/funding/
+/// liquidations are processed. All monetary values are USDC at 1e6 precision
+/// stored as decimal strings to preserve precision.
+model TraderStat {
+  id          String      @id @default(cuid())
+  network     String
+  address     String
+  period      StatsPeriod
+  /// Inclusive start of the rolling window (UTC). For ALL this is the epoch.
+  periodStart DateTime
+  realizedPnl String      @default("0") // 1e6
+  volume      String      @default("0") // notional traded, 1e6
+  tradeCount  Int         @default(0)
+  winningTrades Int       @default(0)
+  losingTrades  Int       @default(0)
+  /// winRate = winningTrades / max(1, winningTrades+losingTrades), 0..1 (4dp string)
+  winRate     String      @default("0")
+  /// roi = realizedPnl / max(1, peakCollateral), signed ratio (4dp string)
+  roi         String      @default("0")
+  feesPaid    String      @default("0") // 1e6
+  fundingPaid String      @default("0") // 1e6 (signed)
+  liquidationCount Int    @default(0)
+  liquidatedVolume String @default("0") // 1e6
+  peakCollateral   String @default("0") // 1e6 — denominator for ROI
+  referralCount    Int    @default(0)
+  referralVolume   String @default("0") // 1e6
+  lastTradeAt DateTime?
+  updatedAt   DateTime    @default(now()) @updatedAt
+  createdAt   DateTime    @default(now())
+
+  @@unique([network, address, period])
+  // Composite indexes power the ranked leaderboard queries (ORDER BY metric DESC)
+  @@index([network, period, realizedPnl])
+  @@index([network, period, volume])
+  @@index([network, period, roi])
+  @@index([address])
+}
+
+/// Point-in-time ranked leaderboard, produced by periodic snapshot jobs so the
+/// FE can render historical boards and rank deltas without recomputing.
+model LeaderboardSnapshot {
+  id          BigInt      @id @default(autoincrement())
+  network     String
+  period      StatsPeriod
+  /// Metric this snapshot was ranked by (e.g. "pnl", "volume", "roi").
+  metric      String
+  capturedAt  DateTime    @default(now())
+  /// Ordered array of { rank, address, value, pnl, volume, roi, winRate }.
+  rankings    Json
+  traderCount Int         @default(0)
+
+  @@index([network, period, metric, capturedAt], map: "LeaderboardSnapshot_lookup_idx")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  PORTFOLIO
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Collateral deposits / withdrawals / transfers, sourced from vault events.
+/// Drives the portfolio "Deposits & Withdrawals" tab and ROI denominators.
+model BalanceChange {
+  id      BigInt            @id @default(autoincrement())
+  network String
+  address String
+  /// Base58 mint (USDC today; xStocks collateral once accepted, `07`/`02`).
+  asset   String
+  kind    BalanceChangeKind
+  amount  String            // 1e6, always positive
+  /// Resulting vault balance after this change (1e6), if known.
+  balanceAfter String?
+  slot         BigInt
+  signature    String
+  createdAt    DateTime          @default(now())
+
+  @@unique([network, signature, address, kind], map: "BalanceChange_unique_idx")
+  @@index([network, address, createdAt], map: "BalanceChange_acct_time_idx")
+  @@index([address])
+}
+
+/// Discrete realized-pnl events: trade close, funding settlement, liquidation,
+/// fee. Summing these reconstructs an account's realized-pnl curve over time.
+model PnlEvent {
+  id        BigInt       @id @default(autoincrement())
+  network   String
+  address   String
+  marketId  Int
+  kind      PnlEventKind
+  /// Signed value, 1e6. Positive = credit to the account.
+  amount    String
+  /// Size involved (1e9) for trade/liquidation events; 0 for funding/fee.
+  size      String       @default("0")
+  price     String       @default("0") // 1e18, execution/mark price if relevant
+  slot      BigInt
+  signature String
+  /// Free-form linkage (e.g. fill id or funding index) to avoid double counting.
+  refKey    String
+  createdAt DateTime     @default(now())
+
+  @@unique([network, address, kind, refKey], map: "PnlEvent_unique_idx")
+  @@index([network, address, createdAt], map: "PnlEvent_acct_time_idx")
+  @@index([marketId, kind], map: "PnlEvent_market_kind_idx")
+}
+
+/// Per-account funding payments (debits/credits) split out from the
+/// market-level FundingUpdate so the portfolio can show a funding ledger.
+model FundingPayment {
+  id           BigInt   @id @default(autoincrement())
+  network      String
+  address      String
+  marketId     Int
+  /// Signed payment 1e6. Positive = received funding.
+  amount       String
+  fundingIndex String // 1e18 index applied
+  slot         BigInt
+  signature    String
+  createdAt    DateTime @default(now())
+
+  @@unique([network, address, marketId, fundingIndex], map: "FundingPayment_unique_idx")
+  @@index([network, address, createdAt], map: "FundingPayment_acct_time_idx")
+}
+
+/// Periodic snapshot of an account's full portfolio state for historical
+/// charts (equity curve, exposure, margin usage). Written by the indexer on a
+/// fixed cadence and on material state changes.
+model PortfolioSnapshot {
+  id                BigInt   @id @default(autoincrement())
+  network           String
+  address           String
+  collateralValue   String   @default("0") // 1e6
+  equity            String   @default("0") // 1e6 (collateral + unrealized)
+  unrealizedPnl     String   @default("0") // 1e6 (signed)
+  realizedPnlCum    String   @default("0") // 1e6 cumulative realized to date
+  freeCollateral    String   @default("0") // 1e6
+  usedMargin        String   @default("0") // 1e6
+  maintenanceMargin String   @default("0") // 1e6
+  marginRatio       String   @default("0") // 1e18 (equity/maintenance)
+  openPositionCount Int      @default(0)
+  longExposure      String   @default("0") // notional 1e6
+  shortExposure     String   @default("0") // notional 1e6
+  liquidatable      Boolean  @default(false)
+  capturedAt        DateTime @default(now())
+
+  @@index([network, address, capturedAt], map: "PortfolioSnapshot_acct_time_idx")
+}
+
+/// Cached, denormalized per-account analytics for instant portfolio header
+/// rendering (avoids recomputing aggregates on every page load). Upserted by
+/// the indexer alongside snapshots.
+model AccountAnalytics {
+  network          String
+  address          String
+  realizedPnlAll   String    @default("0") // 1e6
+  volumeAll        String    @default("0") // 1e6
+  tradeCountAll    Int       @default(0)
+  winRateAll       String    @default("0") // 0..1 (4dp)
+  totalDeposited   String    @default("0") // 1e6
+  totalWithdrawn   String    @default("0") // 1e6
+  totalFundingPaid String    @default("0") // 1e6 signed
+  totalFeesPaid    String    @default("0") // 1e6
+  liquidationCount Int       @default(0)
+  maxDrawdown      String    @default("0") // 1e6 (worst equity dip)
+  firstTradeAt     DateTime?
+  lastTradeAt      DateTime?
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@id([network, address])
+  @@index([network])
+}

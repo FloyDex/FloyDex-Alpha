@@ -45,11 +45,12 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
   - ✅ Backtest: all 10 tickers at 0‰ after mega-cap MM 6% → 7% (2026-09-26, `07` §7).
 
 ## Phase 3 — Off-chain stack (Weeks 6–10, overlapping: 11-02 → 12-06)
+- [x] Shared service kit (`services/kit`, 2026-09-27): env validation at boot (L16), the deployments.json loader with the on-chain drift check (L3), Postgres client + retry, structured JSON logs, webhook alerter (L6)
+- [x] Prisma schema port (`services/db`, 2026-09-27); delete the dead `Position` model (L13); local Postgres via docker compose; round-trips against a real Postgres in CI
 - [ ] Port matcher (queue + concurrent submitters, not settle-in-tick), reconciler
 - [ ] Pyth pusher (own shard), session-calendar keeper, mark poster
 - [ ] Indexer (Helius webhooks or Yellowstone gRPC → Postgres, slot cursor)
 - [ ] Keepers: liquidator, funding, refill; monitor → **real webhook** + on-call
-- [ ] Prisma schema port; delete the dead `Position` model
 - **Gate:** load test ≥ 50 fills/s sustained for 30 min on devnet, from a
   cloud load generator, not a laptop
 
