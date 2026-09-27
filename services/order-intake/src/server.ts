@@ -154,6 +154,7 @@ export function createServer(deps: IntakeDeps) {
           nonce: o.nonce,
           expiryTs: o.expiryTs,
           signature: o.signature,
+          signerPubkey: o.signerPubkey,
         },
         update: {},
       });

@@ -1,0 +1,21 @@
+{
+  "name": "@kryon/matcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Off-chain CLOB matcher: price-time priority over resting orders, one writer per market. Settlement (building and submitting settle_fills transactions) is a separate process reading the durable TxJob queue this writes to (11 L4).",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "start": "node src/main.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@kryon/db": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.3"
+  }
+}

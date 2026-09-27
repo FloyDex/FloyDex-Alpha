@@ -62,7 +62,33 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 - [x] Shared service kit (`services/kit`, 2026-09-27): env validation at boot (L16), the deployments.json loader with the on-chain drift check (L3), Postgres client + retry, structured JSON logs, webhook alerter (L6)
 - [x] Prisma schema port (`services/db`, 2026-09-27); delete the dead `Position` model (L13); local Postgres via docker compose; round-trips against a real Postgres in CI
 - [x] Order intake API (`services/order-intake`, 2026-09-27): verifies the session-key Ed25519 signature over the 108-byte order message (`sdk`'s new `verifyEd25519`), checks the delegate is active on-chain for `(owner, sub_id)`, confirms the market is known and active, and stores the order
-- [ ] Port matcher (queue + concurrent submitters, not settle-in-tick), reconciler
+- [~] Port matcher (queue + concurrent submitters, not settle-in-tick), reconciler
+  - [x] Matching engine + queueing (`services/matcher`, 2026-09-27): price-time
+    priority ported from `reference/stellar/offchain/scripts/matcher-service.ts`
+    (`lib/market/matcher.ts` in that tree turned out to be client-side order
+    submission, not the matcher — noted here since the task description named
+    the wrong file). One writer per market via a transaction-scoped Postgres
+    advisory lock (`pg_try_advisory_xact_lock`, same connection as the reads/
+    writes it guards — a plain `$queryRaw` lock + separate `$transaction`
+    write would silently provide no exclusion under Prisma's connection
+    pool). Self-trade prevention compares `(owner, subId)`, matching the
+    on-chain `UserAccount` identity, not `owner` alone. Each match becomes one
+    `TxJob` row (`kind: "settle_fill"`, structured `payload`, not settled
+    in-tick — L4); `Order.queuedSize` reserves that fill's size so it can't be
+    matched twice before settlement confirms. Found and fixed a real gap:
+    order-intake validated `signerPubkey` but never persisted it, which would
+    have silently blocked every order from ever settling (nothing could build
+    its Ed25519 introspection instruction without it).
+  - [ ] Settlement submitter: concurrent workers claiming `QUEUED` TxJobs
+    (`SELECT ... FOR UPDATE SKIP LOCKED`), building `settle_fills` transactions
+    (Ed25519 instructions + the program instruction, an address lookup table,
+    dynamic priority fee capped by env). Not started yet — this is the rest of
+    item d.
+  - [ ] Reconciler (item e): confirm by signature/slot, retry or roll back
+    idempotently — also the piece that decrements `queuedSize` on a failed/
+    rolled-back job. Until it exists, a job that fails leaves `queuedSize`
+    stuck reserved on its two orders (flagging this now rather than after
+    the fact: worth building the reconciler next, before load-testing).
 - [ ] Pyth pusher (own shard), session-calendar keeper, mark poster
 - [ ] Indexer (Helius webhooks or Yellowstone gRPC → Postgres, slot cursor)
 - [ ] Keepers: liquidator, funding, refill; monitor → **real webhook** + on-call

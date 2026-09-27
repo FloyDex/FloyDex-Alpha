@@ -6,7 +6,8 @@
   "workspaces": [
     "kit",
     "db",
-    "order-intake"
+    "order-intake",
+    "matcher"
   ],
   "scripts": {
     "test": "yarn workspaces run test",

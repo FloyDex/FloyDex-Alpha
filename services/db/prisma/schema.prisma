@@ -177,10 +177,23 @@ model Order {
   nonce      BigInt
   expiryTs   BigInt
   cancelled  Boolean  @default(false)
-  filledSize String   @default("0") // 1e9
+  filledSize String   @default("0") // 1e9, confirmed on-chain (from the indexer, item g)
+  /// Size reserved by outstanding (QUEUED/SUBMITTED, not yet CONFIRMED) settle
+  /// jobs in TxJob. The matcher (item d) treats `size - filledSize -
+  /// queuedSize` as what's left to match, so a fill it just queued is never
+  /// matched again next tick before the reconciler (item e) confirms it (adds
+  /// to filledSize, clears this) or rolls it back (clears this without adding
+  /// to filledSize). 2026-09-27.
+  queuedSize String   @default("0") // 1e9
   /// The session key's signature (base64) over the 108-byte order message
   /// (`sdk/src/order.ts`), stored for settlement replay and audit.
   signature  String?
+  /// The pubkey (owner or an active delegate) that produced `signature` —
+  /// needed to build the settle_fills Ed25519 introspection instruction
+  /// (`05` §5). Added 2026-09-27: order-intake validated and had this
+  /// (`validate.ts`'s `signerPubkey`) but never persisted it, which would
+  /// have silently blocked every order from ever settling.
+  signerPubkey String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -274,6 +287,14 @@ model TxJob {
   network       String
   kind          String
   payloadHash   String
+  /// Structured job data the submitter needs to build the transaction, e.g.
+  /// for kind="settle_fill": marketId, the maker/taker OrderArgs, their
+  /// signatures/signerPubkeys, fillSize, fillPrice (`programs/kryon-perps/
+  /// src/instructions/settle.rs`'s `FillArgs`). Kept separate from
+  /// `unsignedTx` because the submitter rebuilds the transaction fresh each
+  /// attempt (new blockhash, current priority fee), rather than resubmitting
+  /// a stale one. 2026-09-27.
+  payload       Json?
   /// Base64-encoded serialized (unsigned) transaction message.
   unsignedTx    String?
   /// Base64-encoded fully-signed transaction, ready to submit/resubmit.
