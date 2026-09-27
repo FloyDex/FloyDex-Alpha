@@ -1,0 +1,7 @@
+{
+  "cluster": "devnet",
+  "usdcMint": "BL4DqDDg5uerF11E4PafA43Vj7MVfy25xy9wwyXeMCqd",
+  "usdcMintDecimals": 6,
+  "usdcMintAuthority": "deployer (~/.config/solana/id.json)",
+  "usdcMintCreateTx": "51WbSVnd2urr5M3TxYRcH3vFtno2WXPq67BZjSdjGiPKPMZoPmfBrm3YkD3TT8eyZKFbRUnGxaHjHWPoXkpqzsgb"
+}
