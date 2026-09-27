@@ -79,11 +79,33 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
     order-intake validated `signerPubkey` but never persisted it, which would
     have silently blocked every order from ever settling (nothing could build
     its Ed25519 introspection instruction without it).
-  - [ ] Settlement submitter: concurrent workers claiming `QUEUED` TxJobs
-    (`SELECT ... FOR UPDATE SKIP LOCKED`), building `settle_fills` transactions
-    (Ed25519 instructions + the program instruction, an address lookup table,
-    dynamic priority fee capped by env). Not started yet — this is the rest of
-    item d.
+  - [x] Settlement submitter (`services/submitter`, 2026-09-27): concurrent
+    workers claiming `QUEUED` TxJobs (`SELECT ... FOR UPDATE SKIP LOCKED`
+    inside a transaction, marking them `SUBMITTED` atomically so two workers
+    never claim the same job). Rebuilds the exact signed order message from
+    the stored payload (`message.ts`), resolves each side's cross-market/
+    cross-collateral risk accounts from a freshly decoded on-chain
+    `UserAccount` (`accounts.ts`'s `riskAccountsFor`, matching `health.rs`'s
+    documented remaining-accounts order exactly — fails closed, not silently,
+    on a market or collateral the directory hasn't seen), and assembles a v0
+    transaction: compute budget + dynamic priority fee (capped by env,
+    median of `getRecentPrioritizationFees`, `priorityFee.ts`) + Ed25519
+    introspection + `settle_fills`, packing a 2nd same-market fill in only
+    when it actually fits `PACKET_DATA_SIZE` once serialized (falls back to
+    1 otherwise — "measure it," not estimate it). An address lookup table is
+    supported (`SUBMITTER_LOOKUP_TABLE`, maintained by
+    `scripts/submitter/lookup-table.mts`, recorded in `deployments/*.json`)
+    but optional — v0 without one still works, just larger. Idempotency: the
+    signature and the blockhash's last valid block height
+    (`TxJob.lastValidBlockHeight`, new column) are persisted *before* the
+    send call, so a crash between signing and sending leaves the reconciler
+    something to look up rather than nothing. A job that fails before being
+    sent is released to `QUEUED` with backoff, never marked `FAILED`. Tested
+    against a real local Postgres: unit tests for message rebuild, risk-
+    account resolution (including the fail-closed paths), the priority-fee
+    calc, and instruction assembly; an integration test for claim/record/
+    release covering the SKIP LOCKED exclusion. Deliberately never awaits
+    confirmation — that's the reconciler's job, next.
   - [ ] Reconciler (item e): confirm by signature/slot, retry or roll back
     idempotently — also the piece that decrements `queuedSize` on a failed/
     rolled-back job. Until it exists, a job that fails leaves `queuedSize`
