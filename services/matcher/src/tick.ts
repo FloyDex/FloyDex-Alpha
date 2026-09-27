@@ -160,7 +160,7 @@ async function enqueueMatch(tx: Tx, network: string, match: MatchResult, logger:
  */
 export async function tickMarket(deps: TickDeps, marketId: number): Promise<number | null> {
   return deps.prisma.$transaction(async (tx) => {
-    const lockRows = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(${LOCK_NAMESPACE}, ${marketId}) AS locked`;
+    const lockRows = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(${LOCK_NAMESPACE}::int, ${marketId}::int) AS locked`;
     if (!lockRows[0]?.locked) return null;
 
     const orders = await loadOpenOrders(tx, marketId);

@@ -132,13 +132,13 @@ test("tick() skips (returns null contribution) a market another instance already
   try {
     await prisma.market.create({ data: { id: marketId, symbol: `TEST-${network}`, settlementMint: "BL4DqDDg5uerF11E4PafA43Vj7MVfy25xy9wwyXeMCqd", active: true } });
     // Hold the same advisory lock this market's tick would take, on a second connection.
-    await other.$executeRaw`SELECT pg_advisory_lock(${LOCK_NAMESPACE}, ${marketId})`;
+    await other.$executeRaw`SELECT pg_advisory_lock(${LOCK_NAMESPACE}::int, ${marketId}::int)`;
     try {
       const deps = { prisma, network, maxDeviationBps: 1000n, logger };
       const total = await tick(deps, [marketId]);
       assert.equal(total, 0); // locked elsewhere -> tickMarket returned null -> contributes 0, not an error
     } finally {
-      await other.$executeRaw`SELECT pg_advisory_unlock(${LOCK_NAMESPACE}, ${marketId})`;
+      await other.$executeRaw`SELECT pg_advisory_unlock(${LOCK_NAMESPACE}::int, ${marketId}::int)`;
     }
   } finally {
     await prisma.market.deleteMany({ where: { id: marketId } });
