@@ -302,8 +302,17 @@ model TxJob {
   attempts      Int       @default(0)
   status        TxStatus  @default(QUEUED)
   lastError     String?
-  /// Set once the transaction is sent to the cluster.
+  /// Set once the transaction is sent to the cluster, *before* the send
+  /// call — the idempotency anchor for the submitter/reconciler (item d/e,
+  /// 2026-09-27): a crash between signing and confirming a send still leaves
+  /// enough here for the reconciler to look the signature up rather than
+  /// resubmitting blind.
   signature     String?
+  /// The blockhash's last valid block height, recorded alongside
+  /// `signature` before sending. Once the current block height passes this
+  /// with no confirmation, the reconciler (item e) treats the send as
+  /// expired and may safely retry with a fresh blockhash.
+  lastValidBlockHeight BigInt?
   /// Set once the transaction is confirmed at the configured commitment.
   slot          BigInt?
   nextAttemptAt DateTime  @default(now())
