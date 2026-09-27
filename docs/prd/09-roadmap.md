@@ -41,7 +41,21 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
     second market's 25 s session closes the Closed ×2 maintenance makes two leveraged accounts
     liquidatable: a keeper liquidates both by position transfer (~167k CU each). OI stays two-sided;
     conservation holds strictly once flat (vault + bad debt == balances + fees + fund, 2,223 wei of dust).
-  - ⏳ Part 2, devnet with Pyth's sponsored shard-0 feeds: waiting on the RPC URL and devnet USDC mint.
+  - ✅ Part 2, devnet with Pyth's sponsored shard-0 feeds (2026-09-27, Helius RPC,
+    `scripts/devnet-gate.sh` → `deployments/devnet.json`): program deployed at
+    `2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB`
+    ([deploy](https://explorer.solana.com/tx/Sqvw5qJQjzKStmyRLurRNDYMuBCBmcFcWRKcWnLZQubmrRaNgMvd4qhkqg1EAATtgKYqd52yVFWTLCZgbicS21r?cluster=devnet)),
+    a fill settled against the sponsored SOL/USD feed
+    ([settle_fills](https://explorer.solana.com/tx/3Kh3NyCyWg9ePYHjhynDFT1KRbeitNpjWLuQU6Jt7DHjWRoEKTUgsCDpNS31VSfmpBGYgbFvv2Ab8JoE1uwcxY1g?cluster=devnet)),
+    `update_funding` moved the index
+    ([tx](https://explorer.solana.com/tx/4ooSrjMrrK1TWKss9N8CrrpJ7gCizPJFEevaq7Mmh9EWKz3PXtj3BcM3HRDAj7bmw8pJUHCsdv7vu3kHkfWxakFM?cluster=devnet)),
+    and once the session closed a keeper liquidated both leveraged accounts
+    ([1](https://explorer.solana.com/tx/3jmkMVr5EKuRBUvK2AkuMNSGnzjZyGTbZVF74boNUJug3XJKU4U2JsquFtQsAmM6eYiKhKVUPiw4vgWQvutEFNWT?cluster=devnet),
+    [2](https://explorer.solana.com/tx/2CUgVhV5e6jw124KLzgCSi87ruZgcyB5aex48avqvr4V6MidzrHUcPHvDNDP1bzbQNF6DKYb1Ln22eGqC9ptTay?cluster=devnet)).
+    The public devnet RPC timed out three times on the deploy step; a Helius
+    URL (kept only in the gitignored `.env`) got through on the first try.
+    `services/kit`'s L3 drift check (`assertDeploymentMatchesChain`) confirms
+    the on-chain Exchange matches this file.
   - ✅ Backtest: all 10 tickers at 0‰ after mega-cap MM 6% → 7% (2026-09-26, `07` §7).
 
 ## Phase 3 — Off-chain stack (Weeks 6–10, overlapping: 11-02 → 12-06)

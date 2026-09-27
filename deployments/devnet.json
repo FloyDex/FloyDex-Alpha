@@ -1,7 +1,31 @@
 {
   "cluster": "devnet",
-  "usdcMint": "BL4DqDDg5uerF11E4PafA43Vj7MVfy25xy9wwyXeMCqd",
-  "usdcMintDecimals": 6,
-  "usdcMintAuthority": "deployer (~/.config/solana/id.json)",
-  "usdcMintCreateTx": "51WbSVnd2urr5M3TxYRcH3vFtno2WXPq67BZjSdjGiPKPMZoPmfBrm3YkD3TT8eyZKFbRUnGxaHjHWPoXkpqzsgb"
+  "programId": "2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB",
+  "rpc": "devnet.helius-rpc.com",
+  "initializeExchange": "9arerGYVttbVdQLFLRzQKbQgnwnjag2MwLf3ncY5seN3jYCsV6eCYKysHR1qtJzvgdUGAmsWemAPeAtquot6FUu",
+  "addCollateral": "5AkxqydHYamFVrzZYZTfXTbaJHJQQ1BppY16iJ7GDbaqRV48X4McwRjsFBvSc5TzHonqoJED5c8Dfjh1bn3W1TzZ",
+  "createMarket": "4Lt8bx2WPvTGTTmMSmptDH5EMaFzt7kCBTaf5oJY31eDzx1TZg2s4VhMFK8MfG5ezquF72BfzpsSuaeHU2YM2DkJ",
+  "initInsurance": "47oTDBuJRPrmQvMFxCbAvhUH3YsP2BDWtMLeiKx4hDwEg9XJEfXQE4p8xqj8SSdgkfQeEZPJEPkmwgY9canH5HUj",
+  "stake": "21AmeaEB6YUTUX7SNrweDKsZE8TnhZZjjLvtSLS7XGJqEw58F7eCVeBYE49Lm5EHfghyQanq1hLi8pWnk1gGC5c4",
+  "postSessionCalendar": "3wBGXcZCwNCa9oR5YiphQ47Sj3hHUcWWiPSwJuQEXPoPtG7gE4V5PGgUVVKsRUCqo6hc24r3oJRGYpST8uV8fp15",
+  "settleFills": "3Kh3NyCyWg9ePYHjhynDFT1KRbeitNpjWLuQU6Jt7DHjWRoEKTUgsCDpNS31VSfmpBGYgbFvv2Ab8JoE1uwcxY1g",
+  "updateFunding": "4ooSrjMrrK1TWKss9N8CrrpJ7gCizPJFEevaq7Mmh9EWKz3PXtj3BcM3HRDAj7bmw8pJUHCsdv7vu3kHkfWxakFM",
+  "liquidations": [
+    "3jmkMVr5EKuRBUvK2AkuMNSGnzjZyGTbZVF74boNUJug3XJKU4U2JsquFtQsAmM6eYiKhKVUPiw4vgWQvutEFNWT",
+    "2CUgVhV5e6jw124KLzgCSi87ruZgcyB5aex48avqvr4V6MidzrHUcPHvDNDP1bzbQNF6DKYb1Ln22eGqC9ptTay"
+  ],
+  "accounts": {
+    "exchange": "LnVD1MrMvPohtamKtrrCNH6kG992HM5grFJiA6KqnkQ",
+    "market": "2kWD1pj7XLMXankFeb2LRNoyKvx2NhgLGgNwVTpAuR1q",
+    "usdcMint": "BL4DqDDg5uerF11E4PafA43Vj7MVfy25xy9wwyXeMCqd",
+    "settlementCollateral": "49RBddCmqk7dpb2Fu6exWA5mgbjk9soeyXZYEwtDzzGR",
+    "vault": "8byGMd73tNV87Eam96zjvduMsmW4Q7CxupPusz8kaLCY",
+    "insurance": "4wkbjVmv9wcUJTfikTgAQTdbT9R29zExuwqpN37FiKng",
+    "solUsdPushFeed": "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
+    "operator": "CbhFXNFcaEbrwftTZ6aG1YBkCLKNsmxqNjhdXxzbco15",
+    "calendarAuthority": "66hXQNkGVyZDoyjbxMuKXxTZiMNWeKygAASsBpAufwJP",
+    "guardian": "6dyRqaMdJQvWfsydYhEfWMWsuCghkaL4uFBgK6Yp3bG9"
+  },
+  "at": "2026-09-27T08:25:55.014Z",
+  "genesisHash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 }
