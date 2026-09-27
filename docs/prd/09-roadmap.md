@@ -47,6 +47,7 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 ## Phase 3 — Off-chain stack (Weeks 6–10, overlapping: 11-02 → 12-06)
 - [x] Shared service kit (`services/kit`, 2026-09-27): env validation at boot (L16), the deployments.json loader with the on-chain drift check (L3), Postgres client + retry, structured JSON logs, webhook alerter (L6)
 - [x] Prisma schema port (`services/db`, 2026-09-27); delete the dead `Position` model (L13); local Postgres via docker compose; round-trips against a real Postgres in CI
+- [x] Order intake API (`services/order-intake`, 2026-09-27): verifies the session-key Ed25519 signature over the 108-byte order message (`sdk`'s new `verifyEd25519`), checks the delegate is active on-chain for `(owner, sub_id)`, confirms the market is known and active, and stores the order
 - [ ] Port matcher (queue + concurrent submitters, not settle-in-tick), reconciler
 - [ ] Pyth pusher (own shard), session-calendar keeper, mark poster
 - [ ] Indexer (Helius webhooks or Yellowstone gRPC → Postgres, slot cursor)

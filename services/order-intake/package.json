@@ -1,0 +1,23 @@
+{
+  "name": "@kryon/order-intake",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Order intake HTTP service: verifies the session-key signature over a signed order, checks the delegate is active on-chain, and stores the order.",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "start": "node src/main.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
+    "@kryon/db": "0.1.0",
+    "@solana/web3.js": "^1.98.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.3"
+  }
+}

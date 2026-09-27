@@ -5,7 +5,8 @@
   "license": "MIT OR Apache-2.0",
   "workspaces": [
     "kit",
-    "db"
+    "db",
+    "order-intake"
   ],
   "scripts": {
     "test": "yarn workspaces run test",
