@@ -99,3 +99,18 @@ jobs:
           name: e2e-report
           path: .e2e/report.json
           if-no-files-found: ignore
+
+  services:
+    name: services (Part 3 off-chain stack)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: yarn install --frozen-lockfile
+        working-directory: services
+      - run: yarn typecheck
+        working-directory: services
+      - run: yarn test
+        working-directory: services

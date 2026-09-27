@@ -1,0 +1,13 @@
+{
+  "name": "@kryon/services",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT OR Apache-2.0",
+  "workspaces": [
+    "kit"
+  ],
+  "scripts": {
+    "test": "yarn workspaces run test",
+    "typecheck": "yarn workspaces run typecheck"
+  }
+}
