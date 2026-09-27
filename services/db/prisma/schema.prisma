@@ -161,6 +161,14 @@ model Account {
 model Order {
   id         String   @id
   owner      String
+  /// The UserAccount this order trades from — `["user", owner, sub_id]`
+  /// on-chain. Added 2026-09-27: `UserAccount` (and its `cancel_all_below_nonce`,
+  /// which scopes `nonce`) is keyed by `(owner, sub_id)`, not by `owner` alone,
+  /// matching the wire format's `sub_id` byte (`05` line 257: without it the
+  /// operator could settle an order signed for one sub-account against
+  /// another). The Stellar schema had no sub-account concept, so this has no
+  /// direct ancestor there.
+  subId      Int      @default(0)
   marketId   Int
   isLong     Boolean
   size       String // 1e9
@@ -181,9 +189,10 @@ model Order {
   // history that settled against it.
   market  Market  @relation(fields: [marketId], references: [id], onDelete: Restrict)
 
-  // Global per account, NOT per market — see reference/stellar's
-  // lib/market/order-intent.ts, ported as-is on this axis.
-  @@unique([owner, nonce])
+  // Scoped to (owner, sub_id), matching the on-chain UserAccount that tracks
+  // cancel_all_below_nonce — not just `owner` as on Stellar, which had no
+  // sub-accounts, and not per market (reference/stellar's lib/market/order-intent.ts).
+  @@unique([owner, subId, nonce])
   @@index([marketId, isLong, limitPrice])
   @@index([expiryTs])
 }
@@ -193,8 +202,10 @@ model Fill {
   network    String
   marketId   Int
   maker      String
+  makerSubId Int      @default(0) // see Order.subId
   makerNonce BigInt
   taker      String
+  takerSubId Int      @default(0)
   takerNonce BigInt
   fillSize   String // 1e9
   fillPrice  String // 1e9
@@ -209,7 +220,7 @@ model Fill {
   makerAccount Account @relation("MakerFills", fields: [maker], references: [address])
   takerAccount Account @relation("TakerFills", fields: [taker], references: [address])
 
-  @@unique([network, signature, maker, makerNonce, taker, takerNonce])
+  @@unique([network, signature, maker, makerSubId, makerNonce, taker, takerSubId, takerNonce])
   @@index([marketId, slot])
   @@index([maker])
   @@index([taker])

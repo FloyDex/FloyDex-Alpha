@@ -32,9 +32,26 @@ test("Prisma schema round-trips through a real Postgres", { skip: !DATABASE_URL 
       data: {
         id: `${network}-order-1`,
         owner,
+        subId: 0,
         marketId: 1,
         isLong: true,
         size: "1000000000",
+        limitPrice: "150000000000",
+        reduceOnly: false,
+        nonce: 1n,
+        expiryTs: 9999999999n,
+      },
+    });
+    // Same owner+nonce but a different sub-account is a different order —
+    // the unique constraint is (owner, subId, nonce), not (owner, nonce).
+    await prisma.order.create({
+      data: {
+        id: `${network}-order-1-sub1`,
+        owner,
+        subId: 1,
+        marketId: 1,
+        isLong: true,
+        size: "2000000000",
         limitPrice: "150000000000",
         reduceOnly: false,
         nonce: 1n,
@@ -74,7 +91,7 @@ test("Prisma schema round-trips through a real Postgres", { skip: !DATABASE_URL 
     // Clean up in FK-safe order.
     await prisma.fill.deleteMany({ where: { network } });
     await prisma.txJob.deleteMany({ where: { network } });
-    await prisma.order.deleteMany({ where: { id: `${network}-order-1` } });
+    await prisma.order.deleteMany({ where: { id: { in: [`${network}-order-1`, `${network}-order-1-sub1`] } } });
     await prisma.account.deleteMany({
       where: { address: { in: ["71Wd3Sut366NSg71bYMNdSKsjRZ2pHDV6j6GyLFKt4eJ", "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin"] } },
     });
