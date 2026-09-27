@@ -106,11 +106,24 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
     calc, and instruction assembly; an integration test for claim/record/
     release covering the SKIP LOCKED exclusion. Deliberately never awaits
     confirmation — that's the reconciler's job, next.
-  - [ ] Reconciler (item e): confirm by signature/slot, retry or roll back
-    idempotently — also the piece that decrements `queuedSize` on a failed/
-    rolled-back job. Until it exists, a job that fails leaves `queuedSize`
-    stuck reserved on its two orders (flagging this now rather than after
-    the fact: worth building the reconciler next, before load-testing).
+  - [x] Reconciler (`services/reconciler`, 2026-09-27, item e): polls every
+    `SUBMITTED settle_fill` job with a recorded signature, batched by
+    signature (one submitter transaction can carry 2 fills). Landed clean
+    → `CONFIRMED`, `queuedSize` → `filledSize` on both orders, a `Fill` row
+    (fees default `"0"` pending the indexer's real `FillSettled` read).
+    Landed with a program error (e.g. `OrderOverfilled`) → always rolls
+    back (retrying an identical, deterministic failure would just waste
+    fees). Never found past `lastValidBlockHeight` → expired: retries with
+    a fresh blockhash only if both orders are still valid (not cancelled,
+    not expired, wouldn't overfill) and under the attempt cap, else rolls
+    back. This is also what recovers a crash between the submitter
+    persisting a signature and actually sending it — it simply never
+    confirms, so it follows the same expiry path. This is the only place
+    that ever clears `queuedSize`, closing the gap flagged when the
+    submitter shipped: a failed job no longer leaves it stuck. Tested
+    (Postgres-backed): confirmation, program-error rollback, expiry-retry,
+    expiry-rollback-on-cancellation, and still-pending, plus pure unit
+    tests for the retry decision.
 - [ ] Pyth pusher (own shard), session-calendar keeper, mark poster
 - [ ] Indexer (Helius webhooks or Yellowstone gRPC → Postgres, slot cursor)
 - [ ] Keepers: liquidator, funding, refill; monitor → **real webhook** + on-call
