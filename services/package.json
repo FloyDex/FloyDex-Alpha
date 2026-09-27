@@ -8,7 +8,8 @@
     "db",
     "order-intake",
     "matcher",
-    "submitter"
+    "submitter",
+    "reconciler"
   ],
   "scripts": {
     "test": "yarn workspaces run test",
