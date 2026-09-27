@@ -71,11 +71,15 @@ export function deriveExchangePda(programId: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync([Buffer.from("exchange")], programId)[0];
 }
 
+// Field names match the IDL verbatim: this Anchor/Borsh coder decodes struct
+// fields under their IDL names as-is (snake_case here), it does NOT camelCase
+// them — confirmed by an encode/decode round-trip against the real IDL, since
+// getting this wrong silently reads `undefined` instead of throwing.
 interface DecodedExchange {
   admin: PublicKey;
   guardian: PublicKey;
-  calendarAuthority: PublicKey;
-  settlementMint: PublicKey;
+  calendar_authority: PublicKey;
+  settlement_mint: PublicKey;
   paused: boolean;
 }
 
@@ -91,13 +95,13 @@ export function compareExchangeState(deployment: DeploymentRecord, onChain: Deco
   if (accounts.guardian && onChain.guardian.toBase58() !== accounts.guardian) {
     problems.push(`guardian on-chain (${onChain.guardian.toBase58()}) != deployments.json (${accounts.guardian})`);
   }
-  if (accounts.calendarAuthority && onChain.calendarAuthority.toBase58() !== accounts.calendarAuthority) {
+  if (accounts.calendarAuthority && onChain.calendar_authority.toBase58() !== accounts.calendarAuthority) {
     problems.push(
-      `calendarAuthority on-chain (${onChain.calendarAuthority.toBase58()}) != deployments.json (${accounts.calendarAuthority})`,
+      `calendarAuthority on-chain (${onChain.calendar_authority.toBase58()}) != deployments.json (${accounts.calendarAuthority})`,
     );
   }
-  if (deployment.usdcMint && onChain.settlementMint.toBase58() !== deployment.usdcMint) {
-    problems.push(`settlementMint on-chain (${onChain.settlementMint.toBase58()}) != deployments.json usdcMint (${deployment.usdcMint})`);
+  if (deployment.usdcMint && onChain.settlement_mint.toBase58() !== deployment.usdcMint) {
+    problems.push(`settlementMint on-chain (${onChain.settlement_mint.toBase58()}) != deployments.json usdcMint (${deployment.usdcMint})`);
   }
   return problems;
 }
@@ -138,7 +142,9 @@ export async function assertDeploymentMatchesChain(opts: {
   }
 
   const coder = new BorshAccountsCoder(idl);
-  const decoded = coder.decode("exchange", exchangeInfo.data) as DecodedExchange;
+  // Account names are matched exactly as they appear in the IDL's
+  // `accounts[].name` (PascalCase, e.g. "Exchange"), not camelCased.
+  const decoded = coder.decode("Exchange", exchangeInfo.data) as DecodedExchange;
 
   const problems = compareExchangeState(deployment, decoded);
   if (problems.length > 0) throw new DeploymentMismatchError(problems);

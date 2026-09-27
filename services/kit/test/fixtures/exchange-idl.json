@@ -1,0 +1,191 @@
+{
+  "address": "2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB",
+  "metadata": {
+    "name": "kryon_perps",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Kryon tokenized-stock perps: settlement, margin and risk on Solana."
+  },
+  "instructions": [],
+  "accounts": [
+    {
+      "name": "Exchange",
+      "discriminator": [
+        30,
+        200,
+        220,
+        149,
+        3,
+        61,
+        104,
+        50
+      ]
+    }
+  ],
+  "events": [],
+  "errors": [],
+  "types": [
+    {
+      "name": "Exchange",
+      "docs": [
+        "Global configuration. PDA `[\"exchange\"]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "docs": [
+              "Squads vault on mainnet. Everything admin-only checks this key."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "pending_admin",
+            "docs": [
+              "Set by `nominate_admin`, cleared by `accept_admin`. Default = none."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "guardian",
+            "docs": [
+              "Hot key that can only pause."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "operators",
+            "docs": [
+              "Matcher keys allowed to call `settle_fills`. Default = empty slot."
+            ],
+            "type": {
+              "array": [
+                "pubkey",
+                4
+              ]
+            }
+          },
+          {
+            "name": "calendar_authority",
+            "docs": [
+              "Keeper key that posts session windows."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "fee_config",
+            "type": {
+              "defined": {
+                "name": "FeeConfig"
+              }
+            }
+          },
+          {
+            "name": "insurance",
+            "docs": [
+              "`Insurance` PDA, set by `init_insurance`. Default until then."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "domain",
+            "docs": [
+              "`sha256(genesis_hash || program_id)`, computed off-chain (a program",
+              "cannot read the genesis hash). Bound into every signed order."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "max_total_oi_policy_bps",
+            "docs": [
+              "Ceiling on the sum of every market's `oi_policy_bps` (`11` L11)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "total_oi_policy_bps",
+            "docs": [
+              "Running sum of every market's `oi_policy_bps`."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "settlement_mint",
+            "docs": [
+              "Mint of the settlement collateral (USDC). Default until added."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "settlement_collateral_index",
+            "docs": [
+              "`Collateral.index` of the settlement asset (valid once it is added)."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "collateral_count",
+            "docs": [
+              "Collaterals added so far; the next one gets this index."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "max_reward_bps",
+            "docs": [
+              "Liquidator reward cap, bps of closed notional (≤ 10%, `05` §2). Set",
+              "with the insurance fund; zero means liquidation is not live yet."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "partial_liquidation_bps",
+            "docs": [
+              "Share of a position one liquidation step may close (`plan_liquidation`)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "_reserved",
+            "type": {
+              "array": [
+                "u8",
+                56
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "maker_fee_bps",
+            "type": "u32"
+          },
+          {
+            "name": "taker_fee_bps",
+            "type": "u32"
+          }
+        ]
+      }
+    }
+  ]
+}

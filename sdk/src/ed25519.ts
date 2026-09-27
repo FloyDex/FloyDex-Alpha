@@ -6,7 +6,7 @@
  * signatures share one instruction: `[count, pad, offsets…]`, then per
  * signature `pubkey ‖ signature ‖ message`.
  */
-import { createPrivateKey, sign as nodeSign } from "node:crypto";
+import { createPrivateKey, createPublicKey, sign as nodeSign, verify as nodeVerify } from "node:crypto";
 
 export const ED25519_PROGRAM_ID = "Ed25519SigVerify111111111111111111111111111";
 const THIS_INSTRUCTION = 0xffff;
@@ -49,6 +49,9 @@ const PKCS8_ED25519_PREFIX = Uint8Array.from([
   0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
 ]);
 
+// SPKI wrapper for a raw 32-byte Ed25519 public key (RFC 8410).
+const SPKI_ED25519_PREFIX = Uint8Array.from([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00]);
+
 /** Sign with a Solana-style 64-byte secret key (seed ‖ pubkey). */
 export function signEd25519(secretKey: Uint8Array, message: Uint8Array): Uint8Array {
   if (secretKey.length !== 64) throw new RangeError("secret key must be 64 bytes");
@@ -57,4 +60,24 @@ export function signEd25519(secretKey: Uint8Array, message: Uint8Array): Uint8Ar
   der.set(secretKey.subarray(0, 32), PKCS8_ED25519_PREFIX.length);
   const key = createPrivateKey({ key: Buffer.from(der), format: "der", type: "pkcs8" });
   return new Uint8Array(nodeSign(null, message, key));
+}
+
+/**
+ * Verifies a raw 32-byte Ed25519 public key's signature over `message`
+ * off-chain (order intake, before anything touches the DB or the chain).
+ * This is the same check the on-chain Ed25519 program instruction performs
+ * (`ed25519InstructionData`), just run locally so a bad signature never gets
+ * as far as a settlement transaction.
+ */
+export function verifyEd25519(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array): boolean {
+  if (publicKey.length !== 32 || signature.length !== 64) return false;
+  const der = new Uint8Array(SPKI_ED25519_PREFIX.length + 32);
+  der.set(SPKI_ED25519_PREFIX);
+  der.set(publicKey, SPKI_ED25519_PREFIX.length);
+  const key = createPublicKey({ key: Buffer.from(der), format: "der", type: "spki" });
+  try {
+    return nodeVerify(null, message, key, signature);
+  } catch {
+    return false;
+  }
 }
