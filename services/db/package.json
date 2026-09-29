@@ -1,8 +1,8 @@
 {
-  "name": "@kryon/db",
+  "name": "@floydex/db",
   "version": "0.1.0",
   "private": true,
-  "description": "Prisma schema and generated client for the Kryon-sol off-chain stack.",
+  "description": "Prisma schema and generated client for the FloyDex off-chain stack.",
   "type": "module",
   "license": "MIT OR Apache-2.0",
   "main": "./src/index.ts",
@@ -24,5 +24,10 @@
     "@types/node": "^22.0.0",
     "prisma": "^6.1.0",
     "typescript": "^5.7.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FloyDex/FloyDex-Alpha.git"
+  },
+  "homepage": "https://github.com/FloyDex/FloyDex-Alpha"
 }
