@@ -5,7 +5,7 @@ import { getNetworkConfig } from "@/config/networks";
 import { validateOrderIntent } from "@/lib/validation";
 import { bodyTooLarge, rateLimit, requestKey } from "@/lib/rate-limit";
 import { AMOUNT_PRECISION, PRICE_PRECISION } from "@/config";
-import { intentToResting, placeOnBook } from "@/lib/market/onchain-book";
+import { intentToResting, placeOnBook, seedFromBinance } from "@/lib/market/onchain-book";
 import { fetchMarkUsd } from "@/lib/market/marks";
 import { applyFill, checkTriggers, ensureVenueReady, flushVenue, setTriggers, snapshot, isBanned, bannedError } from "@/lib/market/venue";
 
@@ -72,8 +72,23 @@ export async function POST(req: NextRequest) {
     Number.isFinite(sl) && sl > 0 ? sl : null,
   );
 
+  // Serverless instances each hold their own in-memory book. Seed this isolate
+  // before matching so market/IOC orders never cancel against an empty book.
+  await seedFromBinance(o.marketId);
+
   const placed = placeOnBook(intentToResting({ ...o, ioc }));
   const filled = placed.fills.reduce((s, f) => s + f.size, 0);
+  if (ioc && filled <= 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "No liquidity at this price — retry in a moment",
+        book: placed.book,
+        fills: [],
+      },
+      { status: 409 },
+    );
+  }
   if (filled > 0) {
     const vwap = placed.fills.reduce((s, f) => s + f.price * f.size, 0) / filled;
     const applied = await applyFill({

@@ -408,10 +408,12 @@ export function OrderEntry({
           ? ` · TP ${tpPrice || "—"} / SL ${slPrice || "—"}`
           : "";
         toast.success(
-          `${orderType === "market" ? "Market" : "Limit"} ${orderSide} order submitted` +
-          (post ? " as post-only" : "") +
-          (reduce ? " reduce-only" : "") +
-          extras
+          filledQty > 0
+            ? `${orderType === "market" ? "Market" : "Limit"} ${orderSide} filled${extras}`
+            : `${orderType === "market" ? "Market" : "Limit"} ${orderSide} resting` +
+              (post ? " as post-only" : "") +
+              (reduce ? " reduce-only" : "") +
+              extras
         );
         // Immediately refetch all user-facing data and poll fast for 30s to catch on-chain settlement
         const keys = [["balance", address], ["health", address], ["fills", address], ["positions", address]];
