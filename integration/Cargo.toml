@@ -4,7 +4,7 @@
 [workspace]
 
 [package]
-name = "kryon-integration"
+name = "floydex-integration"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -14,7 +14,7 @@ anchor-lang = "=0.31.1"
 anchor-spl = { version = "=0.31.1", default-features = false, features = ["token", "token_2022", "associated_token"] }
 bincode = "1"
 bytemuck = "1"
-kryon-perps = { path = "../programs/kryon-perps", features = ["no-entrypoint", "bench"] }
+floydex-perps = { path = "../programs/floydex-perps", features = ["no-entrypoint", "bench"] }
 litesvm = "0.7.1"
 protocol-core = { path = "../crates/protocol-core" }
 pyth-solana-receiver-sdk = "=1.0.1"

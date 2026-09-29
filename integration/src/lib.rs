@@ -1,4 +1,4 @@
-//! Shared LiteSVM harness for the `kryon_perps` program tests.
+//! Shared LiteSVM harness for the `floydex_perps` program tests.
 
 use anchor_lang::prelude::Pubkey;
 #[allow(deprecated)]
@@ -7,7 +7,7 @@ use anchor_lang::solana_program::instruction::Instruction;
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
 use anchor_spl::token::spl_token;
 use anchor_spl::token_2022::spl_token_2022;
-use kryon_perps::error::KryonError;
+use floydex_perps::error::FloyDexError;
 use litesvm::types::{FailedTransactionMetadata, TransactionMetadata};
 use litesvm::LiteSVM;
 use solana_account::Account;
@@ -17,7 +17,7 @@ use solana_signer::Signer;
 use solana_transaction::Transaction;
 use std::path::PathBuf;
 
-pub use kryon_perps::{accounts as ka, instruction as ki};
+pub use floydex_perps::{accounts as ka, instruction as ki};
 
 pub const P: i128 = protocol_core::PRECISION;
 pub type TxResult = Result<TransactionMetadata, FailedTransactionMetadata>;
@@ -27,20 +27,20 @@ pub fn repo_root() -> PathBuf {
 }
 
 fn program_so(dir: &str) -> Vec<u8> {
-    let so = repo_root().join("target").join(dir).join("kryon_perps.so");
+    let so = repo_root().join("target").join(dir).join("floydex_perps.so");
     std::fs::read(&so).unwrap_or_else(|e| panic!("read {}: {e} (build it first)", so.display()))
 }
 
-/// A fresh VM with the program loaded from `target/<dir>/kryon_perps.so` as a
+/// A fresh VM with the program loaded from `target/<dir>/floydex_perps.so` as a
 /// plain (non-upgradeable) program. Enough for the benchmark.
 pub fn svm_with_program(dir: &str) -> LiteSVM {
     let mut svm = LiteSVM::new();
-    svm.add_program(kryon_perps::ID, &program_so(dir)).unwrap();
+    svm.add_program(floydex_perps::ID, &program_so(dir)).unwrap();
     svm
 }
 
 pub fn program_data_address() -> Pubkey {
-    Pubkey::find_program_address(&[kryon_perps::ID.as_ref()], &bpf_loader_upgradeable::ID).0
+    Pubkey::find_program_address(&[floydex_perps::ID.as_ref()], &bpf_loader_upgradeable::ID).0
 }
 
 /// Load the program the way `solana program deploy` does: an upgradeable
@@ -73,7 +73,7 @@ pub fn load_upgradeable(svm: &mut LiteSVM, authority: &Pubkey) {
     .unwrap();
     let lamports = svm.minimum_balance_for_rent_exemption(data.len());
     svm.set_account(
-        kryon_perps::ID,
+        floydex_perps::ID,
         Account {
             lamports,
             data,
@@ -87,7 +87,7 @@ pub fn load_upgradeable(svm: &mut LiteSVM, authority: &Pubkey) {
 
 pub fn ix<A: ToAccountMetas, D: InstructionData>(accounts: A, data: D) -> Instruction {
     Instruction {
-        program_id: kryon_perps::ID,
+        program_id: floydex_perps::ID,
         accounts: accounts.to_account_metas(None),
         data: data.data(),
     }
@@ -138,13 +138,13 @@ pub fn send(
     r
 }
 
-pub fn anchor_code(e: KryonError) -> u32 {
+pub fn anchor_code(e: FloyDexError) -> u32 {
     anchor_lang::error::ERROR_CODE_OFFSET + e as u32
 }
 
 /// Assert a transaction failed with a specific program error.
 #[track_caller]
-pub fn assert_err(r: TxResult, e: KryonError) {
+pub fn assert_err(r: TxResult, e: FloyDexError) {
     let want = anchor_code(e);
     match r {
         Ok(_) => panic!("expected {e:?}, transaction succeeded"),
@@ -190,24 +190,27 @@ pub fn funded(svm: &mut LiteSVM) -> Keypair {
 // --- PDAs ---
 
 pub fn exchange_pda() -> Pubkey {
-    Pubkey::find_program_address(&[b"exchange"], &kryon_perps::ID).0
+    Pubkey::find_program_address(&[b"exchange"], &floydex_perps::ID).0
 }
 pub fn market_pda(id: u16) -> Pubkey {
-    Pubkey::find_program_address(&[b"market", &id.to_le_bytes()], &kryon_perps::ID).0
+    Pubkey::find_program_address(&[b"market", &id.to_le_bytes()], &floydex_perps::ID).0
+}
+pub fn book_pda(id: u16) -> Pubkey {
+    Pubkey::find_program_address(&[b"book", &id.to_le_bytes()], &floydex_perps::ID).0
 }
 pub fn collateral_pda(mint: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[b"collateral", mint.as_ref()], &kryon_perps::ID).0
+    Pubkey::find_program_address(&[b"collateral", mint.as_ref()], &floydex_perps::ID).0
 }
 pub fn vault_pda(mint: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[b"vault", mint.as_ref()], &kryon_perps::ID).0
+    Pubkey::find_program_address(&[b"vault", mint.as_ref()], &floydex_perps::ID).0
 }
 pub fn user_pda(owner: &Pubkey, sub_id: u8) -> Pubkey {
-    Pubkey::find_program_address(&[b"user", owner.as_ref(), &[sub_id]], &kryon_perps::ID).0
+    Pubkey::find_program_address(&[b"user", owner.as_ref(), &[sub_id]], &floydex_perps::ID).0
 }
 pub fn order_pda(owner: &Pubkey, sub_id: u8, nonce: u64) -> Pubkey {
     Pubkey::find_program_address(
         &[b"order", owner.as_ref(), &[sub_id], &nonce.to_le_bytes()],
-        &kryon_perps::ID,
+        &floydex_perps::ID,
     )
     .0
 }
@@ -349,15 +352,17 @@ pub struct World {
     pub calendar: Keypair,
 }
 
-pub fn default_fees() -> kryon_perps::FeeConfig {
-    kryon_perps::FeeConfig {
+pub fn default_fees() -> floydex_perps::FeeConfig {
+    // Thin fees so margin tests stay readable. Production is 1% both sides
+    // (`FeeConfig::PLATFORM` / `PLATFORM_FEE_BPS`).
+    floydex_perps::FeeConfig {
         maker_fee_bps: 2,
         taker_fee_bps: 5,
     }
 }
 
-pub fn default_market_params() -> kryon_perps::MarketParams {
-    kryon_perps::MarketParams {
+pub fn default_market_params() -> floydex_perps::MarketParams {
+    floydex_perps::MarketParams {
         base_asset: protocol_core::asset_code("TSLA"),
         pyth_feed_id: FEED_TSLA,
         pyth_shard_id: 0,
@@ -370,7 +375,7 @@ pub fn default_market_params() -> kryon_perps::MarketParams {
         max_oracle_confidence_bps: 100,
         max_execution_deviation_bps: 100,
         oi_policy_bps: 0,
-        session_policy: kryon_perps::SessionPolicyArgs {
+        session_policy: floydex_perps::SessionPolicyArgs {
             extended_margin_mult_bps: 15_000,
             closed_margin_mult_bps: 20_000,
             closed_band_base_bps: 200,
@@ -418,12 +423,12 @@ impl World {
             ka::InitializeExchange {
                 exchange: exchange_pda(),
                 authority: *authority,
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
                 program_data: program_data_address(),
                 system_program: anchor_lang::system_program::ID,
             },
             ki::InitializeExchange {
-                args: kryon_perps::InitExchangeArgs {
+                args: floydex_perps::InitExchangeArgs {
                     domain: DOMAIN,
                     guardian: self.guardian.pubkey(),
                     calendar_authority: self.calendar.pubkey(),
@@ -465,7 +470,7 @@ impl World {
     pub fn create_market_ix(
         &self,
         market_id: u16,
-        params: kryon_perps::MarketParams,
+        params: floydex_perps::MarketParams,
     ) -> Instruction {
         ix(
             ka::CreateMarket {
@@ -482,7 +487,7 @@ impl World {
         &self,
         mint: &Pubkey,
         token_program: Pubkey,
-        params: kryon_perps::CollateralParams,
+        params: floydex_perps::CollateralParams,
     ) -> Instruction {
         ix(
             ka::AddCollateral {
@@ -498,7 +503,7 @@ impl World {
         )
     }
 
-    pub fn exchange(&self) -> kryon_perps::state::Exchange {
+    pub fn exchange(&self) -> floydex_perps::state::Exchange {
         fetch(&self.svm, &exchange_pda())
     }
 
@@ -518,8 +523,8 @@ impl World {
     }
 }
 
-pub fn settlement_params() -> kryon_perps::CollateralParams {
-    kryon_perps::CollateralParams {
+pub fn settlement_params() -> floydex_perps::CollateralParams {
+    floydex_perps::CollateralParams {
         haircut_bps: 0,
         pyth_feed_id: [0; 32],
         pyth_shard_id: 0,
@@ -552,7 +557,7 @@ pub fn mock_price(
     };
     mock_price_with(
         svm,
-        kryon_perps::oracle::push_feed_address(shard, &feed),
+        floydex_perps::oracle::push_feed_address(shard, &feed),
         pyth_solana_receiver_sdk::ID,
         {
             let u = PriceUpdateV2 {
@@ -617,7 +622,7 @@ pub fn patch_zc<T: bytemuck::Pod>(svm: &mut LiteSVM, key: &Pubkey, f: impl FnOnc
 }
 
 pub fn event_authority() -> Pubkey {
-    Pubkey::find_program_address(&[b"__event_authority"], &kryon_perps::ID).0
+    Pubkey::find_program_address(&[b"__event_authority"], &floydex_perps::ID).0
 }
 
 pub fn meta(key: Pubkey, writable: bool) -> anchor_lang::prelude::AccountMeta {
@@ -673,7 +678,7 @@ impl World {
             &[],
             |_| vec![],
         );
-        let p = kryon_perps::CollateralParams {
+        let p = floydex_perps::CollateralParams {
             haircut_bps,
             pyth_feed_id: feed,
             pyth_shard_id: 0,
@@ -747,7 +752,7 @@ impl World {
             user_token: *user_token,
             token_program: asset.token_program,
             event_authority: event_authority(),
-            program: kryon_perps::ID,
+            program: floydex_perps::ID,
         }
     }
 
@@ -757,6 +762,25 @@ impl World {
             ki::Deposit { amount },
         );
         send(&mut self.svm, &[i], &t.kp, &[])
+    }
+
+    pub fn collect_fees(&mut self, asset: &Asset, collector_token: &Pubkey) -> TxResult {
+        let payer = self.admin.insecure_clone();
+        let i = ix(
+            ka::CollectFees {
+                exchange: exchange_pda(),
+                payer: payer.pubkey(),
+                collateral: collateral_pda(&asset.mint),
+                mint: asset.mint,
+                vault: vault_pda(&asset.mint),
+                collector_token: *collector_token,
+                token_program: asset.token_program,
+                event_authority: event_authority(),
+                program: floydex_perps::ID,
+            },
+            ki::CollectFees {},
+        );
+        send(&mut self.svm, &[i], &payer, &[])
     }
 
     pub fn withdraw(
@@ -775,15 +799,15 @@ impl World {
         send(&mut self.svm, &[compute_budget(1_400_000), i], &t.kp, &[])
     }
 
-    pub fn user(&self, t: &Trader) -> kryon_perps::state::UserAccount {
+    pub fn user(&self, t: &Trader) -> floydex_perps::state::UserAccount {
         fetch_zc(&self.svm, &t.user)
     }
 
-    pub fn collateral(&self, asset: &Asset) -> kryon_perps::state::Collateral {
+    pub fn collateral(&self, asset: &Asset) -> floydex_perps::state::Collateral {
         fetch(&self.svm, &collateral_pda(&asset.mint))
     }
 
-    pub fn market(&self, id: u16) -> kryon_perps::state::Market {
+    pub fn market(&self, id: u16) -> floydex_perps::state::Market {
         fetch_zc(&self.svm, &market_pda(id))
     }
 
@@ -804,11 +828,11 @@ impl World {
     /// Write a Regular window directly into the market (until
     /// `post_session_calendar` lands, and for surgical tests after).
     pub fn post_regular_window(&mut self, id: u16, start: i64, end: i64) {
-        patch_zc::<kryon_perps::state::Market>(&mut self.svm, &market_pda(id), |m| {
-            m.calendar[0] = kryon_perps::state::SessionWindowPod {
+        patch_zc::<floydex_perps::state::Market>(&mut self.svm, &market_pda(id), |m| {
+            m.calendar[0] = floydex_perps::state::SessionWindowPod {
                 start: start as u64,
                 end: end as u64,
-                session: kryon_perps::state::SESSION_REGULAR,
+                session: floydex_perps::state::SESSION_REGULAR,
                 _pad: [0; 7],
             };
         });
@@ -825,9 +849,9 @@ pub fn inject_position(
     size: i128,
     entry: i128,
 ) {
-    patch_zc::<kryon_perps::state::UserAccount>(svm, user, |u| {
+    patch_zc::<floydex_perps::state::UserAccount>(svm, user, |u| {
         let i = u.positions.iter().position(|p| p.in_use == 0).unwrap();
-        u.positions[i] = kryon_perps::state::PositionSlot {
+        u.positions[i] = floydex_perps::state::PositionSlot {
             position_id: u.next_position_id,
             size: size.into(),
             entry_price: entry.into(),
@@ -849,7 +873,7 @@ impl World {
                 owner: t.key(),
                 user_account: t.user,
                 event_authority: event_authority(),
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
             },
             ki::SetDelegate {
                 delegate: *delegate,
@@ -865,7 +889,7 @@ impl World {
                 owner: t.key(),
                 user_account: t.user,
                 event_authority: event_authority(),
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
             },
             ki::RevokeDelegate {},
         );
@@ -875,8 +899,8 @@ impl World {
 
 // --- orders, Ed25519, settle ---
 
-pub use kryon_perps::ed25519::SigRef;
-pub use kryon_perps::{FillArgs, OrderArgs};
+pub use floydex_perps::ed25519::SigRef;
+pub use floydex_perps::{FillArgs, OrderArgs};
 
 pub const ED25519_ID: Pubkey =
     anchor_lang::solana_program::pubkey!("Ed25519SigVerify111111111111111111111111111");
@@ -1002,7 +1026,7 @@ impl World {
             exchange: exchange_pda(),
             operator: *operator,
             market: market_pda(market_id),
-            price_update: kryon_perps::oracle::push_feed_address(m.pyth_shard_id, &m.pyth_feed_id),
+            price_update: floydex_perps::oracle::push_feed_address(m.pyth_shard_id, &m.pyth_feed_id),
             settlement_collateral: collateral_pda(&self.exchange().settlement_mint),
             instructions: anchor_lang::solana_program::sysvar::instructions::ID,
             system_program: anchor_lang::system_program::ID,
@@ -1011,7 +1035,7 @@ impl World {
                 .get_account(&insurance_pda())
                 .map(|_| insurance_pda()),
             event_authority: event_authority(),
-            program: kryon_perps::ID,
+            program: floydex_perps::ID,
         }
     }
 
@@ -1097,7 +1121,7 @@ impl World {
 /// funding. Only market `market_id` is considered.
 pub fn settlement_liabilities(w: &World, users: &[&Trader], market_id: u16, price: i128) -> i128 {
     let ex = w.exchange();
-    let c: kryon_perps::state::Collateral = fetch(&w.svm, &collateral_pda(&ex.settlement_mint));
+    let c: floydex_perps::state::Collateral = fetch(&w.svm, &collateral_pda(&ex.settlement_mint));
     let m = w.market(market_id);
     let mut total = c.fees_accrued + insurance_fund(w);
     for t in users {
@@ -1124,10 +1148,10 @@ pub fn settlement_liabilities(w: &World, users: &[&Trader], market_id: u16, pric
 }
 
 pub fn insurance_pda() -> Pubkey {
-    Pubkey::find_program_address(&[b"insurance"], &kryon_perps::ID).0
+    Pubkey::find_program_address(&[b"insurance"], &floydex_perps::ID).0
 }
 pub fn stake_pda(owner: &Pubkey) -> Pubkey {
-    Pubkey::find_program_address(&[b"stake", owner.as_ref()], &kryon_perps::ID).0
+    Pubkey::find_program_address(&[b"stake", owner.as_ref()], &floydex_perps::ID).0
 }
 
 /// The insurance fund's NAV, 0 before `init_insurance`.
@@ -1190,7 +1214,7 @@ impl World {
     pub fn post_calendar(
         &mut self,
         market_id: u16,
-        windows: Vec<kryon_perps::SessionWindowArgs>,
+        windows: Vec<floydex_perps::SessionWindowArgs>,
     ) -> TxResult {
         let c = self.calendar.insecure_clone();
         let i = ix(
@@ -1205,8 +1229,8 @@ impl World {
     }
 }
 
-pub fn window(start: i64, end: i64, session: u8) -> kryon_perps::SessionWindowArgs {
-    kryon_perps::SessionWindowArgs {
+pub fn window(start: i64, end: i64, session: u8) -> floydex_perps::SessionWindowArgs {
+    floydex_perps::SessionWindowArgs {
         start: start as u64,
         end: end as u64,
         session,
@@ -1221,12 +1245,12 @@ impl World {
                 exchange: exchange_pda(),
                 operator: operator.pubkey(),
                 market: market_pda(market_id),
-                price_update: kryon_perps::oracle::push_feed_address(
+                price_update: floydex_perps::oracle::push_feed_address(
                     m.pyth_shard_id,
                     &m.pyth_feed_id,
                 ),
                 event_authority: event_authority(),
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
             },
             ki::PostMark { mid },
         );
@@ -1247,7 +1271,7 @@ impl World {
 
     /// Drop every posted window: the market resolves to Closed.
     pub fn close_market(&mut self, market_id: u16) {
-        patch_zc::<kryon_perps::state::Market>(&mut self.svm, &market_pda(market_id), |m| {
+        patch_zc::<floydex_perps::state::Market>(&mut self.svm, &market_pda(market_id), |m| {
             m.calendar = Default::default()
         });
     }
@@ -1261,12 +1285,12 @@ impl World {
             ka::UpdateFunding {
                 exchange: exchange_pda(),
                 market: market_pda(market_id),
-                price_update: kryon_perps::oracle::push_feed_address(
+                price_update: floydex_perps::oracle::push_feed_address(
                     m.pyth_shard_id,
                     &m.pyth_feed_id,
                 ),
                 event_authority: event_authority(),
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
             },
             ki::UpdateFunding {},
         );
@@ -1289,11 +1313,11 @@ impl World {
 // --- insurance and liquidation ---
 
 impl World {
-    pub fn insurance(&self) -> kryon_perps::state::Insurance {
+    pub fn insurance(&self) -> floydex_perps::state::Insurance {
         fetch(&self.svm, &insurance_pda())
     }
 
-    pub fn stake_position(&self, owner: &Pubkey) -> kryon_perps::state::StakePosition {
+    pub fn stake_position(&self, owner: &Pubkey) -> floydex_perps::state::StakePosition {
         fetch(&self.svm, &stake_pda(owner))
     }
 
@@ -1314,7 +1338,7 @@ impl World {
             },
             ki::InitInsurance {
                 unstake_cooldown_secs: cooldown,
-                config: kryon_perps::LiquidationConfig {
+                config: floydex_perps::LiquidationConfig {
                     max_reward_bps,
                     partial_liquidation_bps,
                 },
@@ -1336,7 +1360,7 @@ impl World {
             token_program: asset.token_program,
             system_program: anchor_lang::system_program::ID,
             event_authority: event_authority(),
-            program: kryon_perps::ID,
+            program: floydex_perps::ID,
         }
     }
 
@@ -1361,7 +1385,7 @@ impl World {
                 staker: staker.pubkey(),
                 stake_position: stake_pda(&staker.pubkey()),
                 event_authority: event_authority(),
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
             },
             ki::RequestUnstake { shares },
         );
@@ -1400,12 +1424,12 @@ impl World {
                 liquidator_account: liquidator.user,
                 user_account: user.user,
                 market: market_pda(market_id),
-                price_update: kryon_perps::oracle::push_feed_address(
+                price_update: floydex_perps::oracle::push_feed_address(
                     m.pyth_shard_id,
                     &m.pyth_feed_id,
                 ),
                 event_authority: event_authority(),
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
             },
             ki::Liquidate { position_id },
             extra,
@@ -1449,12 +1473,12 @@ impl World {
                 winner_account: winner.user,
                 counterparty_account: counterparty.user,
                 market: market_pda(market_id),
-                price_update: kryon_perps::oracle::push_feed_address(
+                price_update: floydex_perps::oracle::push_feed_address(
                     m.pyth_shard_id,
                     &m.pyth_feed_id,
                 ),
                 event_authority: event_authority(),
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
             },
             ki::Adl {
                 winner_position_id,
@@ -1467,8 +1491,8 @@ impl World {
 
 // --- crafted Token-2022 mints (extensions newer than the pinned crate) ---
 
-/// Token-2022 extension type numbers, as `kryon_perps::token_ext::ext`.
-pub use kryon_perps::token_ext::ext;
+/// Token-2022 extension type numbers, as `floydex_perps::token_ext::ext`.
+pub use floydex_perps::token_ext::ext;
 
 /// Scaled-UI-amount extension value: authority, multiplier, the unix time
 /// `new_multiplier` takes effect, new multiplier.
@@ -1556,8 +1580,8 @@ pub fn plain_token_account(
 }
 
 /// xStock-like collateral params: 8 decimals, priced by `feed`.
-pub fn xstock_params(feed: [u8; 32], haircut_bps: u32) -> kryon_perps::CollateralParams {
-    kryon_perps::CollateralParams {
+pub fn xstock_params(feed: [u8; 32], haircut_bps: u32) -> floydex_perps::CollateralParams {
+    floydex_perps::CollateralParams {
         haircut_bps,
         pyth_feed_id: feed,
         pyth_shard_id: 0,
