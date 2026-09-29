@@ -1,10 +1,10 @@
-# 11 — Lessons from Kryon on Stellar (don't repeat these)
+# 11 — Lessons from FloyDex on Stellar (don't repeat these)
 
 Each item cost real time or money on Stellar. Each has a test or gate in the
 Solana plan. Details are in `reference/stellar/audits/` and
 `reference/stellar/docs/`.
 
-| # | What happened on Stellar | Rule for Kryon-sol |
+| # | What happened on Stellar | Rule for FloyDex |
 |---|---|---|
 | L1 | The matcher called `settle_fill_signed`, **a function that didn't exist** on-chain. Every fill rolled back and positions never updated | An end-to-end test on a local validator runs in CI for every PR: sign → match → settle → position visible |
 | L2 | Settlement failed deep in the engine with `StaleOracle` because the **USDC collateral feed was missing**. Zero trades settled on testnet for weeks | Every collateral and market feed is in a health check; the deploy script refuses to finish if any feed is stale |

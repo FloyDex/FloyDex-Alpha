@@ -5,7 +5,7 @@ Pyth docs before you sign up.** Sources are in `../sources.md`.
 
 ## 1. What changed in 2026, and why it matters
 
-| Date | Change | Impact on Kryon |
+| Date | Change | Impact on FloyDex |
 |---|---|---|
 | 2026-06-15 | Extended-hours US equity feeds (`.PRE`, `.POST`, `.ON`) moved from Pyth Core to **Pyth Pro** | Pre-market, post-market and overnight prices are paid |
 | 2026-07-31 / 08-26 | **Pyth Core upgrade**: Hermes requires an API key (`Authorization: Bearer <key>`); unauthenticated calls get 401. New endpoint `https://pyth.dourolabs.app/hermes` | Our pusher needs a paid key. The free tier is view-only, 10 s updates, rate-limited |
@@ -14,10 +14,10 @@ Pyth docs before you sign up.** Sources are in `../sources.md`.
 
 ## 2. How we consume it (the pull model)
 
-On-chain (Rust, inside `kryon_perps`):
+On-chain (Rust, inside `floydex_perps`):
 
 ```toml
-# programs/kryon-perps/Cargo.toml
+# programs/floydex-perps/Cargo.toml
 pyth-solana-receiver-sdk = "<latest compatible with anchor 0.31.1>"
 ```
 
@@ -53,12 +53,12 @@ const hermes = new HermesClient("https://pyth.dourolabs.app/hermes", {
 const { binary } = await hermes.getLatestPriceUpdates(FEED_IDS, { encoding: "base64" });
 const receiver = new PythSolanaReceiver({ connection, wallet });
 const tx = receiver.newTransactionBuilder({ closeUpdateAccounts: false });
-await tx.addUpdatePriceFeed(binary.data, KRYON_SHARD_ID); // write to our own price-feed accounts (check the method name against the installed SDK version)
+await tx.addUpdatePriceFeed(binary.data, FLOYDEX_SHARD_ID); // write to our own price-feed accounts (check the method name against the installed SDK version)
 ```
 
 Two ways to get fresh prices on-chain:
 1. **Our own price-feed accounts (recommended for v1).** The pusher updates a
-   fixed account per feed, `getPriceFeedAccountAddress(KRYON_SHARD_ID, feedId)`,
+   fixed account per feed, `getPriceFeedAccountAddress(FLOYDEX_SHARD_ID, feedId)`,
    every ~1 s in session and every ~10 s when closed. `settle_fills`,
    `liquidate` and `update_funding` read those accounts. Transactions stay
    small because no VAA goes inside the matcher's transactions.
@@ -132,8 +132,8 @@ later. It's a policy change, not a code change.
   multiplier and include it in valuation.
 - Issuer freeze/pause powers: they're a risk to collateral, so reflect them in
   the haircut.
-- Holder restrictions: xStocks are not for US persons. This lines up with our
-  geofence (`10`).
+- Holder restrictions on some xStocks issuers may still apply at the token
+  layer; FloyDex itself does not geofence by country (`10`).
 
 **Built (decided 2026-09-26):**
 - **Allow-list, read from raw TLV** (`token_ext.rs`). The pinned

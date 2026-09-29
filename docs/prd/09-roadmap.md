@@ -4,11 +4,11 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 **phase gates are not optional**. Don't move on with a gate red.
 
 ## Phase 0 — Foundation (Week 1: 09-28 → 10-04)
-- [x] `git init` Kryon-sol and push (github.com/SamyaDeb/kryon-sol)
+- [x] `git init` FloyDex and push ([github.com/FloyDex/FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha))
 - [x] Port `protocol-core` + `risk-engine` off Soroban (done, 25 tests)
 - [x] `session.rs` session-aware risk (done)
 - [x] Benchmark `mul_div` (I256) compute units in BPF; decide on keeping it or a u128 path (u64-limb path adopted, `05` §6)
-- [x] `anchor init` equivalent: `programs/kryon-perps` builds for SBF
+- [x] `anchor init` equivalent: `programs/floydex-perps` builds for SBF
 - [x] RPC: public devnet endpoint for now (dedicated Helius/Triton before Phase 3 load test); Pyth API key not needed (free sponsored shard-0 feeds, `06` §8); devnet USDC mint `BL4DqDDg5uerF11E4PafA43Vj7MVfy25xy9wwyXeMCqd` (6 decimals, authority = deployer), 2026-09-27
 - **Gate:** program builds; the crates compile to `sbf`; CU numbers written down
 
@@ -134,8 +134,8 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 - [ ] Port the trade terminal; wallet adapter + session-key onboarding (one approval, then popup-free)
 - [ ] Session badge, band indicator, effective leverage, liquidation price from `risk-engine` WASM
 - [ ] Deposit/withdraw with xStocks; portfolio; leaderboard
-- [ ] Geofence + ToS + sanctions screening
-- [ ] TS SDK + conformance vectors (reuse the KryonSDK structure); MM docs
+- [x] Open access (no country geofence); ToS optional — wallet bans only via admin
+- [ ] TS SDK + conformance vectors (reuse the FloyDexSDK structure); MM docs
 - **Gate:** a new user goes from connecting a wallet to their first trade in under 60 s with one wallet approval
 
 ## Phase 5 — Devnet public beta (Weeks 12–15: 12-14 → 2027-01-10)
@@ -159,7 +159,7 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 ## Phase 8 — Growth (Mar–Jun 2027)
 - [ ] Portfolio margin + Basis Vault (D1)
 - [ ] Commodities/FX markets; Pyth Pro extended hours (if the budget allows)
-- [ ] Pre-listing markets (D5), first KRY pre-market
+- [ ] Pre-listing markets (D5); FloyDex-token pre-market only after ticker is announced
 - [ ] TGE, once the `08` §A1 gates are met
 
 ## Budget sketch (first 6 months, USD, estimates)
