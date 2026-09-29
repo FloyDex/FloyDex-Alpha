@@ -243,6 +243,13 @@
   transition: opacity .15s ease;
 }
 .s5-footer-socials a:hover { opacity: .7; }
+.s5-footer-token {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #14F195 !important;
+  white-space: nowrap;
+}
 
 .s5-menu-overlay {
   position: fixed;

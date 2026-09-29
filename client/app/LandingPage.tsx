@@ -763,7 +763,7 @@ export function LandingPage() {
                       rel="noopener noreferrer"
                       aria-label="$FLOYDEX"
                       title="$FLOYDEX"
-                      className="text-[13px] font-semibold tracking-wide text-[#14F195]"
+                      className="s5-footer-token"
                     >
                       $FLOYDEX
                     </a>
