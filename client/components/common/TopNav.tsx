@@ -1,68 +1,75 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { CircleHelp, Menu, X } from "lucide-react";
+import { FloyDexLogo } from "@/components/common/FloyDexLogo";
 import { WalletConnect } from "@/features/wallet/components/WalletConnect";
 import { NotificationBell } from "@/features/navbar/components/NotificationBell";
 import { SettingsMenu } from "@/features/navbar/components/SettingsMenu";
+import { FuturesDrawerLinks, FuturesMenu } from "@/features/navbar/components/FuturesMenu";
+import { PopularTicker } from "@/features/navbar/components/PopularTicker";
+import { STAKE_PUBLIC } from "@/lib/market/stake";
 import { DEFAULT_MARKET_SYMBOL } from "@/config";
-import { NetworkToggle } from "@/features/network/components/NetworkToggle";
-import { NetworkBanner } from "@/features/network/components/NetworkBanner";
+import { useTradeSettings } from "@/stores/settings";
 
 const TABS = [
-  { label: "Trade", href: `/trade/${DEFAULT_MARKET_SYMBOL}`, match: "/trade" },
   { label: "Markets", href: "/markets", match: "/markets" },
   { label: "Portfolio", href: "/portfolio", match: "/portfolio" },
+  ...(STAKE_PUBLIC ? [{ label: "Stake", href: "/stake", match: "/stake" }] : []),
   { label: "Leaderboard", href: "/leaderboard", match: "/leaderboard" },
-  { label: "Activity", href: "/dashboard", match: "/dashboard" },
 ];
 
 export function TopNav() {
   const pathname = usePathname() ?? "";
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const requestDeskTour = useTradeSettings((s) => s.requestDeskTour);
+
+  function openDeskGuide() {
+    requestDeskTour();
+    if (!pathname.startsWith("/trade")) {
+      router.push(`/trade/${DEFAULT_MARKET_SYMBOL}?tour=1`);
+    }
+  }
 
   return (
     <header
-      className="relative shrink-0 border-b border-[#2A2A31] bg-[#212128]"
+      className="relative z-40 shrink-0 border-b border-[#15221E] bg-[#0B1210]"
       style={{ paddingTop: "max(6px, env(safe-area-inset-top))" }}
     >
-      <div className="flex items-center justify-between gap-2 px-3 pb-[6px] sm:px-[14px]">
+      <div className="flex items-center justify-between gap-2 px-3 py-[6px] sm:px-[14px]">
         <div className="flex min-w-0 items-center gap-2 sm:gap-[12px]">
-          {/* Hamburger — mobile only */}
           <button
             type="button"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] text-[#a3a3a3] hover:bg-[#19191A] hover:text-[#f5f5f5] transition-colors md:hidden"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-[7px] text-[#a3a3a3] transition-colors hover:bg-[#070B0A] hover:text-[#f5f5f5] md:hidden"
           >
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
 
           <Link href="/" className="flex shrink-0 items-center gap-[8px] select-none">
-            <Image src="/logo.png" alt="Kryon" width={36} height={11} priority className="object-contain" />
+            <FloyDexLogo size={28} className="text-[#14F195]" />
             <span
               className="text-[18px] font-bold text-[#f5f5f5]"
               style={{ fontFamily: "var(--font-poppins), 'Poppins', system-ui, sans-serif" }}
             >
-              KRYON
+              FLOYDEX
             </span>
           </Link>
 
-          {/* Desktop / tablet inline nav */}
-          <nav className="hidden gap-[6px] md:flex">
+          <nav className="hidden items-center md:flex">
+            <FuturesMenu />
             {TABS.map((t) => {
               const active = pathname.startsWith(t.match);
               return (
                 <Link
                   key={t.label}
                   href={t.href}
-                  className={`px-[12px] py-[6px] rounded-[6px] text-[13px] font-medium transition-colors ${
-                    active ? "text-[#f5f5f5]" : "text-[#a3a3a3] hover:text-[#f5f5f5]"
-                  }`}
+                  className={`desk-tab px-3 py-2 text-[13px] ${active ? "is-on" : ""}`}
                 >
                   {t.label}
                 </Link>
@@ -71,17 +78,25 @@ export function TopNav() {
           </nav>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-[12px]">
-          {/* Hidden on mobile, where it moves into the drawer — the segmented
-              control plus the wallet button does not fit a phone-width bar. */}
-          <NetworkToggle className="hidden sm:flex" />
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-[10px]">
+          <button
+            type="button"
+            onClick={openDeskGuide}
+            aria-label="Desk guide"
+            title="Desk guide"
+            className="inline-flex h-[34px] items-center gap-1.5 rounded-[7px] px-2 text-[#a3a3a3] transition-colors hover:bg-[#070B0A] hover:text-[#f5f5f5] sm:px-2.5"
+          >
+            <CircleHelp size={15} />
+            <span className="hidden text-[12px] font-medium sm:inline">Guide</span>
+          </button>
           <WalletConnect />
           <NotificationBell />
           <SettingsMenu />
         </div>
       </div>
 
-      {/* Mobile drawer */}
+      <PopularTicker />
+
       {menuOpen && (
         <>
           <button
@@ -90,11 +105,8 @@ export function TopNav() {
             className="fixed inset-0 z-40 bg-black/50 md:hidden"
             onClick={() => setMenuOpen(false)}
           />
-          <nav className="absolute inset-x-0 top-full z-50 border-b border-[#2A2A31] bg-[#212128] p-2 shadow-[0_20px_40px_rgba(0,0,0,.5)] md:hidden">
-            <div className="mb-2 flex items-center justify-between gap-2 border-b border-[#2A2A31] px-2 pb-3 sm:hidden">
-              <span className="text-[13px] font-medium text-[#a3a3a3]">Network</span>
-              <NetworkToggle />
-            </div>
+          <nav className="absolute inset-x-0 top-full z-50 border-b border-[#1A2A26] bg-[#0E1614] p-2 shadow-[0_20px_40px_rgba(0,0,0,.5)] md:hidden">
+            <FuturesDrawerLinks onNavigate={() => setMenuOpen(false)} />
             {TABS.map((t) => {
               const active = pathname.startsWith(t.match);
               return (
@@ -103,18 +115,29 @@ export function TopNav() {
                   href={t.href}
                   onClick={() => setMenuOpen(false)}
                   className={`block rounded-[8px] px-4 py-3 text-[15px] font-medium transition-colors ${
-                    active ? "bg-[#19191A] text-[#f5f5f5]" : "text-[#a3a3a3] hover:bg-[#19191A] hover:text-[#f5f5f5]"
+                    active
+                      ? "bg-[#070B0A] text-[#f5f5f5]"
+                      : "text-[#a3a3a3] hover:bg-[#070B0A] hover:text-[#f5f5f5]"
                   }`}
                 >
                   {t.label}
                 </Link>
               );
             })}
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                openDeskGuide();
+              }}
+              className="mt-1 flex w-full items-center gap-2 rounded-[8px] px-4 py-3 text-left text-[15px] font-medium text-[#a3a3a3] transition-colors hover:bg-[#070B0A] hover:text-[#f5f5f5]"
+            >
+              <CircleHelp size={16} />
+              Desk guide
+            </button>
           </nav>
         </>
       )}
-
-      <NetworkBanner />
     </header>
   );
 }
