@@ -3,7 +3,7 @@
  * Must byte-match `protocol_core::OrderMsg::encode` in Rust; both are pinned
  * by `sdk/conformance/order-v1.json`.
  *
- *   0    8  magic        "KRYONv1\0"
+ *   0    8  magic        "FLOYDEX\0"
  *   8   32  domain       sha256(genesis_hash || program_id)
  *   40  32  owner        wallet pubkey (never the delegate)
  *   72   1  sub_id
@@ -16,7 +16,7 @@
  */
 import { createHash } from "node:crypto";
 
-export const ORDER_MAGIC = new Uint8Array([0x4b, 0x52, 0x59, 0x4f, 0x4e, 0x76, 0x31, 0x00]); // "KRYONv1\0"
+export const ORDER_MAGIC = new Uint8Array([0x46, 0x4c, 0x4f, 0x59, 0x44, 0x45, 0x58, 0x00]); // "FLOYDEX\0"
 export const ORDER_MSG_LEN = 108;
 
 export const FLAG_IS_LONG = 1 << 0;
