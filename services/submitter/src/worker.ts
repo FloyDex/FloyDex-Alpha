@@ -9,7 +9,7 @@
  */
 import anchorPkg from "@coral-xyz/anchor";
 import { Connection, Keypair, PACKET_DATA_SIZE, PublicKey, TransactionMessage, VersionedTransaction, type AddressLookupTableAccount } from "@solana/web3.js";
-import type { PrismaClient } from "@kryon/db";
+import type { PrismaClient } from "@floydex/db";
 import type { Logger } from "../../kit/src/logger.ts";
 import { claimSettleFillJobs, recordPendingSend, releaseJob, type ClaimedJob } from "./claim.ts";
 import { buildFillPlan, settleFillsStaticAccounts, insurancePda, type BuildInputs, type UserContext } from "./build.ts";

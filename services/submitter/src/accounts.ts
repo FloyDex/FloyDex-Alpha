@@ -1,6 +1,6 @@
 /**
  * PDA derivation and on-chain account resolution for `settle_fills`
- * (`programs/kryon-perps/src/instructions/settle.rs`, `programs/kryon-perps/
+ * (`programs/floydex-perps/src/instructions/settle.rs`, `programs/floydex-perps/
  * src/health.rs`). Kept separate from `build.ts` so the pure instruction
  * assembly is testable without a live `Connection`.
  */
@@ -15,7 +15,7 @@ export function pda(programId: PublicKey, ...seeds: (Buffer | Uint8Array)[]): Pu
 /**
  * `Program.account` is typed against the IDL's TS-generated type when one
  * exists; every service here instead constructs `Program` from the raw JSON
- * IDL loaded at runtime (`target/idl/kryon_perps.json`), so TS only knows it
+ * IDL loaded at runtime (`target/idl/floydex_perps.json`), so TS only knows it
  * as `AccountNamespace<Idl>` with no per-account keys. This is the one place
  * that loosens the type back to `{ fetch }` per account name, kept narrow
  * (not exported beyond this module's own use) so a genuine typo in an

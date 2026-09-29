@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import anchorPkg from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, type AddressLookupTableAccount } from "@solana/web3.js";
-import { PrismaClient } from "@kryon/db";
+import { PrismaClient } from "@floydex/db";
 import { bootEnv } from "../../kit/src/env.ts";
 import { createLogger } from "../../kit/src/logger.ts";
 import { createAlerter } from "../../kit/src/alerter.ts";
@@ -26,7 +26,7 @@ async function main() {
   const connection = new Connection(env.RPC_URL, "confirmed");
   const operator = loadKeypair(env.OPERATOR_KEYPAIR_FILE);
   const programId = new PublicKey(deployment.programId);
-  const idl = JSON.parse(readFileSync("target/idl/kryon_perps.json", "utf8"));
+  const idl = JSON.parse(readFileSync("target/idl/floydex_perps.json", "utf8"));
   const provider = new AnchorProvider(connection, new Wallet(operator), { commitment: "confirmed" });
   const program = new Program(idl, provider);
 

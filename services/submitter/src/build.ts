@@ -2,7 +2,7 @@
  * Assembles the instructions for one `settle_fills` transaction: an Ed25519
  * introspection instruction (one signature pair per fill, `05` §5) followed
  * by the `settle_fills` instruction itself, batching 1..N same-market fills
- * (`programs/kryon-perps/src/instructions/settle.rs`).
+ * (`programs/floydex-perps/src/instructions/settle.rs`).
  *
  * Kept as a pure function of already-fetched chain state (no `Connection`
  * calls in here) so it's unit-testable: given a `ChainDirectory` and decoded

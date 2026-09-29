@@ -5,7 +5,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PrismaClient } from "@kryon/db";
+import { PrismaClient } from "@floydex/db";
 import { claimSettleFillJobs, recordPendingSend, releaseJob } from "../src/claim.ts";
 
 const DATABASE_URL = process.env.DATABASE_URL;

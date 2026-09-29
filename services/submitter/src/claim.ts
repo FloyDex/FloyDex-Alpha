@@ -10,7 +10,7 @@
  * that's slow on one market must never block every other worker's claim on
  * the same rows — it just skips whatever's already locked.
  */
-import type { Prisma, PrismaClient } from "@kryon/db";
+import type { Prisma, PrismaClient } from "@floydex/db";
 import type { StoredFillPayload } from "./message.ts";
 
 export interface ClaimedJob {
