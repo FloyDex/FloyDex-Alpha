@@ -22,7 +22,7 @@ export default async function TradePage({
           a fixed-height terminal that never scrolls the page — only its panels. */}
       <div
         className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden"
-        style={{ background: "#19191A", fontFamily: "var(--font-poppins), 'Poppins', system-ui, sans-serif" }}
+        style={{ background: "#070B0A", fontFamily: "var(--font-poppins), 'Poppins', system-ui, sans-serif" }}
       >
         <TopNav />
         <TradeTerminalGrid market={marketConfig} />
