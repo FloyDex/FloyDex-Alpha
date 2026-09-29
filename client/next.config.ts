@@ -1,4 +1,30 @@
+import { existsSync, readFileSync } from "fs";
+import { resolve } from "path";
 import type { NextConfig } from "next";
+
+/** Repo-root `.env` is the only env file. It is applied with override so those values always win. */
+const rootEnv = resolve(__dirname, "../.env");
+if (existsSync(rootEnv)) {
+  for (const line of readFileSync(rootEnv, "utf8").split("\n")) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const i = t.indexOf("=");
+    if (i <= 0) continue;
+    let v = t.slice(i + 1);
+    if (
+      (v.startsWith('"') && v.endsWith('"')) ||
+      (v.startsWith("'") && v.endsWith("'"))
+    ) {
+      v = v.slice(1, -1);
+    }
+    process.env[t.slice(0, i).trim()] = v;
+  }
+}
+
+const publicEnv: Record<string, string> = {};
+for (const [k, v] of Object.entries(process.env)) {
+  if (k.startsWith("NEXT_PUBLIC_") && typeof v === "string") publicEnv[k] = v;
+}
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -47,11 +73,12 @@ const csp = [
   // Both networks' RPC and Horizon endpoints are listed: the navbar toggle
   // serves both venues from one bundle, so a build for either must be able to
   // reach the other's chain endpoints after a switch.
-  `connect-src 'self' https://api.binance.com https://*.tradingview.com wss://*.tradingview.com https://soroban-testnet.stellar.org https://soroban-mainnet.stellar.org https://mainnet.sorobanrpc.com https://horizon-testnet.stellar.org https://horizon.stellar.org ${wsConnectSrc}${isDev ? " ws://localhost:8080 ws://localhost:8081" : ""}`,
+  `connect-src 'self' https://api.binance.com https://*.tradingview.com wss://*.tradingview.com https://api.devnet.solana.com https://api.mainnet-beta.solana.com https://*.helius-rpc.com https://api.usepod.ai https://clawpump.tech ${wsConnectSrc}${isDev ? " ws://localhost:8080 ws://localhost:8081" : ""}`,
   "worker-src 'self' blob:",
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  env: publicEnv,
   // The web tier runs on a 945MB micro instance, which cannot run `next build`
   // — the compile alone wants well over a gigabyte. Standalone emits a
   // self-contained server plus only the node_modules it actually traces, so the
