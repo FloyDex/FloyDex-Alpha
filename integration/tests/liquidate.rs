@@ -4,8 +4,8 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use protocol_core::{apply_bps, mul_div, notional};
 
 /// Book + insurance (7-day cooldown, reward cap 20 bps, 50% per step) + a
@@ -32,7 +32,7 @@ fn a_healthy_account_is_not_liquidatable() {
     let id = pid(&b, &b.alice);
     assert_err(
         b.w.liquidate(&carol, &b.alice, 1, id, vec![]),
-        KryonError::NotLiquidatable,
+        FloyDexError::NotLiquidatable,
     );
 }
 
@@ -73,7 +73,7 @@ fn a_partial_liquidation_transfers_the_minimum_slice_at_the_mark() {
     let per_unit = mul_div(165 * P, 950, 10_000).unwrap();
     let exact = protocol_core::mul_div_ceil(shortfall, P, per_unit).unwrap();
     // Rounded up to whole order units (1e-9 share) so it stays closable.
-    let size = kryon_perps::position::to_whole_units(exact, 100 * P);
+    let size = floydex_perps::position::to_whole_units(exact, 100 * P);
     assert!(size >= exact && size - exact < 1_000_000_000);
     assert!(size < 50 * P);
     let n = notional(size, 165 * P).unwrap();
@@ -116,7 +116,7 @@ fn one_step_restores_health_and_then_it_stops() {
     assert_eq!(steps, 1, "one step restores maintenance");
     assert_err(
         b.w.liquidate(&carol, &b.alice, 1, id, vec![]),
-        KryonError::NotLiquidatable,
+        FloyDexError::NotLiquidatable,
     );
     assert!(
         b.position(&b.alice).is_some(),
@@ -173,7 +173,7 @@ fn a_bankrupt_account_draws_insurance_then_records_bad_debt_and_retires_shares()
     // Dan's retired shares are gone: he has nothing left to unstake.
     assert_err(
         b.w.request_unstake(&dan, 500 * P),
-        KryonError::InsufficientShares,
+        FloyDexError::InsufficientShares,
     );
 }
 
@@ -187,7 +187,7 @@ fn halted_markets_are_not_liquidated() {
     let id = pid(&b, &b.alice);
     assert_err(
         b.w.liquidate(&carol, &b.alice, 1, id, vec![]),
-        KryonError::MarketHalted,
+        FloyDexError::MarketHalted,
     );
 }
 
@@ -204,7 +204,7 @@ fn nobody_liquidates_their_own_account() {
     };
     assert_err(
         b.w.liquidate(&alice, &b.alice, 1, id, vec![]),
-        KryonError::SelfLiquidation,
+        FloyDexError::SelfLiquidation,
     );
 }
 
@@ -221,7 +221,7 @@ fn the_liquidator_must_be_able_to_margin_the_position() {
     let id = pid(&b, &b.alice);
     assert_err(
         b.w.liquidate(&poor, &b.alice, 1, id, vec![]),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
 }
 
@@ -240,11 +240,11 @@ fn grace_protects_an_account_from_the_close_multiplier_alone() {
     let id = pid(&b, &b.alice);
     assert_err(
         b.w.liquidate(&carol, &b.alice, 1, id, vec![]),
-        KryonError::NotLiquidatable,
+        FloyDexError::NotLiquidatable,
     );
     // Had she added exposure during the ramp, she would get no grace.
     let saved = b.w.user(&b.alice).last_increase_ts;
-    patch_zc::<kryon_perps::state::UserAccount>(&mut b.w.svm, &b.alice.user, |u| {
+    patch_zc::<floydex_perps::state::UserAccount>(&mut b.w.svm, &b.alice.user, |u| {
         u.last_increase_ts = (t0 + 2_000) as u64
     });
     b.w.svm.expire_blockhash();
@@ -347,7 +347,7 @@ fn other_collateral_is_sold_to_the_liquidator_at_its_haircut_value() {
                 assert!(
                     format!("{:?}", f.err).contains(&format!(
                         "Custom({})",
-                        anchor_code(KryonError::NotLiquidatable)
+                        anchor_code(FloyDexError::NotLiquidatable)
                     )),
                     "{:?}\n{:#?}",
                     f.err,

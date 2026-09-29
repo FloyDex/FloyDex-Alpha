@@ -4,8 +4,8 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
@@ -56,16 +56,16 @@ fn init_insurance_validates_its_config() {
     let mut b = Book::new();
     assert_err(
         b.w.init_insurance(WEEK, 0, 5_000),
-        KryonError::InvalidConfig,
+        FloyDexError::InvalidConfig,
     );
     assert_err(
         b.w.init_insurance(WEEK, 1_001, 5_000),
-        KryonError::InvalidConfig,
+        FloyDexError::InvalidConfig,
     );
-    assert_err(b.w.init_insurance(WEEK, 20, 0), KryonError::InvalidConfig);
+    assert_err(b.w.init_insurance(WEEK, 20, 0), FloyDexError::InvalidConfig);
     assert_err(
         b.w.init_insurance(91 * 86_400, 20, 5_000),
-        KryonError::InvalidConfig,
+        FloyDexError::InvalidConfig,
     );
     assert_ok(b.w.init_insurance(WEEK, 20, 5_000));
     let ex = b.w.exchange();
@@ -94,7 +94,7 @@ fn shares_are_priced_against_nav() {
 }
 
 /// Test-only surgery on the Insurance account (Borsh).
-fn patch_insurance(b: &mut Book, f: impl FnOnce(&mut kryon_perps::state::Insurance)) {
+fn patch_insurance(b: &mut Book, f: impl FnOnce(&mut floydex_perps::state::Insurance)) {
     use anchor_lang::AccountSerialize;
     let mut ins = b.w.insurance();
     let delta_fund = {
@@ -131,19 +131,19 @@ fn unstaking_waits_out_the_cooldown_and_pays_the_nav_then() {
     let mut b = setup();
     let s = staker(&mut b, 1_000);
     assert_ok(stake(&mut b, &s, 1_000));
-    assert_err(withdraw(&mut b, &s), KryonError::NoPendingUnstake);
+    assert_err(withdraw(&mut b, &s), FloyDexError::NoPendingUnstake);
     assert_err(
         b.w.request_unstake(&s.kp, 1_001 * P),
-        KryonError::InsufficientShares,
+        FloyDexError::InsufficientShares,
     );
-    assert_err(b.w.request_unstake(&s.kp, 0), KryonError::InvalidAmount);
+    assert_err(b.w.request_unstake(&s.kp, 0), FloyDexError::InvalidAmount);
     assert_ok(b.w.request_unstake(&s.kp, 600 * P));
     assert_err(
         b.w.request_unstake(&s.kp, 100 * P),
-        KryonError::UnstakePending,
+        FloyDexError::UnstakePending,
     );
     b.w.warp(WEEK as i64 - 1);
-    assert_err(withdraw(&mut b, &s), KryonError::UnstakeLocked);
+    assert_err(withdraw(&mut b, &s), FloyDexError::UnstakeLocked);
     // A loss lands during the cooldown: the pending shares absorb it too.
     patch_insurance(&mut b, |i| i.fund -= 200 * P); // NAV 800 for 1,000 shares
     b.w.warp(1);
@@ -209,7 +209,7 @@ fn staking_stops_while_paused_but_withdrawing_does_not() {
         ki::Pause {},
     );
     assert_ok(send(&mut b.w.svm, &[i], &g, &[]));
-    assert_err(stake(&mut b, &s, 100), KryonError::Paused);
+    assert_err(stake(&mut b, &s, 100), FloyDexError::Paused);
     b.w.warp(WEEK as i64);
     assert_ok(withdraw(&mut b, &s));
     assert_eq!(token_balance(&b.w.svm, &s.wallet), 1_000 * USDC);

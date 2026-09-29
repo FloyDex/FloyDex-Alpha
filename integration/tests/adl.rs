@@ -4,8 +4,8 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 
 /// Alice goes bankrupt at $140 with an empty fund: all of it is bad debt.
 /// Carol (keeper) ends up holding Alice's long; Bob holds the short.
@@ -39,7 +39,7 @@ fn adl_cuts_the_winner_just_enough_and_clears_the_bad_debt() {
     let bob0 = b.w.user(&b.bob).balance(0);
     let carol0 = b.w.user(&carol).balance(0);
     // Bob's short from 250 makes 110 a share at 140: close ⌈debt / 110⌉.
-    let size = kryon_perps::position::to_whole_units(
+    let size = floydex_perps::position::to_whole_units(
         protocol_core::mul_div_ceil(debt, P, 110 * P).unwrap(),
         100 * P,
     );
@@ -60,7 +60,7 @@ fn adl_cuts_the_winner_just_enough_and_clears_the_bad_debt() {
     // Nothing left to offset.
     assert_err(
         b.w.adl(&b.bob, bob_id, &carol, carol_id, 1),
-        KryonError::NoBadDebtToOffset,
+        FloyDexError::NoBadDebtToOffset,
     );
 }
 
@@ -73,7 +73,7 @@ fn adl_needs_recorded_bad_debt() {
     let (a, bo) = (pid(&b, &b.alice), pid(&b, &b.bob));
     assert_err(
         b.w.adl(&b.alice, a, &b.bob, bo, 1),
-        KryonError::NoBadDebtToOffset,
+        FloyDexError::NoBadDebtToOffset,
     );
 }
 
@@ -85,12 +85,12 @@ fn adl_only_takes_from_a_position_in_profit() {
     b.w.tick(1, 139.0);
     assert_err(
         b.w.adl(&carol, carol_id, &b.bob, bob_id, 1),
-        KryonError::PositionNotInProfit,
+        FloyDexError::PositionNotInProfit,
     );
     // A position is not its own counterparty.
     assert_err(
         b.w.adl(&b.bob, bob_id, &b.bob, bob_id, 1),
-        KryonError::SelfTrade,
+        FloyDexError::SelfTrade,
     );
 }
 
@@ -103,14 +103,14 @@ fn adl_is_refused_while_halted() {
     mock_usd(&mut b.w.svm, FEED_TSLA, 140.0, now - 600);
     assert_err(
         b.w.adl(&b.bob, bob_id, &carol, carol_id, 1),
-        KryonError::MarketHalted,
+        FloyDexError::MarketHalted,
     );
 }
 
 // --- OI against the fund (Stellar require_insurance_headroom, Q11) ---
 
 fn set_oi_policy(b: &mut Book, bps: u32) {
-    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| m.oi_policy_bps = bps);
+    patch_zc::<floydex_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| m.oi_policy_bps = bps);
 }
 
 #[test]
@@ -118,9 +118,9 @@ fn new_exposure_is_capped_by_what_the_fund_can_stand_behind() {
     let mut b = Book::new();
     set_oi_policy(&mut b, 20_000); // 2x the fund
                                    // No insurance yet: a capped market cannot add exposure.
-    assert_err(b.trade(true, W, PX), KryonError::InsuranceNotInitialized);
+    assert_err(b.trade(true, W, PX), FloyDexError::InsuranceNotInitialized);
     assert_ok(b.w.init_insurance(7 * 86_400, 20, 5_000));
-    assert_err(b.trade(true, W, PX), KryonError::InsuranceFundInsufficient);
+    assert_err(b.trade(true, W, PX), FloyDexError::InsuranceFundInsufficient);
     // 1,000 staked → 2,000 of notional → 8 shares at $250.
     let s = funded(&mut b.w.svm);
     let st = Trader {
@@ -135,7 +135,7 @@ fn new_exposure_is_capped_by_what_the_fund_can_stand_behind() {
     let wallet = b.w.wallet(&st, &usdc, 1_000 * USDC);
     assert_ok(b.w.stake(&s, &usdc, &wallet, 1_000 * USDC));
     assert_ok(b.trade(true, 8 * W, PX));
-    assert_err(b.trade(true, W, PX), KryonError::InsuranceFundInsufficient);
+    assert_err(b.trade(true, W, PX), FloyDexError::InsuranceFundInsufficient);
     // Exits are never blocked.
     assert_ok(b.trade(false, 3 * W, PX));
     assert_ok(b.trade(true, 3 * W, PX));
@@ -149,7 +149,7 @@ fn the_aggregate_ceiling_cannot_drop_below_what_markets_committed() {
     let i = w.create_market_ix(1, p);
     assert_ok(w.admin_send(&[i]));
     let i = w.admin_ix(ki::SetMaxTotalOiPolicyBps { max_total: 39_999 });
-    assert_err(w.admin_send(&[i]), KryonError::AggregateOiPolicyExceeded);
+    assert_err(w.admin_send(&[i]), FloyDexError::AggregateOiPolicyExceeded);
     let i = w.admin_ix(ki::SetMaxTotalOiPolicyBps { max_total: 50_000 });
     assert_ok(w.admin_send(&[i]));
     assert_eq!(w.exchange().max_total_oi_policy_bps, 50_000);
@@ -157,5 +157,5 @@ fn the_aggregate_ceiling_cannot_drop_below_what_markets_committed() {
     let mut p = default_market_params();
     p.oi_policy_bps = 10_001;
     let i = w.create_market_ix(2, p);
-    assert_err(w.admin_send(&[i]), KryonError::AggregateOiPolicyExceeded);
+    assert_err(w.admin_send(&[i]), FloyDexError::AggregateOiPolicyExceeded);
 }

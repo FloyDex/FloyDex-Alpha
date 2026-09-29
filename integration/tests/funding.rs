@@ -3,8 +3,8 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 
 /// Default market: coefficient 1.0, max 0.1%/h. A 1% premium clamps to
 /// the max, 1e15 per unit per hour.
@@ -126,7 +126,7 @@ fn funding_is_permissionless_but_stops_while_paused() {
     );
     assert_ok(send(&mut b.w.svm, &[i], &g, &[]));
     b.w.tick(60, 250.0);
-    assert_err(b.w.update_funding(1), KryonError::Paused);
+    assert_err(b.w.update_funding(1), FloyDexError::Paused);
 }
 
 #[test]
