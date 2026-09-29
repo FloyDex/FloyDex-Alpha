@@ -5,7 +5,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PrismaClient } from "@kryon/db";
+import { PrismaClient } from "@floydex/db";
 import { createLogger } from "../../kit/src/logger.ts";
 import { tickMarket, tick, fillArgsPayload, payloadHash, LOCK_NAMESPACE } from "../src/tick.ts";
 import type { MatchResult, RestingOrder } from "../src/engine.ts";

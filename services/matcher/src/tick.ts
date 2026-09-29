@@ -21,7 +21,7 @@
  * separate unlock call to forget on an error path.
  */
 import { createHash } from "node:crypto";
-import type { Prisma, PrismaClient } from "@kryon/db";
+import type { Prisma, PrismaClient } from "@floydex/db";
 import type { Logger } from "../../kit/src/logger.ts";
 import { matchAll, withinOracleBand, type MatchResult, type RestingOrder } from "./engine.ts";
 
@@ -87,7 +87,7 @@ async function loadOpenOrders(tx: Tx, marketId: number): Promise<RestingOrder[]>
   return rows.map(toResting).filter((o) => o.size - o.filledSize - o.queuedSize > 0n);
 }
 
-/** The `FillArgs`-shaped data (`programs/kryon-perps/src/instructions/settle.rs`) the submitter needs to build the settle_fills instruction. */
+/** The `FillArgs`-shaped data (`programs/floydex-perps/src/instructions/settle.rs`) the submitter needs to build the settle_fills instruction. */
 export function fillArgsPayload(match: MatchResult) {
   const side = (o: RestingOrder) => ({
     owner: o.owner,
