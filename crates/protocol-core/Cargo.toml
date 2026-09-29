@@ -1,6 +1,6 @@
 [package]
 name = "protocol-core"
-description = "Chain-agnostic fixed-point math, types and oracle guards for Kryon perps."
+description = "Chain-agnostic fixed-point math, types and oracle guards for FloyDex perps."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

@@ -2,7 +2,7 @@
 //! Borsh encoding of the field sequence below. What a session key signs.
 //!
 //! ```text
-//! 0    8  magic        "KRYONv1\0"
+//! 0    8  magic        "FLOYDEX\0"
 //! 8   32  domain       sha256(genesis_hash || program_id)
 //! 40  32  owner        wallet pubkey (never the delegate)
 //! 72   1  sub_id
@@ -16,7 +16,7 @@
 
 use crate::{checked_mul, CoreError, PRECISION};
 
-pub const ORDER_MAGIC: [u8; 8] = *b"KRYONv1\0";
+pub const ORDER_MAGIC: [u8; 8] = *b"FLOYDEX\0";
 pub const ORDER_MSG_LEN: usize = 108;
 
 pub const FLAG_IS_LONG: u8 = 1 << 0;
@@ -128,7 +128,7 @@ mod tests {
     fn layout_offsets_match_the_spec() {
         let b = sample().encode();
         assert_eq!(b.len(), 108);
-        assert_eq!(&b[0..8], b"KRYONv1\0");
+        assert_eq!(&b[0..8], b"FLOYDEX\0");
         assert_eq!(b[8], 0xAB);
         assert_eq!(b[40], 0x11);
         assert_eq!(b[72], 2);
