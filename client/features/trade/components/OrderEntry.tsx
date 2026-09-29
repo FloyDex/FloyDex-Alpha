@@ -1,18 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWalletStore } from "@/stores/wallet";
 import { useMarketStore } from "@/stores/market";
-import { MarketConfig, AMOUNT_PRECISION, PRICE_PRECISION, ASSETS, NETWORK_LABEL } from "@/config";
+import { MarketConfig, AMOUNT_PRECISION, PRICE_PRECISION, ASSETS, PLATFORM_FEE_BPS } from "@/config";
 import { buildOrderIntent } from "@/lib/market/order-intent";
 import { submitOrder } from "@/lib/market/matcher";
 import { useLocalOrders } from "@/stores/orders";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getBalance, getAccountHealth } from "@/lib/stellar/contracts";
-import { amountToHuman, formatMarketPrice, formatMarketUsd, priceToHuman, toPriceInput } from "@/lib/format";
-import { freighterConnect, freighterIsInstalled, isOnExpectedNetwork } from "@/lib/stellar/freighter";
+import { getBalance } from "@/lib/solana/vault";
+import { getAccountHealth } from "@/lib/solana/health";
+import { amountToHuman, formatAccountUsd, formatMarketPrice, formatMarketUsd, priceToHuman, toPriceInput } from "@/lib/format";
 import { calcLiqPrice } from "@/lib/math";
+import { gainPct, pnlUsd, priceFromPct, priceFromPnl, roePct, validateTpSl } from "@/lib/market/tpsl";
+import {
+  baseSizeFromInput,
+  nextTicketSizeMode,
+  sizeFromBuyingPowerPct,
+} from "@/lib/market/quick-market";
 import { UsdcLogo, logoFor } from "@/components/common/AssetLogos";
 import { useTradeSettings } from "@/stores/settings";
 import { Shuffle, X } from "lucide-react";
@@ -46,8 +52,7 @@ export function OrderEntry({
   side?: "buy" | "sell";
   setSide?: (v: "buy" | "sell") => void;
 }) {
-  const { address, connected, connecting, setAddress, setConnected, setConnecting, setWrongNetwork } =
-    useWalletStore();
+  const { address, connected, setWrongNetwork } = useWalletStore();
   const queryClient = useQueryClient();
   const addOrder = useLocalOrders((s) => s.addOrder);
   const localOrders = useLocalOrders((s) => s.orders);
@@ -56,13 +61,17 @@ export function OrderEntry({
   const selectedPrice = useMarketStore((s) => s.selectedPrice[market.marketId]);
   const degenMode = useTradeSettings((s) => s.degenMode);
   const setDegenMode = useTradeSettings((s) => s.setDegenMode);
+  const ticketLeverage = useTradeSettings((s) => s.ticketLeverage);
+  const setTicketLeverage = useTradeSettings((s) => s.setTicketLeverage);
+  const size = useTradeSettings((s) => s.ticketSize);
+  const setSize = useTradeSettings((s) => s.setTicketSize);
+  const sizeMode = useTradeSettings((s) => s.ticketSizeMode);
+  const setSizeMode = useTradeSettings((s) => s.setTicketSizeMode);
 
   const [sideState, setSideState] = useState<"buy" | "sell">("buy");
   const side = sideProp ?? sideState;
   const setSide = setSideProp ?? setSideState;
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
-  const [size, setSize] = useState("");
-  const [sizeInQuote, setSizeInQuote] = useState(false);
   const [limitPrice, setLimitPrice] = useState("");
   const [tpPrice, setTpPrice] = useState("");
   const [slPrice, setSlPrice] = useState("");
@@ -78,7 +87,6 @@ export function OrderEntry({
     const parts = cleaned.split(".");
     return parts.length > 2 ? parts[0] + "." + parts.slice(1).join("") : cleaned;
   };
-  const [leverage, setLeverage] = useState(15);
   const [reduce, setReduce] = useState(false);
   const [post, setPost] = useState(false);
   const [tpsl, setTpsl] = useState(false);
@@ -88,6 +96,11 @@ export function OrderEntry({
   // Leverage cap always follows the market config (which mirrors the on-chain
   // engine limits) — degen mode must not advertise leverage the chain rejects.
   const maxLev = Math.round(market.maxLeverageBps / 10000);
+  const leverage = Math.min(Math.max(1, ticketLeverage || 15), maxLev);
+  const setLeverage = (v: number | ((prev: number) => number)) => {
+    const next = typeof v === "function" ? v(leverage) : v;
+    setTicketLeverage(next);
+  };
   const effectiveLeverage = Math.min(leverage, maxLev);
   const levMarks = [1, 2, 5, 10, 25, 50, maxLev].filter(
     (v, i, arr) => v >= 1 && v <= maxLev && arr.indexOf(v) === i
@@ -133,17 +146,21 @@ export function OrderEntry({
   const sizeNum = parseFloat(size) || 0;
   const limitPriceNum = parseFloat(limitPrice) || 0;
   const baseSymbol = market.baseAsset;
-  const sizeUnit = sizeInQuote ? market.quoteAsset : baseSymbol;
+  const sizeUnit =
+    sizeMode === "base" ? baseSymbol : sizeMode === "quote" ? market.quoteAsset : "Margin";
   const midDisplay = midPriceHuman !== null ? formatMarketPrice(market, midPriceHuman) : "—";
 
   const execPrice = orderType === "market" ? midPriceHuman ?? 0 : limitPriceNum;
   const bestAsk = book?.asks[0] ? parseFloat(book.asks[0].price) : null;
   const bestBid = book?.bids[0] ? parseFloat(book.bids[0].price) : null;
-  const baseSizeNum = sizeInQuote && execPrice > 0 ? sizeNum / execPrice : sizeNum;
+  const baseSizeNum = baseSizeFromInput(sizeNum, sizeMode, execPrice, effectiveLeverage);
 
   const orderValue = baseSizeNum > 0 && execPrice > 0
     ? (baseSizeNum * execPrice).toFixed(2)
     : "0.00";
+  const feeUsd = baseSizeNum > 0 && execPrice > 0
+    ? (baseSizeNum * execPrice * PLATFORM_FEE_BPS) / 10_000
+    : 0;
   const marginRequired = baseSizeNum > 0 && execPrice > 0
     ? (baseSizeNum * execPrice / effectiveLeverage).toFixed(2)
     : "0.00";
@@ -162,43 +179,122 @@ export function OrderEntry({
     return formatMarketUsd(market, liq);
   })();
 
-  async function handleConnect() {
-    const installed = await freighterIsInstalled();
-    if (!installed) {
-      toast.error("Freighter not found — install from freighter.app then refresh.");
-      return;
+  const liqHuman = (() => {
+    if (baseSizeNum <= 0 || execPrice <= 0) return 0;
+    const entryRaw = BigInt(Math.round(execPrice * Number(PRICE_PRECISION)));
+    const liq = calcLiqPrice(side === "buy", entryRaw, effectiveLeverage, market.maintenanceMarginBps);
+    return liq > 0n ? priceToHuman(liq) : 0;
+  })();
+
+  const isLong = side === "buy";
+  const tpNum = parseFloat(tpPrice) || 0;
+  const slNum = parseFloat(slPrice) || 0;
+  const tpPnl = tpNum > 0 && execPrice > 0 && baseSizeNum > 0
+    ? pnlUsd(execPrice, tpNum, baseSizeNum, isLong) : 0;
+  const slPnl = slNum > 0 && execPrice > 0 && baseSizeNum > 0
+    ? pnlUsd(execPrice, slNum, baseSizeNum, isLong) : 0;
+  const notional = baseSizeNum * execPrice;
+  const tpRoe = roePct(tpPnl, notional, effectiveLeverage);
+  const slRoe = roePct(slPnl, notional, effectiveLeverage);
+  const tpSlError = tpsl
+    ? validateTpSl({
+        isLong,
+        entry: execPrice,
+        tp: tpNum || undefined,
+        sl: slNum || undefined,
+        liq: liqHuman || undefined,
+      })
+    : null;
+
+  const editingTpGain = useRef(false);
+  const editingSlLoss = useRef(false);
+
+  // Keep % / USDC in sync with the current mark and size. Those fields used to
+  // freeze at whatever was typed, so a $1080 TP still showed a stale 33.84%.
+  useEffect(() => {
+    if (!(execPrice > 0)) return;
+    if (!editingTpGain.current && tpNum > 0) {
+      const pct = gainPct(execPrice, tpNum, isLong);
+      const usd = pnlUsd(execPrice, tpNum, Math.max(baseSizeNum, 0), isLong);
+      const next = tpGainUnit === "percent" ? pct.toFixed(2) : Math.abs(usd).toFixed(2);
+      setTpGain((prev) => (prev === next ? prev : next));
     }
-    setConnecting(true);
-    try {
-      const addr = await freighterConnect();
-      setAddress(addr);
-      setConnected(true);
-      const ok = await isOnExpectedNetwork();
-      setWrongNetwork(!ok);
-      if (!ok) toast.warning("Switch Freighter to the configured Stellar network.");
-      else toast.success("Wallet connected");
-    } catch (e) {
-      toast.error(String(e));
-    } finally {
-      setConnecting(false);
+    if (!editingSlLoss.current && slNum > 0) {
+      const pct = -gainPct(execPrice, slNum, isLong);
+      const usd = -pnlUsd(execPrice, slNum, Math.max(baseSizeNum, 0), isLong);
+      const next = slLossUnit === "percent" ? Math.max(0, pct).toFixed(2) : Math.max(0, usd).toFixed(2);
+      setSlLoss((prev) => (prev === next ? prev : next));
     }
+  }, [execPrice, tpNum, slNum, isLong, baseSizeNum, tpGainUnit, slLossUnit]);
+
+  function onTpPrice(raw: string) {
+    const next = sanitizeNumericInput(raw);
+    setTpPrice(next);
+    const px = parseFloat(next);
+    if (!(px > 0) || execPrice <= 0) return;
+    const pct = gainPct(execPrice, px, isLong);
+    const usd = pnlUsd(execPrice, px, Math.max(baseSizeNum, 0), isLong);
+    setTpGain(tpGainUnit === "percent" ? pct.toFixed(2) : Math.abs(usd).toFixed(2));
   }
 
-  async function handleSubmit() {
-    if (!address || !connected) { toast.error("Connect your wallet first"); return; }
-    // Re-check live in case user switched networks in Freighter after connecting
-    const onCorrectNetwork = await isOnExpectedNetwork();
-    if (!onCorrectNetwork) {
-      setWrongNetwork(true);
-      toast.error(`Freighter is on the wrong network — switch to ${NETWORK_LABEL} and try again.`);
+  function onTpGain(raw: string) {
+    const next = sanitizeNumericInput(raw);
+    setTpGain(next);
+    const g = parseFloat(next);
+    if (!(g > 0) || execPrice <= 0) return;
+    const px = tpGainUnit === "percent"
+      ? priceFromPct(execPrice, g, isLong, true)
+      : priceFromPnl(execPrice, g, Math.max(baseSizeNum, 1e-9), isLong, true);
+    if (px > 0) setTpPrice(toPriceInput(market, px));
+  }
+
+  function onSlPrice(raw: string) {
+    const next = sanitizeNumericInput(raw);
+    setSlPrice(next);
+    const px = parseFloat(next);
+    if (!(px > 0) || execPrice <= 0) return;
+    const pct = -gainPct(execPrice, px, isLong);
+    const usd = -pnlUsd(execPrice, px, Math.max(baseSizeNum, 0), isLong);
+    setSlLoss(slLossUnit === "percent" ? Math.max(0, pct).toFixed(2) : Math.max(0, usd).toFixed(2));
+  }
+
+  function onSlLoss(raw: string) {
+    const next = sanitizeNumericInput(raw);
+    setSlLoss(next);
+    const g = parseFloat(next);
+    if (!(g > 0) || execPrice <= 0) return;
+    const px = slLossUnit === "percent"
+      ? priceFromPct(execPrice, g, isLong, false)
+      : priceFromPnl(execPrice, g, Math.max(baseSizeNum, 1e-9), isLong, false);
+    if (px > 0) setSlPrice(toPriceInput(market, px));
+  }
+
+  function applySizePct(pct: number) {
+    const avail = amountToHuman(availableToTrade);
+    const next = sizeFromBuyingPowerPct({
+      availableHuman: avail,
+      leverage: effectiveLeverage,
+      pct,
+      execPrice,
+      sizeMode,
+    });
+    if (!next) {
+      toast.error(avail <= 0 ? "Deposit USDC first" : "Waiting for a market price");
       return;
     }
+    setSize(next);
+  }
+
+  async function handleSubmit(nextSide?: "buy" | "sell") {
+    const orderSide = nextSide ?? side;
+    if (nextSide) setSide(nextSide);
+    if (!address || !connected) { toast.error("Connect your wallet first"); return; }
     setWrongNetwork(false);
     if (!size || sizeNum <= 0) { toast.error("Enter a valid size"); return; }
     if (execPrice <= 0) {
       toast.error(orderType === "market" ? "Waiting for a market price" : "Enter a limit price"); return;
     }
-    if (sizeInQuote && baseSizeNum <= 0) {
+    if (sizeMode !== "base" && baseSizeNum <= 0) {
       toast.error("Waiting for a price to convert the order size");
       return;
     }
@@ -207,7 +303,7 @@ export function OrderEntry({
       return;
     }
     if (post && orderType === "limit") {
-      const wouldCross = side === "buy"
+      const wouldCross = orderSide === "buy"
         ? bestAsk !== null && limitPriceNum >= bestAsk
         : bestBid !== null && limitPriceNum <= bestBid;
       if (wouldCross) {
@@ -215,9 +311,22 @@ export function OrderEntry({
         return;
       }
     }
-    if (showTpSl && tpsl && !tpPrice && !slPrice && !tpGain && !slLoss) {
-      toast.error("Enter a take-profit or stop-loss value");
-      return;
+    if (tpsl) {
+      if (!tpPrice && !slPrice && !tpGain && !slLoss) {
+        toast.error("Enter a take-profit or stop-loss value");
+        return;
+      }
+      const err = validateTpSl({
+        isLong: orderSide === "buy",
+        entry: execPrice,
+        tp: parseFloat(tpPrice) || undefined,
+        sl: parseFloat(slPrice) || undefined,
+        liq: liqHuman || undefined,
+      });
+      if (err) {
+        toast.error(err);
+        return;
+      }
     }
 
     // Self-trade heads-up: the matcher never matches two orders from the same
@@ -225,10 +334,10 @@ export function OrderEntry({
     // sit unfilled until a different wallet takes the other side.
     const wouldSelfCross = localOrders.some((o) => {
       if (o.status !== "pending" || o.owner !== address || o.marketId !== market.marketId) return false;
-      if (o.isLong === (side === "buy")) return false;
+      if (o.isLong === (orderSide === "buy")) return false;
       if (orderType === "market") return true; // market orders cross any resting price
       const restingPrice = priceToHuman(o.limitPrice);
-      return side === "buy" ? limitPriceNum >= restingPrice : limitPriceNum <= restingPrice;
+      return orderSide === "buy" ? limitPriceNum >= restingPrice : limitPriceNum <= restingPrice;
     });
     if (wouldSelfCross) {
       toast.warning(
@@ -259,28 +368,45 @@ export function OrderEntry({
             const mark = rawMarkPrice && rawMarkPrice > 0n
               ? rawMarkPrice
               : BigInt(Math.round(execPrice * Number(PRICE_PRECISION)));
-            return side === "buy" ? mark * 2n : mark / 2n || 1n;
+            return orderSide === "buy" ? mark * 2n : mark / 2n || 1n;
           })()
         : BigInt(Math.round(limitPriceNum * Number(PRICE_PRECISION)));
 
       const intent = buildOrderIntent({
         owner: address,
         marketId: market.marketId,
-        isLong: side === "buy",
+        isLong: orderSide === "buy",
         size: rawSize,
         limitPrice: rawPrice,
         reduceOnly: reduce,
         ttlSeconds: 3600,
+        leverage: effectiveLeverage,
       });
-      const result = await submitOrder(intent);
+      const result = await submitOrder(intent, {
+        ...(tpsl ? {
+          tpPrice: parseFloat(tpPrice) || undefined,
+          slPrice: parseFloat(slPrice) || undefined,
+        } : {}),
+        ...(orderType === "market" ? { ioc: true, orderType: "market" as const } : {}),
+      });
       if (result.ok) {
         addOrder(intent);
+        const filledQty = result.fills?.reduce((s, f) => s + f.size, 0) ?? 0;
+        if (filledQty > 0 || orderType === "market") {
+          // Market/IOC never rests — mark filled or cancel so Open Orders stays clean.
+          if (filledQty > 0) useLocalOrders.getState().markFilled(intent.nonce, address);
+          else useLocalOrders.getState().cancelOrder(intent.nonce, address);
+        }
+        if (result.book) useMarketStore.getState().setOrderBook(market.marketId, result.book);
+        const extras = tpsl && (tpPrice || slPrice)
+          ? ` · TP ${tpPrice || "—"} / SL ${slPrice || "—"}`
+          : "";
         toast.success(
-          `${orderType === "market" ? "Market" : "Limit"} ${side} order submitted` +
+          `${orderType === "market" ? "Market" : "Limit"} ${orderSide} order submitted` +
           (post ? " as post-only" : "") +
-          (reduce ? " reduce-only" : "")
+          (reduce ? " reduce-only" : "") +
+          extras
         );
-        if (showTpSl && tpsl) toast.message("TP/SL values are staged in the ticket; trigger order submission is not yet supported by the matcher.");
         // Immediately refetch all user-facing data and poll fast for 30s to catch on-chain settlement
         queryClient.invalidateQueries({ queryKey: ["balance", address] });
         queryClient.invalidateQueries({ queryKey: ["health", address] });
@@ -300,8 +426,7 @@ export function OrderEntry({
   }
 
   const rowCls = "flex justify-between items-center text-[12px] text-[#a3a3a3]";
-  const valCls = "text-[#737373] font-mono";
-  const showTpSl = false;
+  const showTpSl = true;
   // Degen mode: kept in code but hidden for v1 — its old 500x cap exceeded the
   // on-chain max leverage, so the toggle only misled users.
   const showDegenMode = false;
@@ -309,36 +434,37 @@ export function OrderEntry({
   return (
     <div className="relative flex flex-col">
       <div className="flex flex-col gap-[10px] p-3">
-        {/* Long / Short */}
-        <div className="grid grid-cols-2 rounded-[9px] overflow-hidden bg-[#212128] border border-[#334155]">
-          <button
-            onClick={() => setSide("buy")}
-            className={`py-[9px] text-center text-[12.5px] font-semibold transition-colors ${
-              side === "buy" ? "bg-[#1fae5b] text-white" : "text-[#a3a3a3] hover:text-[#f5f5f5]"
-            }`}
-          >
-            Long/Buy
-          </button>
-          <button
-            onClick={() => setSide("sell")}
-            className={`py-[9px] text-center text-[12.5px] font-semibold transition-colors ${
-              side === "sell" ? "bg-[#e8716f] text-white" : "text-[#a3a3a3] hover:text-[#f5f5f5]"
-            }`}
-          >
-            Short/Sell
-          </button>
+        <div className="flex items-center justify-between">
+          <div className="desk-seg w-[148px]">
+            <button
+              type="button"
+              onClick={() => setReduce(false)}
+              className={!reduce ? "is-on" : ""}
+            >
+              Open
+            </button>
+            <button
+              type="button"
+              onClick={() => setReduce(true)}
+              className={reduce ? "is-on" : ""}
+            >
+              Close
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-[#8A9B94]">
+            <span>Available</span>
+            <span className="font-mono tabular text-[#f5f5f5]">
+              {connected ? formatAccountUsd(amountToHuman(availableToTrade)) : "$0.00"}
+            </span>
+          </div>
         </div>
 
         {/* Order type + price display */}
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(116px,1fr)] gap-2">
-          <div className="grid h-[36px] grid-cols-2 rounded-[8px] bg-[#212128] p-[2px]">
+          <div className="desk-seg h-[36px]">
             <button
               type="button"
-              className={`rounded-[6px] text-[11.5px] font-bold transition-colors ${
-                orderType === "market"
-                  ? "border border-[#46d985] bg-[#24332c] text-[#46d985]"
-                  : "text-[#8f98aa] hover:text-[#f5f5f5]"
-              }`}
+              className={orderType === "market" ? "is-on" : ""}
               onClick={() => {
                 setOrderType("market");
                 setPost(false);
@@ -349,11 +475,7 @@ export function OrderEntry({
             </button>
             <button
               type="button"
-              className={`rounded-[6px] text-[11.5px] font-bold transition-colors ${
-                orderType === "limit"
-                  ? "border border-[#46d985] bg-[#24332c] text-[#46d985]"
-                  : "text-[#8f98aa] hover:text-[#f5f5f5]"
-              }`}
+              className={orderType === "limit" ? "is-on" : ""}
               onClick={() => {
                 setOrderType("limit");
                 if (midPriceHuman && !limitPrice) setLimitPrice(toPriceInput(market, midPriceHuman));
@@ -363,7 +485,7 @@ export function OrderEntry({
             </button>
           </div>
           {orderType === "limit" ? (
-            <div className="flex h-[36px] min-w-0 items-center justify-end gap-2 rounded-[8px] bg-[#212128] px-3">
+            <div className="flex h-[36px] min-w-0 items-center justify-end gap-2 rounded-[8px] bg-[#0E1614] px-3">
               <span className="font-mono text-[12.5px] font-medium text-[#8f98aa]">$</span>
               <input
                 className="min-w-0 flex-1 bg-transparent text-right font-mono text-[12.5px] font-medium text-[#f5f5f5] outline-none placeholder:text-[#737373]"
@@ -380,50 +502,61 @@ export function OrderEntry({
           )}
         </div>
 
-        {/* Account info */}
-        <div className={rowCls}>
-          <span>Available to Trade</span>
-          <span className={valCls}>
-            {connected && (balance !== undefined || health !== undefined)
-              ? `$${amountToHuman(availableToTrade).toFixed(2)}`
-              : "—"}
-          </span>
-        </div>
-        <div className={rowCls}>
-          <span>Position</span>
-          <span className={valCls}>—</span>
-        </div>
+        {orderType === "market" && (
+          <div className="flex items-center justify-between rounded-[8px] border border-[#1C332C] bg-[#0E1614] px-3 py-2">
+            <span className="text-[12px] text-[#8A9B94]">Price</span>
+            <button
+              type="button"
+              className="font-mono text-[13px] font-semibold text-[#f5f5f5]"
+              onClick={() => {
+                if (midPriceHuman) {
+                  setOrderType("limit");
+                  setLimitPrice(toPriceInput(market, midPriceHuman));
+                }
+              }}
+            >
+              {midDisplay} <span className="text-[10px] text-[#6b7c74]">Last</span>
+            </button>
+          </div>
+        )}
 
-        {/* Order size field */}
-        <div className="bg-[#212128] border border-[#334155] rounded-[9px] p-2 flex flex-col gap-1">
+        {/* Order size field — cycle base qty → notional USDC → margin USDC */}
+        <div className="flex flex-col gap-1 rounded-[9px] border border-[#1C332C] bg-[#0E1614] p-2">
           <div className="flex items-center justify-between text-[12px] text-[#a3a3a3]">
-            <div className="flex items-center gap-[5px]">
-              <span>Order Size</span>
-    
-            </div>
+            <span>{sizeMode === "margin" ? "Margin" : "Quantity"}</span>
+            <span className="font-mono text-[11px] text-[#737373]">
+              ${sizeNum > 0 && execPrice > 0 ? (baseSizeNum * execPrice).toFixed(2) : "0.00"}
+            </span>
           </div>
           <div className="flex items-center justify-between gap-2">
             <input
-              className="flex-1 bg-transparent border-0 outline-none text-[#f5f5f5] font-mono text-[17px] font-medium text-right w-full"
+              className="w-full flex-1 border-0 bg-transparent text-right font-mono text-[17px] font-medium text-[#f5f5f5] outline-none"
               placeholder="0"
               value={size}
               onChange={(e) => setSize(sanitizeNumericInput(e.target.value))}
             />
-          </div>
-          <div className="flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setSizeInQuote((v) => !v)}
-              className="flex items-center gap-1.5 px-2 py-[3px] bg-[#212128] border border-[#334155] rounded-[6px] text-[#f5f5f5] text-[12px] font-medium transition-colors hover:border-[#475569]"
-              title="Toggle order size denomination"
+              onClick={() => setSizeMode(nextTicketSizeMode(sizeMode))}
+              className="flex items-center gap-1.5 rounded-[6px] border border-[#1C332C] bg-[#0E1614] px-2 py-[3px] text-[12px] font-medium text-[#f5f5f5] transition-colors hover:border-[#2A4A40]"
+              title="Cycle: asset → notional → margin"
             >
-              {sizeInQuote ? <UsdcLogo size={15} /> : logoFor(baseSymbol, 15)}
+              {sizeMode === "base" ? logoFor(baseSymbol, 15) : <UsdcLogo size={15} />}
               {sizeUnit}
               <Shuffle size={13} className="text-[#a3a3a3]" />
             </button>
-            <span className="font-mono text-[11px] text-[#737373]">
-              ${sizeNum > 0 && execPrice > 0 ? (baseSizeNum * execPrice).toFixed(2) : "0.00"}
-            </span>
+          </div>
+          <div className="mt-1 grid grid-cols-4 gap-1">
+            {[25, 50, 75, 100].map((pct) => (
+              <button
+                key={pct}
+                type="button"
+                onClick={() => applySizePct(pct)}
+                className="rounded-[5px] bg-[#12201C] py-[5px] font-mono text-[11px] text-[#8A9B94] hover:bg-[#1A2A26] hover:text-[#f5f5f5]"
+              >
+                {pct}%
+              </button>
+            ))}
           </div>
         </div>
 
@@ -443,19 +576,19 @@ export function OrderEntry({
               setDegenPromptOpen(true);
             }}
             className={`relative h-[24px] w-[44px] rounded-full border transition-colors ${
-              degenMode ? "border-[#e2a9f1] bg-[#e2a9f1]/20" : "border-[#334155] bg-[#212128]"
+              degenMode ? "border-[#14F195] bg-[#14F195]/20" : "border-[#1C332C] bg-[#0E1614]"
             }`}
           >
             <span
               className={`absolute left-0 top-1/2 h-[18px] w-[18px] -translate-y-1/2 rounded-full transition-transform ${
-                degenMode ? "translate-x-[21px] bg-[#e2a9f1]" : "translate-x-[3px] bg-[#a3a3a3]"
+                degenMode ? "translate-x-[21px] bg-[#14F195]" : "translate-x-[3px] bg-[#a3a3a3]"
               }`}
             />
           </button>
         </div>
         )}
 
-        {/* Order leverage — inline slider */}
+        {/* Order leverage — continuous 1…maxLev slider; marks sit on the real scale */}
         <div className="px-[2px] py-[2px]">
           <div className="flex items-center justify-between mb-[7px]">
             <span className="flex items-center gap-[6px] text-[12px] text-[#a3a3a3]">
@@ -465,27 +598,50 @@ export function OrderEntry({
                 <path d="M8 7h8M8 12h2M12 12h2M16 12h.01M8 16h2M12 16h2M16 16h.01" />
               </svg>
             </span>
-            <span className="font-mono text-[14px] font-medium text-[#f5f5f5]">{effectiveLeverage}x</span>
+            <span className="font-mono text-[14px] font-medium tabular-nums text-[#f5f5f5]">{effectiveLeverage}x</span>
           </div>
-          <input
-            type="range"
-            min={1}
-            max={maxLev}
-            step={1}
-            value={effectiveLeverage}
-            onChange={(e) => setLeverage(Number(e.target.value))}
-            className="w-full h-[4px] cursor-pointer accent-[#f5f5f5]"
-            aria-label="Order leverage"
-          />
-          <div className="flex justify-between font-mono text-[10.5px] text-[#737373] mt-[6px]">
-            {levMarks.map((m) => (
-              <span
-                key={m}
-                className={effectiveLeverage === m ? "text-[#f5f5f5]" : ""}
-              >
-                {m}x
-              </span>
-            ))}
+          <div className="relative pt-[2px] pb-[14px]">
+            <input
+              type="range"
+              min={1}
+              max={maxLev}
+              step={1}
+              value={effectiveLeverage}
+              onChange={(e) => setLeverage(Number(e.target.value))}
+              onInput={(e) => setLeverage(Number((e.target as HTMLInputElement).value))}
+              className="desk-lev-slider"
+              style={{
+                // Live fill follows the thumb so drag feels continuous.
+                background: `linear-gradient(to right, #f5f5f5 0%, #f5f5f5 ${
+                  maxLev <= 1 ? 100 : ((effectiveLeverage - 1) / (maxLev - 1)) * 100
+                }%, #1C332C ${
+                  maxLev <= 1 ? 100 : ((effectiveLeverage - 1) / (maxLev - 1)) * 100
+                }%, #1C332C 100%)`,
+              }}
+              aria-label="Order leverage"
+            />
+            <div className="pointer-events-none absolute inset-x-0 top-[18px] h-[14px]">
+              {levMarks.map((m) => {
+                const pct = maxLev <= 1 ? 0 : ((m - 1) / (maxLev - 1)) * 100;
+                const active = effectiveLeverage === m;
+                const edge =
+                  pct <= 0 ? "translate-x-0" : pct >= 100 ? "-translate-x-full" : "-translate-x-1/2";
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    tabIndex={-1}
+                    className={`pointer-events-auto absolute top-0 ${edge} font-mono text-[10.5px] transition-colors ${
+                      active ? "text-[#f5f5f5]" : "text-[#737373] hover:text-[#a3a3a3]"
+                    }`}
+                    style={{ left: `${pct}%` }}
+                    onClick={() => setLeverage(m)}
+                  >
+                    {m}x
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -506,58 +662,108 @@ export function OrderEntry({
         </div>
         {showTpSl && <CheckBox checked={tpsl} onChange={setTpsl} label="Take Profit / Stop Loss" />}
         {showTpSl && tpsl && (
-          <div className="grid grid-cols-2 gap-2">
-            <TpSlBox label="TP Price" prefix="$" value={tpPrice} onChange={setTpPrice} placeholder="0" />
-            <TpSlBox
-              label="Gain"
-              suffix={tpGainUnit === "percent" ? "%" : " USDC"}
-              value={tpGain}
-              onChange={setTpGain}
-              onToggleUnit={() => setTpGainUnit((u) => (u === "percent" ? "quote" : "percent"))}
-            />
-            <TpSlBox label="SL Price" prefix="$" value={slPrice} onChange={setSlPrice} placeholder="0" />
-            <TpSlBox
-              label="Loss"
-              suffix={slLossUnit === "percent" ? "%" : " USDC"}
-              value={slLoss}
-              onChange={setSlLoss}
-              onToggleUnit={() => setSlLossUnit((u) => (u === "percent" ? "quote" : "percent"))}
-            />
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <TpSlBox label="TP Price" prefix="$" value={tpPrice} onChange={onTpPrice} placeholder="0" />
+              <TpSlBox
+                label="Gain"
+                suffix={tpGainUnit === "percent" ? "%" : " USDC"}
+                value={tpGain}
+                onChange={onTpGain}
+                onFocusChange={(on) => { editingTpGain.current = on; }}
+                onToggleUnit={() => {
+                  setTpGainUnit((u) => {
+                    const next = u === "percent" ? "quote" : "percent";
+                    if (tpNum > 0 && execPrice > 0) {
+                      const pct = gainPct(execPrice, tpNum, isLong);
+                      const usd = pnlUsd(execPrice, tpNum, Math.max(baseSizeNum, 0), isLong);
+                      setTpGain(next === "percent" ? pct.toFixed(2) : Math.abs(usd).toFixed(2));
+                    }
+                    return next;
+                  });
+                }}
+              />
+            </div>
+            {tpNum > 0 && execPrice > 0 && (
+              <div className="px-1 font-mono text-[11px] text-[#1fae5b]">
+                TP {formatMarketUsd(market, tpNum)} → {tpPnl >= 0 ? "+" : ""}${tpPnl.toFixed(2)}
+                {baseSizeNum > 0 ? ` · ${tpRoe >= 0 ? "+" : ""}${tpRoe.toFixed(1)}% ROE` : ""}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <TpSlBox label="SL Price" prefix="$" value={slPrice} onChange={onSlPrice} placeholder="0" />
+              <TpSlBox
+                label="Loss"
+                suffix={slLossUnit === "percent" ? "%" : " USDC"}
+                value={slLoss}
+                onChange={onSlLoss}
+                onFocusChange={(on) => { editingSlLoss.current = on; }}
+                onToggleUnit={() => {
+                  setSlLossUnit((u) => {
+                    const next = u === "percent" ? "quote" : "percent";
+                    if (slNum > 0 && execPrice > 0) {
+                      const pct = -gainPct(execPrice, slNum, isLong);
+                      const usd = -pnlUsd(execPrice, slNum, Math.max(baseSizeNum, 0), isLong);
+                      setSlLoss(next === "percent" ? Math.max(0, pct).toFixed(2) : Math.max(0, usd).toFixed(2));
+                    }
+                    return next;
+                  });
+                }}
+              />
+            </div>
+            {slNum > 0 && execPrice > 0 && (
+              <div className="px-1 font-mono text-[11px] text-[#e8716f]">
+                SL {formatMarketUsd(market, slNum)} → {slPnl >= 0 ? "+" : ""}${slPnl.toFixed(2)}
+                {baseSizeNum > 0 ? ` · ${slRoe >= 0 ? "+" : ""}${slRoe.toFixed(1)}% ROE` : ""}
+              </div>
+            )}
+            {tpSlError && (
+              <div className="px-1 text-[11px] text-[#e8716f]">{tpSlError}</div>
+            )}
           </div>
         )}
 
-        {/* Place order button */}
-        {!connected ? (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-[8px] bg-[#0E1614] px-2 py-2">
+            <div className="text-[10px] text-[#6b7c74]">Max Long</div>
+            <div className="font-mono text-[12px] text-[#14F195] tabular">
+              {connected && execPrice > 0
+                ? `${(amountToHuman(availableToTrade) * effectiveLeverage / execPrice).toFixed(4)} ${baseSymbol}`
+                : `0.00 ${baseSymbol}`}
+            </div>
+          </div>
+          <div className="rounded-[8px] bg-[#0E1614] px-2 py-2 text-right">
+            <div className="text-[10px] text-[#6b7c74]">Max Short</div>
+            <div className="font-mono text-[12px] text-[#FF5C6A] tabular">
+              {connected && execPrice > 0
+                ? `${(amountToHuman(availableToTrade) * effectiveLeverage / execPrice).toFixed(4)} ${baseSymbol}`
+                : `0.00 ${baseSymbol}`}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={handleConnect}
-            disabled={connecting}
-            className="w-full py-[13px] rounded-[9px] text-[13.5px] font-semibold text-[#19191A] transition-colors disabled:opacity-50"
-            style={{ background: "#f5f5f5", letterSpacing: ".01em" }}
-            onMouseOver={(e) => (e.currentTarget.style.background = "#e5e7eb")}
-            onMouseOut={(e) => (e.currentTarget.style.background = "#f5f5f5")}
+            onClick={() => void handleSubmit("buy")}
+            disabled={loading}
+            className="desk-btn-long rounded-[8px] py-[12px] text-[13px] font-semibold disabled:opacity-50"
           >
-            {connecting ? "Connecting…" : "Connect Wallet"}
+            {loading && side === "buy" ? "Placing…" : reduce ? "Close Short" : "Open Long"}
           </button>
-        ) : (
           <button
-            onClick={handleSubmit}
-            disabled={loading || (parseFloat(marginRequired) > 0 && parseFloat(marginRequired) > amountToHuman(availableToTrade))}
-            className={`w-full py-[13px] rounded-[9px] text-[13.5px] font-semibold text-white transition-colors disabled:opacity-50 ${
-              side === "buy"
-                ? "bg-[#1fae5b] hover:brightness-110"
-                : "bg-[#e8716f] hover:brightness-110"
-            }`}
+            onClick={() => void handleSubmit("sell")}
+            disabled={loading}
+            className="desk-btn-short rounded-[8px] py-[12px] text-[13px] font-semibold disabled:opacity-50"
           >
-            {loading
-              ? "Placing…"
-              : parseFloat(marginRequired) > 0 && parseFloat(marginRequired) > amountToHuman(availableToTrade)
-              ? "Insufficient Balance"
-              : `Place ${side === "buy" ? "Long" : "Short"} ${orderType === "market" ? "Market" : "Limit"} Order`}
+            {loading && side === "sell" ? "Placing…" : reduce ? "Close Long" : "Open Short"}
           </button>
+        </div>
+        {!connected && (
+          <p className="text-center text-[11px] text-[#6b7c74]">Connect a wallet in the header to settle fills on Solana.</p>
         )}
 
         {/* Order summary */}
-        <div className="flex flex-col gap-1.5 rounded-[9px] bg-[#212128] p-3">
+        <div className="flex flex-col gap-1.5 rounded-[9px] bg-[#0E1614] p-3">
           <div className={rowCls}>
             <span>{orderType === "market" ? "Expected Price" : "Limit Price"}</span>
             <span className="font-mono text-[#f5f5f5]">
@@ -570,6 +776,24 @@ export function OrderEntry({
               {liqPriceDisplay}
             </span>
           </div>
+          {tpsl && tpNum > 0 && (
+            <div className={rowCls}>
+              <span>Take Profit</span>
+              <span className="font-mono text-[#1fae5b]">
+                {formatMarketUsd(market, tpNum)}
+                {baseSizeNum > 0 ? ` (${tpPnl >= 0 ? "+" : ""}${tpPnl.toFixed(2)})` : ""}
+              </span>
+            </div>
+          )}
+          {tpsl && slNum > 0 && (
+            <div className={rowCls}>
+              <span>Stop Loss</span>
+              <span className="font-mono text-[#e8716f]">
+                {formatMarketUsd(market, slNum)}
+                {baseSizeNum > 0 ? ` (${slPnl >= 0 ? "+" : ""}${slPnl.toFixed(2)})` : ""}
+              </span>
+            </div>
+          )}
           <div className={rowCls}>
             <span>Order Value</span>
             <span className="font-mono text-[#f5f5f5]">${orderValue}</span>
@@ -588,17 +812,10 @@ export function OrderEntry({
             </div>
           )}
           <div className={rowCls}>
-            <span className="flex items-center gap-[5px]">
-              Fees
-              {orderType === "limit" && (
-                <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <circle cx="12" cy="12" r="9" />
-                  <path d="M12 11v5M12 8h.01" />
-                </svg>
-              )}
-            </span>
+            <span>Fees</span>
             <span className="font-mono text-[#f5f5f5]">
-              {orderType === "market" ? "0.035%" : "0.035% | 0.005%"}
+              {(PLATFORM_FEE_BPS / 100).toFixed(2)}%
+              {feeUsd > 0 ? ` · $${feeUsd.toFixed(2)}` : ""}
             </span>
           </div>
         </div>
@@ -628,7 +845,7 @@ function DegenModeModal({
     <div className="fixed inset-0 z-[80] flex items-end justify-center p-0 sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onMouseDown={onCancel} />
       <div
-        className="relative max-h-[92dvh] w-full max-w-full overflow-y-auto rounded-t-2xl border border-[#334155] bg-[#19191A] p-5 pb-[max(20px,env(safe-area-inset-bottom))] text-[#f5f5f5] shadow-[0_20px_60px_rgba(0,0,0,.6)] sm:w-[420px] sm:rounded-xl sm:pb-5"
+        className="relative max-h-[92dvh] w-full max-w-full overflow-y-auto rounded-t-2xl border border-[#1C332C] bg-[#070B0A] p-5 pb-[max(20px,env(safe-area-inset-bottom))] text-[#f5f5f5] shadow-[0_20px_60px_rgba(0,0,0,.6)] sm:w-[420px] sm:rounded-xl sm:pb-5"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -640,20 +857,20 @@ function DegenModeModal({
             type="button"
             onClick={onCancel}
             aria-label="Close"
-            className="w-7 h-7 grid place-items-center rounded-[6px] text-[#a3a3a3] hover:text-[#f5f5f5] hover:bg-[#212128] transition-colors"
+            className="w-7 h-7 grid place-items-center rounded-[6px] text-[#a3a3a3] hover:text-[#f5f5f5] hover:bg-[#0E1614] transition-colors"
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="mt-4 rounded-[12px] border border-[#334155] bg-[#212128] p-4">
+        <div className="mt-4 rounded-[12px] border border-[#1C332C] bg-[#0E1614] p-4">
           <div className="text-center">
             <div className="text-[12px] font-semibold uppercase tracking-[.16em] text-[#a3a3a3]">Are you</div>
             <div className="mt-1 text-[20px] font-black uppercase tracking-[.08em] text-[#f5f5f5]">
               Degen Enough?
             </div>
           </div>
-          <div className="my-4 h-px bg-[#2A2A31]" />
+          <div className="my-4 h-px bg-[#1A2A26]" />
           <ul className="space-y-3 text-[13px] leading-5 text-[#d4d4d8]">
             <li className="flex gap-3">
               <span className="mt-[8px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#a3a3a3]" />
@@ -674,14 +891,14 @@ function DegenModeModal({
           <button
             type="button"
             onClick={onCancel}
-            className="h-12 rounded-[10px] border border-[#334155] bg-[#212128] text-[14px] font-semibold text-[#a3a3a3] hover:text-[#f5f5f5] hover:border-[#475569] transition-colors"
+            className="h-12 rounded-[10px] border border-[#1C332C] bg-[#0E1614] text-[14px] font-semibold text-[#a3a3a3] hover:text-[#f5f5f5] hover:border-[#2A4A40] transition-colors"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onAccept}
-            className="h-12 rounded-[10px] text-[14px] font-bold text-[#19191A] bg-[#e2a9f1] hover:brightness-110 transition"
+            className="h-12 rounded-[10px] text-[14px] font-bold text-[#070B0A] bg-[#14F195] hover:brightness-110 transition"
           >
             Accept & Continue
           </button>
@@ -702,6 +919,7 @@ function TpSlBox({
   suffix = "",
   placeholder = "0",
   onToggleUnit,
+  onFocusChange,
 }: {
   label: string;
   value: string;
@@ -710,6 +928,7 @@ function TpSlBox({
   suffix?: string;
   placeholder?: string;
   onToggleUnit?: () => void;
+  onFocusChange?: (focused: boolean) => void;
 }) {
   const sanitize = (val: string): string => {
     const cleaned = val.replace(/[^0-9.]/g, "").replace(/^0+(\d)/, "$1");
@@ -718,15 +937,17 @@ function TpSlBox({
   };
 
   return (
-    <div className="flex h-[36px] items-center justify-between gap-2 rounded-[8px] bg-[#212128] px-2.5 text-[11.5px]">
+    <div className="flex h-[36px] items-center justify-between gap-2 rounded-[8px] bg-[#0E1614] px-2.5 text-[11.5px]">
       <span className="text-[#9fb0c9]">{label}</span>
       <span className="flex min-w-0 items-center gap-1.5 font-mono text-[#9fb0c9]">
         {prefix && <span>{prefix}</span>}
         <input
-          className="min-w-0 max-w-[62px] bg-transparent text-right font-mono text-[#f5f5f5] outline-none placeholder:text-[#737373]"
+          className="min-w-0 max-w-[88px] bg-transparent text-right font-mono text-[#f5f5f5] outline-none placeholder:text-[#737373]"
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(sanitize(e.target.value))}
+          onFocus={() => onFocusChange?.(true)}
+          onBlur={() => onFocusChange?.(false)}
         />
         {suffix && <span>{suffix}</span>}
         {onToggleUnit && (
@@ -760,7 +981,7 @@ function CheckBox({
     >
       <div
         className={`w-[14px] h-[14px] rounded-[3px] border grid place-items-center transition-colors ${
-          checked ? "bg-[#f5f5f5] border-[#f5f5f5] text-[#19191A]" : "bg-[#212128] border-[#475569]"
+          checked ? "bg-[#f5f5f5] border-[#f5f5f5] text-[#070B0A]" : "bg-[#0E1614] border-[#2A4A40]"
         }`}
       >
         {checked && <CheckIcon />}
