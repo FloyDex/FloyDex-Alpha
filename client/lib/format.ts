@@ -12,6 +12,14 @@ export function humanToAmount(val: number): bigint {
   return BigInt(Math.round(val * Number(AMOUNT_PRECISION)));
 }
 
+/** Account USDC amounts — 4dp under $10 so small PnL / SL hits stay visible. */
+export function formatAccountUsd(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "$0.00";
+  const abs = Math.abs(n);
+  const body = abs < 10 ? abs.toFixed(4) : abs.toFixed(2);
+  return `${n < 0 ? "-" : ""}$${body}`;
+}
+
 // ── Market-aware formatting ──────────────────────────────────────────────────
 // Precision is a property of the ASSET, not a constant. A hardcoded 4dp is
 // right for a $0.20 asset and wrong by four orders of magnitude for BTC
@@ -36,6 +44,7 @@ export function formatMarketUsd(
 ): string {
   if (value === null || value === undefined) return "—";
   if (typeof value === "bigint" && value <= 0n) return "—";
+  if (typeof value === "number" && !(value > 0)) return "—";
   return "$" + formatMarketPrice(market, value);
 }
 

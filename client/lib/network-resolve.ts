@@ -15,15 +15,15 @@
 
 import { PRIMARY_NETWORK, isNetworkId, type NetworkId } from "@/config/networks";
 
-export const NETWORK_COOKIE = "kryon_network";
+export const NETWORK_COOKIE = "floydex_network";
 export const NETWORK_PARAM = "network";
 
 /** One year. The choice is a durable user preference, not a session detail. */
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
-/** Coerce anything into a valid network, falling back to the deployment default. */
-export function coerceNetwork(value: unknown, fallback: NetworkId = PRIMARY_NETWORK): NetworkId {
-  return isNetworkId(value) ? value : fallback;
+/** Mainnet only — Devnet is not offered. */
+export function coerceNetwork(_value?: unknown, _fallback?: NetworkId): NetworkId {
+  return "mainnet";
 }
 
 function readCookie(name: string): string | undefined {
@@ -50,8 +50,7 @@ function readCookie(name: string): string | undefined {
  * NetworkProvider reconciles it by writing the cookie and reloading once.
  */
 export function resolveClientNetwork(): NetworkId {
-  if (typeof window === "undefined") return PRIMARY_NETWORK;
-  return coerceNetwork(readCookie(NETWORK_COOKIE));
+  return "mainnet";
 }
 
 /**
@@ -62,14 +61,14 @@ export function resolveClientNetwork(): NetworkId {
 export function pendingUrlNetwork(): NetworkId | undefined {
   if (typeof window === "undefined") return undefined;
   const fromUrl = new URLSearchParams(window.location.search).get(NETWORK_PARAM);
-  if (!isNetworkId(fromUrl)) return undefined;
-  return fromUrl === resolveClientNetwork() ? undefined : fromUrl;
+  if (fromUrl && fromUrl !== "mainnet") return "mainnet";
+  return undefined;
 }
 
 /** Persist the choice so the next request — and the next visit — agrees. */
-export function writeNetworkCookie(network: NetworkId): void {
+export function writeNetworkCookie(_network?: NetworkId): void {
   if (typeof document === "undefined") return;
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
   document.cookie =
-    `${NETWORK_COOKIE}=${network}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
+    `${NETWORK_COOKIE}=mainnet; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
 }

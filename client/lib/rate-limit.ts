@@ -64,14 +64,17 @@ export async function rateLimit(key: string, limit: number): Promise<boolean> {
   return localRateLimit(key, limit);
 }
 
-export function requestKey(req: Request, owner: string): string {
+export function clientIp(req: Request): string {
   // CF-Connecting-IP is set by Cloudflare and cannot be spoofed by the client
   // (Cloudflare strips inbound values). x-forwarded-for is client-spoofable
   // and only a best-effort fallback for non-Cloudflare deployments.
   const cfIp = req.headers.get("cf-connecting-ip")?.trim();
   const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = cfIp || forwarded || req.headers.get("x-real-ip") || "unknown";
-  return `${owner}:${ip}`;
+  return cfIp || forwarded || req.headers.get("x-real-ip") || "unknown";
+}
+
+export function requestKey(req: Request, owner: string): string {
+  return `${owner}:${clientIp(req)}`;
 }
 
 export function bodyTooLarge(req: Request, maxBytes = 4096): boolean {

@@ -5,8 +5,8 @@ import { PRIMARY_NETWORK, type NetworkId } from "@/config/networks";
 // The DATABASE_URL_* vars are private (no NEXT_PUBLIC_ prefix).
 
 /**
- * Each network has its own physical database (`kryon_mainnet`,
- * `kryon_testnet`), so routing a request to the right venue means routing it to
+ * Each network has its own physical database (`floydex_mainnet`,
+ * `floydex_testnet`), so routing a request to the right venue means routing it to
  * the right connection string.
  *
  * `DATABASE_URL` (unsuffixed) is the legacy single-network var and is treated

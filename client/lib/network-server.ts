@@ -16,7 +16,7 @@ import { coerceNetwork, NETWORK_COOKIE, NETWORK_PARAM } from "@/lib/network-reso
  * Resolve the caller's network.
  *
  * Precedence matches the client: explicit `?network=` (what `apiFetch` sends on
- * every call) → the `kryon_network` cookie → the deployment default. An
+ * every call) → the `floydex_network` cookie → the deployment default. An
  * unrecognised value falls back rather than erroring, so a stale bookmark
  * degrades to the default venue instead of a 500.
  */

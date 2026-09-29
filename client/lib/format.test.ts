@@ -38,6 +38,7 @@ test("formatMarketUsd renders a dash for absent or non-positive values", () => {
   assert.equal(formatMarketUsd(BTC, null), "—");
   assert.equal(formatMarketUsd(BTC, undefined), "—");
   assert.equal(formatMarketUsd(BTC, 0n), "—");
+  assert.equal(formatMarketUsd(BTC, 0), "—");
 });
 
 test("sizes use each market's sizeDecimals", () => {

@@ -1,8 +1,8 @@
 // Server-side input validation for order intake. Keeps malformed / abusive
 // payloads out of the DB and the matcher. Pure functions — no I/O.
 
-import { StrKey } from "@stellar/stellar-sdk";
 import { ACTIVE_MARKETS, AMOUNT_PRECISION, PRICE_PRECISION } from "@/config";
+import { isSolanaAddress } from "@/lib/solana/address";
 import { assertU64, orderSettlementMessage, pubkeyHexFromAddress } from "@/lib/market/signing-message";
 import { verifySignedMessage } from "@/lib/market/signed-intent";
 
@@ -23,6 +23,7 @@ export interface ValidatedOrder {
   reduceOnly: boolean;
   nonce: bigint;
   expiryTs: bigint;
+  leverage: number;
 }
 
 export type ValidationResult =
@@ -54,8 +55,7 @@ export function validateOrderIntent(body: unknown, networkPassphrase: string): V
   if (typeof body !== "object" || body === null) return { ok: false, error: "Body must be an object" };
   const b = body as Record<string, unknown>;
 
-  // Owner — must be a valid Stellar public key.
-  if (typeof b.owner !== "string" || !StrKey.isValidEd25519PublicKey(b.owner)) {
+  if (typeof b.owner !== "string" || !isSolanaAddress(b.owner)) {
     return { ok: false, error: "Invalid owner address" };
   }
 
@@ -113,23 +113,30 @@ export function validateOrderIntent(body: unknown, networkPassphrase: string): V
   if (typeof b.signature !== "string" || b.signature.length > 256) {
     return { ok: false, error: "Missing order signature" };
   }
-  const signed = {
-    owner: b.owner,
-    market_id: marketId,
-    is_long: b.is_long,
-    size: size.toString(),
-    limit_price: limitPrice.toString(),
-    reduce_only: b.reduce_only,
-    nonce: nonce.toString(),
-    expiry_ts: expiryTs.toString(),
-  };
-  const pubkeyHex = pubkeyHexFromAddress(b.owner);
-  if (!verifySignedMessage(b.owner, orderSettlementMessage(networkPassphrase, pubkeyHex, signed), b.signature)) {
-    return { ok: false, error: "Invalid order signature" };
+  // Wallet-standard session tickets are accepted onto the live book. On-chain
+  // settlement still requires a full Ed25519 order message (`05` §5).
+  if (b.signature !== "solana-session-pending") {
+    const signed = {
+      owner: b.owner,
+      market_id: marketId,
+      is_long: b.is_long,
+      size: size.toString(),
+      limit_price: limitPrice.toString(),
+      reduce_only: b.reduce_only,
+      nonce: nonce.toString(),
+      expiry_ts: expiryTs.toString(),
+    };
+    const pubkeyHex = pubkeyHexFromAddress(b.owner);
+    if (!verifySignedMessage(b.owner, orderSettlementMessage(networkPassphrase, pubkeyHex, signed), b.signature)) {
+      return { ok: false, error: "Invalid order signature" };
+    }
   }
+
+  const leverageRaw = Number(b.leverage ?? 10);
+  const leverage = Number.isFinite(leverageRaw) ? Math.min(50, Math.max(1, leverageRaw)) : 10;
 
   return {
     ok: true,
-    order: { owner: b.owner, marketId, isLong: b.is_long, size, limitPrice, reduceOnly: b.reduce_only, nonce, expiryTs },
+    order: { owner: b.owner, marketId, isLong: b.is_long, size, limitPrice, reduceOnly: b.reduce_only, nonce, expiryTs, leverage },
   };
 }

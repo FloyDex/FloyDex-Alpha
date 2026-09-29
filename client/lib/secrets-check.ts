@@ -68,7 +68,7 @@ export function assertRequiredSecrets(required: string[]): void {
     for (const key of missing) {
       process.stderr.write(`FATAL: missing required env var ${key}\n`);
     }
-    process.stderr.write(`\nSet the above variables in .env.local (local) or Railway Secrets (production).\n`);
+    process.stderr.write(`\nSet the above variables in the repo-root .env (local) or Railway Secrets (production).\n`);
     process.exit(1);
   }
 
