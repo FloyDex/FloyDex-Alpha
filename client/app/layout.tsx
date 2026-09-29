@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "@/components/common/Providers";
 import { networkFromCookies } from "@/lib/network-server";
 import "./globals.css";
@@ -66,6 +67,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" className={`${poppins.variable} ${geistMono.variable} dark h-full`}>
       <body className="min-h-dvh bg-[#070B0A] text-[#f5f5f5] antialiased">
         <Providers network={network}>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
