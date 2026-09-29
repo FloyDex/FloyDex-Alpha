@@ -12,7 +12,7 @@ Legend: ✅ done · ♻️ port (logic survives) · 🔁 rewrite (idea survives,
 |---|---|---|---|---|
 | `onchain/crates/protocol-core` | 440 | ✅ | `crates/protocol-core` | Soroban removed. `Address`→`[u8;32]`, `Symbol`→`[u8;16]`, `Vec`→slices. All 8 tests pass |
 | `onchain/crates/risk-engine` | 814 | ✅ + ➕ | `crates/risk-engine` | `Map`→`MarketLookup` trait, `Env` removed. All 10 tests pass. **New `session.rs`** (7 tests) |
-| `onchain/contracts/perp-engine` | 1,937 | 🔁 | `programs/kryon-perps/src/engine/` | open/increase/reduce/close position, fees, OI, funding indexes, OI policy. The logic is portable; storage becomes zero-copy accounts |
+| `onchain/contracts/perp-engine` | 1,937 | 🔁 | `programs/floydex-perps/src/engine/` | open/increase/reduce/close position, fees, OI, funding indexes, OI policy. The logic is portable; storage becomes zero-copy accounts |
 | `onchain/contracts/perp-vault` | 1,699 | 🔁 | `…/vault/` | Balances live inside `UserAccount`; tokens move via `token_interface` (SPL and Token-2022). Keep deposit caps, pause, `apply_pnl`, `absorb_bad_debt`, `seize_for_deficit` semantics |
 | `onchain/contracts/perp-order-gateway` | 1,429 | 🔁 | `…/settlement/` | Keep the `validate_fill` table **verbatim**. Replace SEP-53 with Ed25519 introspection; `filled`/`is_cancelled` become `OrderRecord` PDAs; keep `reclaim_order_state` |
 | `onchain/contracts/perp-liquidation` | 1,105 | 🔁 | `…/liquidation/` | `liquidate`, `adl`, `max_reward_bps ≤ 1000`, driven by `plan_liquidation` |
@@ -58,7 +58,7 @@ Legend: ✅ done · ♻️ port (logic survives) · 🔁 rewrite (idea survives,
 | `app/api/*` routes | ♻️ | Keep orders, fills, markets, portfolio, leaderboard, health. Verify the delegate signature instead of SEP-53 |
 | `DepositWithdrawDialog.tsx`, `SettlementModal.tsx` | 🔁 | — |
 | ➕ Session badge + band indicator | new | Regular / Extended / Closed / Halted, with effective max leverage |
-| ➕ Geofence + ToS gate | new | See `10` |
+| — Country geofence | not doing | Open worldwide; see `10` |
 | `@stellar/stellar-sdk`, `@stellar/freighter-api` | 🗑 | — |
 
 ## 4. Remove entirely (don't bring across)
@@ -81,4 +81,4 @@ Legend: ✅ done · ♻️ port (logic survives) · 🔁 rewrite (idea survives,
 5. Portfolio margin (phase 2) and the Basis Vault (phase 2).
 6. Squads v4 governance setup and runbooks.
 7. `risk-engine` → WASM bindings for UI and SDK.
-8. Compliance layer: geofence, sanctions screening, ToS (see `10`).
+8. Access: no country geofence; optional ToS; wallet bans via admin (see `10`).

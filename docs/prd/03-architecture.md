@@ -14,9 +14,9 @@
    │                                  ▲
    ▼                                  │ ⑦ indexer (Helius/Yellowstone gRPC → Anchor events)
  Matcher (one writer per market)      │
-   │ ④ settle_fills tx: [Ed25519Program ix(s)] + [kryon_perps::settle_fills]
+   │ ④ settle_fills tx: [Ed25519Program ix(s)] + [floydex_perps::settle_fills]
    ▼                                  │
- ┌──────────────────── kryon_perps (single Anchor program) ────────────────────┐
+ ┌──────────────────── floydex_perps (single Anchor program) ────────────────────┐
  │ Exchange · Market · Collateral · UserAccount · OrderRecord · Insurance      │
  │ uses crates/protocol-core + crates/risk-engine (pure Rust, no_std)          │
  │ reads Pyth PriceUpdateV2 accounts ◄── ⑤ price pusher (Hermes API key)       │
@@ -47,13 +47,13 @@ signed**, and every non-user flow is checked by the program.
 ## 3. Proposed folder layout (build here)
 
 ```
-Kryon-sol/
+FloyDex/
 ├── Cargo.toml                  workspace (crates now; add programs/ next)
 ├── Anchor.toml                 (create with `anchor init`, see README)
 ├── crates/
 │   ├── protocol-core/          ✅ ported, tested
 │   └── risk-engine/            ✅ ported + session.rs, tested
-├── programs/kryon-perps/       Anchor program (to build; see 05)
+├── programs/floydex-perps/       Anchor program (to build; see 05)
 ├── services/                   matcher, pusher, indexer, ws, liquidator, funding, reconciler, monitor
 ├── app/                        Next.js terminal (port from reference/stellar/frontend)
 ├── sdk/                        TS SDK + risk-engine WASM bindings

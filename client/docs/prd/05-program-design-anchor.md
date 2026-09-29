@@ -1,4 +1,4 @@
-# 05 — `kryon_perps` Anchor program design
+# 05 — `floydex_perps` Anchor program design
 
 Target: Anchor 0.31.1, Solana 2.1 (Agave), `token_interface` (SPL Token and
 Token-2022). One program, internal modules. Big accounts use zero-copy
@@ -35,6 +35,11 @@ Notes:
   toward −∞ and fees round up, so dust always stays with the protocol. This
   lives in the program; `protocol-core` gained `mul_div_floor`/`mul_div_ceil`
   alongside the unchanged truncating `mul_div`.
+- **Platform fee (decided 2026-09-28).** Every fill charges 1% (`PLATFORM_FEE_BPS`
+  = 100) on both sides — buy and sell, maker and taker. Fees debit settlement
+  collateral and accrue in `Collateral.fees_accrued` until permissionless
+  `collect_fees` sends them to `Exchange.fee_collector`
+  (`HPXzdeaarrnLL8PKGi11PT2BBd8HY5yty7WwDBZavCbn`). Cap stays 1% a side.
 - Fixed-point: `protocol_core::PRECISION = 1e18` for prices and sizes, exactly
   as on Stellar. Convert token amounts (USDC 6 decimals, xStocks ~8 decimals,
   **verify per mint**) at the vault edge only.
@@ -43,7 +48,7 @@ Notes:
 
 ### Admin (Squads multisig through the time lock)
 `initialize_exchange`, `nominate_admin`, `accept_admin`, `set_guardian`,
-`set_operators`, `set_fee_config`, `create_market`, `update_market`
+`set_operators`, `set_fee_config`, `set_fee_collector`, `create_market`, `update_market`
 (risk params, session policy, funding config, OI policy),
 `add_collateral`, `update_collateral` (haircut, cap, active),
 `set_max_total_oi_policy_bps`, `unpause`.
@@ -120,6 +125,8 @@ effect.
 ### Permissionless keepers
 `update_funding(market)` (hourly; premium from mark vs. index;
 `MAX_FUNDING_ELAPSED_SECS` cap).
+`collect_fees` (drains `fees_accrued` of the settlement collateral to
+`Exchange.fee_collector`).
 
 **`update_funding` as built (decided 2026-09-26):**
 - Premium = the book against the index, never OI imbalance (`11` L8). In
@@ -233,6 +240,7 @@ retire shares when a loss wipes the pool.
 
 ## 3. Events (for the indexer)
 `Deposit`, `Withdraw`, `FillSettled{market, maker, taker, size, price, maker_fee, taker_fee}`,
+`FeesCollected{mint, collector, amount}`,
 `PositionChanged`, `FundingUpdated`, `Liquidated`, `Adl`, `BadDebt`,
 `SessionChanged`, `DelegateSet`, `OrderCancelled`. Use `emit_cpi!` so events
 survive log truncation.
@@ -242,7 +250,7 @@ survive log truncation.
 A compact binary layout, Borsh, little-endian, **108 bytes**:
 
 ```
-0   8  magic        "KRYONv1\0"
+0   8  magic        "FLOYDEX\0"
 8  32  domain       sha256(genesis_hash || program_id)   // blocks cross-cluster/cross-deploy replay
 40 32  owner        user wallet pubkey (NOT the delegate)
 72  1  sub_id       u8, the UserAccount the order trades from
@@ -264,7 +272,7 @@ Rules:
 - **Golden test:** TS `encodeOrder()` and Rust `OrderMsg::try_to_vec()` must
   produce identical bytes for fixed vectors. This is the same discipline as
   Stellar's `canonical_digest_matches_offchain_golden`. Keep the vectors in
-  `sdk/conformance/`, the way KryonSDK does.
+  `sdk/conformance/`, the way FloyDexSDK does.
 - On-chain, widen `u64` → `i128` PRECISION (×1e9) before using `risk-engine`.
 - The cancel message has its own magic `"KRYCANv1"`, so a signed order can
   never double as a cancel.
