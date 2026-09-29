@@ -1,7 +1,7 @@
 //! (d) set_delegate / revoke_delegate.
 
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
@@ -40,11 +40,11 @@ fn delegate_expiry_must_be_in_the_future() {
     let k = Keypair::new().pubkey();
     assert_err(
         w.set_delegate(&t, &k, now),
-        KryonError::InvalidDelegateExpiry,
+        FloyDexError::InvalidDelegateExpiry,
     );
     assert_err(
         w.set_delegate(&t, &k, now - 1),
-        KryonError::InvalidDelegateExpiry,
+        FloyDexError::InvalidDelegateExpiry,
     );
 }
 
@@ -55,12 +55,12 @@ fn delegate_cannot_be_empty_or_the_owner() {
     let now = w.now();
     assert_err(
         w.set_delegate(&t, &anchor_lang::prelude::Pubkey::default(), now + 60),
-        KryonError::InvalidConfig,
+        FloyDexError::InvalidConfig,
     );
     let owner = t.key();
     assert_err(
         w.set_delegate(&t, &owner, now + 60),
-        KryonError::InvalidConfig,
+        FloyDexError::InvalidConfig,
     );
 }
 
@@ -78,7 +78,7 @@ fn only_the_owner_manages_the_session_key() {
                 owner: session.pubkey(),
                 user_account: t.user,
                 event_authority: event_authority(),
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
             },
             ki::SetDelegate {
                 delegate: session.pubkey(),
@@ -90,7 +90,7 @@ fn only_the_owner_manages_the_session_key() {
                 owner: session.pubkey(),
                 user_account: t.user,
                 event_authority: event_authority(),
-                program: kryon_perps::ID,
+                program: floydex_perps::ID,
             },
             ki::RevokeDelegate {},
         ),

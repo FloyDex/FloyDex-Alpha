@@ -3,8 +3,8 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_signer::Signer;
 
 fn ema(b: &Book) -> i128 {
@@ -48,15 +48,15 @@ fn post_mark_is_operator_only_rate_limited_and_clamped_while_closed() {
     let stranger = funded(&mut b.w.svm);
     assert_err(
         b.w.post_mark_as(1, 251 * W, &stranger),
-        KryonError::NotOperator,
+        FloyDexError::NotOperator,
     );
     b.w.warp(600);
     assert_ok(b.w.post_mark(1, 300 * W)); // far outside the 2% band
                                           // Clamped to 255 first, then the 50 bps step bound: 250 → 251.25.
     assert_eq!(ema(&b), 25125 * P / 100);
-    assert_err(b.w.post_mark(1, 300 * W), KryonError::PostMarkTooSoon);
+    assert_err(b.w.post_mark(1, 300 * W), FloyDexError::PostMarkTooSoon);
     b.w.warp(9);
-    assert_err(b.w.post_mark(1, 300 * W), KryonError::PostMarkTooSoon);
+    assert_err(b.w.post_mark(1, 300 * W), FloyDexError::PostMarkTooSoon);
     b.w.warp(1);
     assert_ok(b.w.post_mark(1, 300 * W));
     assert!(ema(&b) > 25125 * P / 100);
@@ -89,7 +89,7 @@ fn the_closed_mark_follows_the_ema_inside_the_band() {
     // The execution band (1%) is now centred on the EMA mark, not on 250:
     // 256 is inside it, 251 is not.
     assert_ok(b.trade(true, W, 256 * W));
-    assert_err(b.trade(true, W, 251 * W), KryonError::PriceOutsideBand);
+    assert_err(b.trade(true, W, 251 * W), FloyDexError::PriceOutsideBand);
 }
 
 #[test]
@@ -99,7 +99,7 @@ fn post_mark_is_refused_while_halted() {
     let now = b.w.now();
     mock_usd(&mut b.w.svm, FEED_TSLA, 250.0, now - 600); // stale in session
     b.w.warp(20);
-    assert_err(b.w.post_mark(1, PX), KryonError::MarketHalted);
+    assert_err(b.w.post_mark(1, PX), FloyDexError::MarketHalted);
 }
 
 #[test]
@@ -135,7 +135,7 @@ fn the_reopen_snaps_the_ema_to_the_oracle_and_clears_the_close() {
     assert_eq!(m.closed_since, 0);
     assert_eq!(m.mark_ema.get(), 262 * P, "snapped, then 262 again");
     assert_eq!(m.last_oracle_price.get(), 262 * P);
-    assert_eq!(m.last_session, kryon_perps::state::SESSION_REGULAR + 1);
+    assert_eq!(m.last_session, floydex_perps::state::SESSION_REGULAR + 1);
 }
 
 #[test]
@@ -148,14 +148,14 @@ fn initial_margin_ramps_up_before_the_close() {
     b.w.post_regular_window(1, now - 3_600, now + 1_800);
     assert_err(
         b.trade(true, 134 * W, PX),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     assert_ok(b.trade(true, 132 * W, PX));
     // Ten minutes later (IM 33.4%) she cannot add, but can still reduce.
     b.w.warp(600);
     let now = b.w.now();
     mock_usd(&mut b.w.svm, FEED_TSLA, 250.0, now);
-    assert_err(b.trade(true, W, PX), KryonError::InsufficientCollateral);
+    assert_err(b.trade(true, W, PX), FloyDexError::InsufficientCollateral);
     assert_ok(b.trade(false, W, PX));
 }
 

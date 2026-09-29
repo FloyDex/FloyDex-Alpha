@@ -4,8 +4,8 @@
 use anchor_lang::prelude::Pubkey;
 use anchor_spl::token::spl_token;
 use anchor_spl::token_2022::spl_token_2022::{self, extension::ExtensionType};
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
@@ -16,7 +16,7 @@ fn only_the_upgrade_authority_can_initialize() {
     let i = w.init_exchange_ix(&stranger.pubkey());
     assert_err(
         send(&mut w.svm, &[i], &stranger, &[]),
-        KryonError::NotUpgradeAuthority,
+        FloyDexError::NotUpgradeAuthority,
     );
 
     let i = w.init_exchange_ix(&w.admin.pubkey());
@@ -25,6 +25,7 @@ fn only_the_upgrade_authority_can_initialize() {
     assert_eq!(ex.admin, w.admin.pubkey());
     assert_eq!(ex.guardian, w.guardian.pubkey());
     assert_eq!(ex.domain, DOMAIN);
+    assert_eq!(ex.fee_collector, floydex_perps::constants::FEE_COLLECTOR);
     assert!(!ex.paused);
 
     // A second initialize fails: the PDA already exists.
@@ -47,7 +48,7 @@ fn admin_handover_is_two_step() {
     );
     assert_err(
         send(&mut w.svm, &[i], &stranger, &[]),
-        KryonError::Unauthorized,
+        FloyDexError::Unauthorized,
     );
 
     // Accepting with nothing pending fails.
@@ -62,7 +63,7 @@ fn admin_handover_is_two_step() {
     };
     assert_err(
         send(&mut w.svm, &[accept(&next.pubkey())], &next, &[]),
-        KryonError::NotPendingAdmin,
+        FloyDexError::NotPendingAdmin,
     );
 
     let i = w.admin_ix(ki::NominateAdmin {
@@ -78,7 +79,7 @@ fn admin_handover_is_two_step() {
     // Only the nominee can accept.
     assert_err(
         send(&mut w.svm, &[accept(&stranger.pubkey())], &stranger, &[]),
-        KryonError::NotPendingAdmin,
+        FloyDexError::NotPendingAdmin,
     );
     assert_ok(send(&mut w.svm, &[accept(&next.pubkey())], &next, &[]));
     let ex = w.exchange();
@@ -89,7 +90,7 @@ fn admin_handover_is_two_step() {
     let i = w.admin_ix(ki::SetGuardian {
         guardian: stranger.pubkey(),
     });
-    assert_err(w.admin_send(&[i]), KryonError::Unauthorized);
+    assert_err(w.admin_send(&[i]), FloyDexError::Unauthorized);
 }
 
 #[test]
@@ -103,7 +104,7 @@ fn roles_are_admin_only() {
     );
     assert_err(
         send(&mut w.svm, &[i], &stranger, &[]),
-        KryonError::Unauthorized,
+        FloyDexError::Unauthorized,
     );
     let i = ix(
         w.admin_accounts(&stranger.pubkey()),
@@ -113,7 +114,7 @@ fn roles_are_admin_only() {
     );
     assert_err(
         send(&mut w.svm, &[i], &stranger, &[]),
-        KryonError::Unauthorized,
+        FloyDexError::Unauthorized,
     );
     let i = ix(
         w.admin_accounts(&stranger.pubkey()),
@@ -123,7 +124,7 @@ fn roles_are_admin_only() {
     );
     assert_err(
         send(&mut w.svm, &[i], &stranger, &[]),
-        KryonError::Unauthorized,
+        FloyDexError::Unauthorized,
     );
 
     let new_guardian = Keypair::new();
@@ -150,20 +151,46 @@ fn roles_are_admin_only() {
 fn fee_config_is_capped() {
     let mut w = World::new();
     let i = w.admin_ix(ki::SetFeeConfig {
-        fee_config: kryon_perps::FeeConfig {
+        fee_config: floydex_perps::FeeConfig {
             maker_fee_bps: 101,
             taker_fee_bps: 0,
         },
     });
-    assert_err(w.admin_send(&[i]), KryonError::InvalidConfig);
+    assert_err(w.admin_send(&[i]), FloyDexError::InvalidConfig);
     let i = w.admin_ix(ki::SetFeeConfig {
-        fee_config: kryon_perps::FeeConfig {
+        fee_config: floydex_perps::FeeConfig {
             maker_fee_bps: 1,
             taker_fee_bps: 3,
         },
     });
     assert_ok(w.admin_send(&[i]));
     assert_eq!(w.exchange().fee_config.taker_fee_bps, 3);
+
+    let i = w.admin_ix(ki::SetFeeConfig {
+        fee_config: floydex_perps::FeeConfig::PLATFORM,
+    });
+    assert_ok(w.admin_send(&[i]));
+    assert_eq!(w.exchange().fee_config.maker_fee_bps, 100);
+    assert_eq!(w.exchange().fee_config.taker_fee_bps, 100);
+}
+
+#[test]
+fn fee_collector_is_settable_and_rejects_default() {
+    let mut w = World::new();
+    assert_eq!(
+        w.exchange().fee_collector,
+        floydex_perps::constants::FEE_COLLECTOR
+    );
+    let i = w.admin_ix(ki::SetFeeCollector {
+        collector: Pubkey::default(),
+    });
+    assert_err(w.admin_send(&[i]), FloyDexError::InvalidConfig);
+    let next = funded(&mut w.svm);
+    let i = w.admin_ix(ki::SetFeeCollector {
+        collector: next.pubkey(),
+    });
+    assert_ok(w.admin_send(&[i]));
+    assert_eq!(w.exchange().fee_collector, next.pubkey());
 }
 
 #[test]
@@ -181,7 +208,7 @@ fn guardian_pauses_and_only_admin_unpauses() {
 
     // The admin is not the guardian.
     let i = pause(&w.admin.pubkey());
-    assert_err(w.admin_send(&[i]), KryonError::Unauthorized);
+    assert_err(w.admin_send(&[i]), FloyDexError::Unauthorized);
 
     let g = w.guardian.insecure_clone();
     assert_ok(send(&mut w.svm, &[pause(&g.pubkey())], &g, &[]));
@@ -189,7 +216,7 @@ fn guardian_pauses_and_only_admin_unpauses() {
 
     // The guardian cannot unpause.
     let i = ix(w.admin_accounts(&g.pubkey()), ki::Unpause {});
-    assert_err(send(&mut w.svm, &[i], &g, &[]), KryonError::Unauthorized);
+    assert_err(send(&mut w.svm, &[i], &g, &[]), FloyDexError::Unauthorized);
 
     let i = w.admin_ix(ki::Unpause {});
     assert_ok(w.admin_send(&[i]));
@@ -201,7 +228,7 @@ fn create_market_stores_the_config() {
     let mut w = World::new();
     let i = w.create_market_ix(1, default_market_params());
     assert_ok(w.admin_send(&[i]));
-    let m: kryon_perps::state::Market = fetch_zc(&w.svm, &market_pda(1));
+    let m: floydex_perps::state::Market = fetch_zc(&w.svm, &market_pda(1));
     assert_eq!(m.market_id, 1);
     assert_eq!(m.active, 1);
     assert_eq!(m.pyth_feed_id, FEED_TSLA);
@@ -221,14 +248,14 @@ fn create_market_stores_the_config() {
     i.accounts[1].pubkey = stranger.pubkey();
     assert_err(
         send(&mut w.svm, &[i], &stranger, &[]),
-        KryonError::Unauthorized,
+        FloyDexError::Unauthorized,
     );
 }
 
 #[test]
 fn create_market_rejects_every_bad_config() {
     let mut w = World::new();
-    type Edit = fn(&mut kryon_perps::MarketParams);
+    type Edit = fn(&mut floydex_perps::MarketParams);
     let cases: &[(&str, u16, Edit)] = &[
         ("market id 0", 0, |_| {}),
         ("zero initial margin", 3, |p| p.initial_margin_bps = 0),
@@ -279,7 +306,7 @@ fn create_market_rejects_every_bad_config() {
         let i = w.create_market_ix(*id, p);
         let r = w.admin_send(&[i]);
         assert!(r.is_err(), "{name} should be rejected");
-        assert_err(r, KryonError::InvalidConfig);
+        assert_err(r, FloyDexError::InvalidConfig);
     }
 }
 
@@ -292,7 +319,7 @@ fn aggregate_oi_policy_is_capped_across_markets() {
     let i = w.create_market_ix(1, p.clone());
     assert_ok(w.admin_send(&[i]));
     let i = w.create_market_ix(2, p.clone());
-    assert_err(w.admin_send(&[i]), KryonError::AggregateOiPolicyExceeded);
+    assert_err(w.admin_send(&[i]), FloyDexError::AggregateOiPolicyExceeded);
     p.oi_policy_bps = 40_000;
     let i = w.create_market_ix(2, p);
     assert_ok(w.admin_send(&[i]));
@@ -310,11 +337,11 @@ fn settlement_collateral_is_unique_and_at_par() {
     let mut bad = settlement_params();
     bad.pyth_feed_id = FEED_TSLA;
     let i = w.add_collateral_ix(&usdc, spl_token::ID, bad);
-    assert_err(w.admin_send(&[i]), KryonError::InvalidConfig);
+    assert_err(w.admin_send(&[i]), FloyDexError::InvalidConfig);
 
     let i = w.add_collateral_ix(&usdc, spl_token::ID, settlement_params());
     assert_ok(w.admin_send(&[i]));
-    let c: kryon_perps::state::Collateral = fetch(&w.svm, &collateral_pda(&usdc));
+    let c: floydex_perps::state::Collateral = fetch(&w.svm, &collateral_pda(&usdc));
     assert!(c.is_settlement && c.active);
     assert_eq!((c.decimals, c.index), (6, 0));
     assert_eq!(c.vault, vault_pda(&usdc));
@@ -323,7 +350,7 @@ fn settlement_collateral_is_unique_and_at_par() {
     assert_eq!(token_balance(&w.svm, &vault_pda(&usdc)), 0);
 
     let i = w.add_collateral_ix(&usdc2, spl_token::ID, settlement_params());
-    assert_err(w.admin_send(&[i]), KryonError::SettlementCollateralExists);
+    assert_err(w.admin_send(&[i]), FloyDexError::SettlementCollateralExists);
 }
 
 #[test]
@@ -334,13 +361,13 @@ fn non_settlement_collateral_needs_a_feed() {
     let mut p = settlement_params();
     p.is_settlement = false;
     let i = w.add_collateral_ix(&x, spl_token_2022::ID, p.clone());
-    assert_err(w.admin_send(&[i]), KryonError::InvalidConfig);
+    assert_err(w.admin_send(&[i]), FloyDexError::InvalidConfig);
     p.pyth_feed_id = FEED_TSLA;
     p.max_oracle_age_secs = 70;
     p.haircut_bps = 1_500;
     let i = w.add_collateral_ix(&x, spl_token_2022::ID, p);
     assert_ok(w.admin_send(&[i]));
-    let c: kryon_perps::state::Collateral = fetch(&w.svm, &collateral_pda(&x));
+    let c: floydex_perps::state::Collateral = fetch(&w.svm, &collateral_pda(&x));
     assert_eq!(c.token_program, spl_token_2022::ID);
     assert_eq!(c.haircut_bps, 1_500);
 }
@@ -373,7 +400,7 @@ fn token_2022_mints_with_unsupported_extensions_are_refused() {
     p.pyth_feed_id = FEED_TSLA;
     p.max_oracle_age_secs = 70;
     let i = w.add_collateral_ix(&fee_mint, spl_token_2022::ID, p.clone());
-    assert_err(w.admin_send(&[i]), KryonError::UnsupportedMintExtension);
+    assert_err(w.admin_send(&[i]), FloyDexError::UnsupportedMintExtension);
 
     let pd_mint = create_mint(
         &mut w.svm,
@@ -391,7 +418,7 @@ fn token_2022_mints_with_unsupported_extensions_are_refused() {
         },
     );
     let i = w.add_collateral_ix(&pd_mint, spl_token_2022::ID, p.clone());
-    assert_err(w.admin_send(&[i]), KryonError::UnsupportedMintExtension);
+    assert_err(w.admin_send(&[i]), FloyDexError::UnsupportedMintExtension);
 
     // An allowed extension passes.
     let close_mint = create_mint(
@@ -421,5 +448,5 @@ fn mints_above_18_decimals_are_refused() {
     let admin = w.admin.insecure_clone();
     let m = create_mint(&mut w.svm, &admin, spl_token::ID, 19, &[], |_| vec![]);
     let i = w.add_collateral_ix(&m, spl_token::ID, settlement_params());
-    assert_err(w.admin_send(&[i]), KryonError::InvalidConfig);
+    assert_err(w.admin_send(&[i]), FloyDexError::InvalidConfig);
 }

@@ -4,9 +4,9 @@
 mod common;
 use anchor_lang::AccountSerialize;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
-use kryon_perps::state::{SESSION_CLOSED, SESSION_EXTENDED, SESSION_REGULAR};
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
+use floydex_perps::state::{SESSION_CLOSED, SESSION_EXTENDED, SESSION_REGULAR};
 use pyth_solana_receiver_sdk::price_update::{PriceFeedMessage, PriceUpdateV2, VerificationLevel};
 use solana_signer::Signer;
 
@@ -57,7 +57,7 @@ fn the_shard_is_configurable_and_binds_the_price_account() {
     // Passing the (still fresh) shard-0 account instead is refused.
     let (mo, to) = b.pair(true, W, PX);
     let mut settle = b.w.settle_ix(1, &[plan(&b.alice, &b.bob, mo, to, W, PX)]);
-    settle.accounts[3].pubkey = kryon_perps::oracle::push_feed_address(0, &FEED_TSLA);
+    settle.accounts[3].pubkey = floydex_perps::oracle::push_feed_address(0, &FEED_TSLA);
     let entries = [
         SigEntry::sign(&b.alice_key, &order_message(DOMAIN, &b.alice, &mo)),
         SigEntry::sign(&b.bob_key, &order_message(DOMAIN, &b.bob, &to)),
@@ -69,7 +69,7 @@ fn the_shard_is_configurable_and_binds_the_price_account() {
         &op,
         &[],
     );
-    assert_err(r, KryonError::InvalidOracleAccount);
+    assert_err(r, FloyDexError::InvalidOracleAccount);
 }
 
 #[test]
@@ -89,8 +89,8 @@ fn only_the_admin_changes_the_oracle_source() {
             max_oracle_confidence_bps: 50,
         },
     );
-    assert_err(send(&mut b.w.svm, &[i], &s, &[]), KryonError::Unauthorized);
-    assert_err(set_oracle(&mut b, 1, 0, 50), KryonError::InvalidConfig);
+    assert_err(send(&mut b.w.svm, &[i], &s, &[]), FloyDexError::Unauthorized);
+    assert_err(set_oracle(&mut b, 1, 0, 50), FloyDexError::InvalidConfig);
 }
 
 #[test]
@@ -116,11 +116,11 @@ fn partially_verified_updates_are_refused() {
     u.try_serialize(&mut data).unwrap();
     mock_price_with(
         &mut b.w.svm,
-        kryon_perps::oracle::push_feed_address(0, &FEED_TSLA),
+        floydex_perps::oracle::push_feed_address(0, &FEED_TSLA),
         pyth_solana_receiver_sdk::ID,
         data,
     );
-    assert_err(b.trade(true, W, PX), KryonError::OracleNotFullyVerified);
+    assert_err(b.trade(true, W, PX), FloyDexError::OracleNotFullyVerified);
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn any_pyth_exponent_rescales_to_precision() {
         -18,
         now,
     );
-    assert_err(b.trade(true, W, PX), KryonError::PriceOutsideBand);
+    assert_err(b.trade(true, W, PX), FloyDexError::PriceOutsideBand);
 }
 
 #[test]
@@ -151,7 +151,7 @@ fn a_publish_time_in_the_future_is_never_fresh() {
     let now = b.w.now();
     mock_usd(&mut b.w.svm, FEED_TSLA, 250.0, now + 30);
     // In a scheduled window a not-fresh oracle means Halted: reduce-only.
-    assert_err(b.trade(true, W, PX), KryonError::SessionExposureBlocked);
+    assert_err(b.trade(true, W, PX), FloyDexError::SessionExposureBlocked);
 }
 
 #[test]
@@ -186,7 +186,7 @@ fn only_the_calendar_authority_posts() {
             windows: vec![window(now + 10, now + 20, SESSION_REGULAR)],
         },
     );
-    assert_err(send(&mut b.w.svm, &[i], &s, &[]), KryonError::Unauthorized);
+    assert_err(send(&mut b.w.svm, &[i], &s, &[]), FloyDexError::Unauthorized);
 }
 
 #[test]
@@ -206,7 +206,7 @@ fn windows_must_be_future_sorted_and_disjoint() {
         vec![window(cur_end + 10, cur_end + 20, 9)], // unknown session code
     ];
     for ws in bad {
-        assert_err(b.w.post_calendar(1, ws), KryonError::InvalidSessionWindow);
+        assert_err(b.w.post_calendar(1, ws), FloyDexError::InvalidSessionWindow);
     }
     // 15 future windows fit next to the current one; 16 do not.
     let many = |n: i64| {
@@ -222,7 +222,7 @@ fn windows_must_be_future_sorted_and_disjoint() {
     };
     assert_err(
         b.w.post_calendar(1, many(16)),
-        KryonError::InvalidSessionWindow,
+        FloyDexError::InvalidSessionWindow,
     );
     assert_ok(b.w.post_calendar(1, many(15)));
 }
@@ -252,10 +252,10 @@ fn sessions_follow_the_posted_calendar() {
     // Start with no calendar at all: the market is Closed (fail-safe), so a
     // first fill needs a last trusted price.
     let mut b = Book::new();
-    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
+    patch_zc::<floydex_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
         m.calendar = Default::default()
     });
-    assert_err(b.trade(true, W, PX), KryonError::StaleOracle);
+    assert_err(b.trade(true, W, PX), FloyDexError::StaleOracle);
     // The keeper posts: Regular in 60 s for an hour, then Extended.
     let now = b.w.now();
     assert_ok(b.w.post_calendar(
@@ -273,7 +273,7 @@ fn sessions_follow_the_posted_calendar() {
     mock_usd(&mut b.w.svm, FEED_TSLA, 250.0, now + 3_700);
     assert_err(
         b.trade(true, 100 * W, PX),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     assert_ok(b.trade(true, 10 * W, PX));
     // After the last window: Closed at the last trusted price, margin ×2

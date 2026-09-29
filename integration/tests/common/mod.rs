@@ -2,7 +2,7 @@
 //! with session keys.
 #![allow(dead_code)]
 
-use kryon_integration::*;
+use floydex_integration::*;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
@@ -87,7 +87,7 @@ impl Book {
         self.fill(mo, to, size, price)
     }
 
-    pub fn position(&self, t: &Trader) -> Option<kryon_perps::state::PositionSlot> {
+    pub fn position(&self, t: &Trader) -> Option<floydex_perps::state::PositionSlot> {
         let u = self.w.user(t);
         u.find_position(1).map(|i| u.positions[i])
     }
