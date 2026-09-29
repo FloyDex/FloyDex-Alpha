@@ -227,13 +227,34 @@ export async function fetchYahoo24h(marketId: number): Promise<{
   };
 }
 
+/**
+ * Spot hosts. `api.binance.com` is often blocked from cloud/Vercel IPs (451 /
+ * empty); `data-api.binance.vision` is the public market-data mirror and works
+ * from most serverless regions. `api.binance.us` is a last-resort US endpoint
+ * (subset of pairs).
+ */
+const BINANCE_SPOT_HOSTS = [
+  "https://data-api.binance.vision",
+  "https://api.binance.com",
+  "https://api.binance.us",
+] as const;
+
+async function binanceSpotFetch(path: string): Promise<Response | null> {
+  for (const host of BINANCE_SPOT_HOSTS) {
+    try {
+      const res = await fetch(`${host}${path}`, { cache: "no-store" });
+      if (res.ok) return res;
+    } catch {
+      /* try next host */
+    }
+  }
+  return null;
+}
+
 async function binanceLast(pair: string): Promise<number | null> {
   try {
-    const res = await fetch(
-      `https://api.binance.com/api/v3/ticker/price?symbol=${pair}`,
-      { cache: "no-store" },
-    );
-    if (!res.ok) return null;
+    const res = await binanceSpotFetch(`/api/v3/ticker/price?symbol=${pair}`);
+    if (!res) return null;
     const data = (await res.json()) as { price?: string };
     const px = parseFloat(data.price ?? "");
     return px > 0 ? px : null;
@@ -299,11 +320,8 @@ async function binance24h(pair: string): Promise<{
   volumeUsd: number;
 } | null> {
   try {
-    const res = await fetch(
-      `https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`,
-      { cache: "no-store" },
-    );
-    if (!res.ok) return null;
+    const res = await binanceSpotFetch(`/api/v3/ticker/24hr?symbol=${pair}`);
+    if (!res) return null;
     const d = (await res.json()) as {
       lastPrice?: string;
       highPrice?: string;
@@ -335,11 +353,10 @@ async function binanceSpark(pair: string): Promise<number[]> {
   const hit = sparkCache.get(pair);
   if (hit && Date.now() - hit.at < 20_000) return hit.pts;
   try {
-    const res = await fetch(
-      `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=1h&limit=24`,
-      { cache: "no-store" },
+    const res = await binanceSpotFetch(
+      `/api/v3/klines?symbol=${pair}&interval=1h&limit=24`,
     );
-    if (!res.ok) return hit?.pts ?? [];
+    if (!res) return hit?.pts ?? [];
     const rows = (await res.json()) as [number, string, string, string, string][];
     const pts = rows
       .map((r) => parseFloat(r[4]))
@@ -442,11 +459,8 @@ export type VenueTrade = {
 const tradeCache = new Map<number, { at: number; rows: VenueTrade[] }>();
 
 async function binanceTrades(pair: string): Promise<VenueTrade[]> {
-  const res = await fetch(
-    `https://api.binance.com/api/v3/trades?symbol=${pair}&limit=50`,
-    { cache: "no-store" },
-  );
-  if (!res.ok) return [];
+  const res = await binanceSpotFetch(`/api/v3/trades?symbol=${pair}&limit=50`);
+  if (!res) return [];
   const rows = (await res.json()) as {
     price: string;
     qty: string;
