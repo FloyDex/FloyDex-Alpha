@@ -13,6 +13,7 @@ export interface OrderIntent {
   reduceOnly: boolean;
   nonce: bigint;
   expiryTs: bigint;   // unix seconds
+  leverage?: number;
 }
 
 // Nonce uniqueness is GLOBAL PER ACCOUNT, not per market: the DB enforces
@@ -48,6 +49,7 @@ export function buildOrderIntent(params: {
   limitPrice: bigint;
   reduceOnly?: boolean;
   ttlSeconds?: number;
+  leverage?: number;
 }): OrderIntent {
   return {
     owner: params.owner,
@@ -58,6 +60,7 @@ export function buildOrderIntent(params: {
     reduceOnly: params.reduceOnly ?? false,
     nonce: nextOrderNonce(),
     expiryTs: BigInt(Math.floor(Date.now() / 1000) + (params.ttlSeconds ?? 300)),
+    leverage: params.leverage,
   };
 }
 
@@ -71,5 +74,6 @@ export function orderIntentToJson(o: OrderIntent): Record<string, string | numbe
     reduce_only: o.reduceOnly,
     nonce: o.nonce.toString(),
     expiry_ts: o.expiryTs.toString(),
+    leverage: o.leverage ?? 10,
   };
 }

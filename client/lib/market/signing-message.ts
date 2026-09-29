@@ -2,7 +2,7 @@ import { StrKey } from "@stellar/stellar-sdk";
 import { NETWORK } from "@/config";
 import type { OrderIntent } from "./order-intent";
 
-const APP_DOMAIN = "kryon.perps";
+const APP_DOMAIN = "floydex.perps";
 const MAX_U64 = (1n << 64n) - 1n;
 
 export interface SignedOrderPayload {
