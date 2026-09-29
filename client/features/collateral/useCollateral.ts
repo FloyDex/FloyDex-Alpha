@@ -5,9 +5,8 @@
 // account bar, the portfolio table and the deposit dialog cannot disagree.
 
 import { useQuery } from "@tanstack/react-query";
-import { getBalance, getTokenBalance } from "@/lib/stellar/contracts";
-import { getOraclePrice } from "@/lib/stellar/oracle";
-import { listVaultCollateral, type ListedCollateral } from "@/lib/stellar/collateral";
+import { getBalance, getTokenBalance, listVaultCollateral } from "@/lib/solana/vault";
+import type { ListedCollateral } from "@/lib/stellar/collateral";
 import { amountToHuman } from "@/lib/format";
 import { PRICE_PRECISION } from "@/config";
 
@@ -55,11 +54,9 @@ export function useCollateral(address: string | null | undefined) {
           const [raw, wallet, price] = await Promise.all([
             getBalance(address!, asset.contract),
             getTokenBalance(address!, asset.contract).catch(() => 0n),
-            getOraclePrice(asset.oracleSymbol).catch(() => null),
+            Promise.resolve(asset.settlement ? PRICE_PRECISION : 0n),
           ]);
-          // A missing price shows as zero value rather than crashing the table,
-          // and is never treated as free margin.
-          const px = price?.price ?? 0n;
+          const px = price ?? 0n;
           const value = toUsd(raw, px);
           return {
             ...asset,

@@ -23,7 +23,7 @@ export function NetworkToggle({ className = "" }: { className?: string }) {
     <div
       role="group"
       aria-label="Network"
-      className={`flex items-center gap-[2px] rounded-[7px] border border-[#2A2A31] bg-[#19191A] p-[2px] ${className}`}
+      className={`flex items-center gap-[2px] rounded-[7px] border border-[#1A2A26] bg-[#070B0A] p-[2px] ${className}`}
     >
       {NETWORK_IDS.map((id) => {
         const active = id === network;
@@ -42,7 +42,7 @@ export function NetworkToggle({ className = "" }: { className?: string }) {
             onClick={() => switchNetwork(id)}
             title={active ? `Connected to ${cfg.label}` : `Switch to ${cfg.label}`}
             className={`flex items-center gap-[6px] rounded-[5px] px-[9px] py-[5px] text-[12px] font-medium transition-colors disabled:cursor-wait ${
-              active ? "" : "text-[#a3a3a3] hover:bg-[#212128] hover:text-[#f5f5f5]"
+              active ? "" : "text-[#a3a3a3] hover:bg-[#0E1614] hover:text-[#f5f5f5]"
             }`}
             style={
               active

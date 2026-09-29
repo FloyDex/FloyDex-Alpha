@@ -46,8 +46,8 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-24px)] rounded-[12px] border border-[#2A2A31] bg-[#212128] shadow-[0_20px_40px_rgba(0,0,0,.6)] z-50 overflow-hidden">
-          <div className="flex items-center justify-between border-b border-[#2A2A31] px-4 py-3">
+        <div className="absolute right-0 top-full mt-2 w-[340px] max-w-[calc(100vw-24px)] rounded-[12px] border border-[#1A2A26] bg-[#0E1614] shadow-[0_20px_40px_rgba(0,0,0,.6)] z-50 overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[#1A2A26] px-4 py-3">
             <span className="text-[13px] font-semibold text-[#f5f5f5]">Notifications</span>
             {unread > 0 && (
               <button
@@ -64,10 +64,10 @@ export function NotificationBell() {
                 No notifications yet
               </div>
             ) : (
-              <div className="divide-y divide-[#2A2A31]">
+              <div className="divide-y divide-[#1A2A26]">
                 {notifications.map((n) => (
-                  <div key={n.id} className="flex gap-3 px-4 py-3 hover:bg-[#19191A] transition-colors">
-                    <div className="flex w-8 h-8 shrink-0 items-center justify-center rounded-full bg-[#19191A] text-[#a3a3a3]">
+                  <div key={n.id} className="flex gap-3 px-4 py-3 hover:bg-[#070B0A] transition-colors">
+                    <div className="flex w-8 h-8 shrink-0 items-center justify-center rounded-full bg-[#070B0A] text-[#a3a3a3]">
                       <Bell size={14} />
                     </div>
                     <div className="min-w-0 flex-1">
