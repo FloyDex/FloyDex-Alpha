@@ -107,7 +107,7 @@ function computeContractId(deployerPubkey: string, salt: Buffer): string {
 async function main() {
   const secret = process.env.ORACLE_PUBLISHER_SECRET;
   if (!secret) {
-    console.error("❌  ORACLE_PUBLISHER_SECRET is not set in .env.local");
+    console.error("❌  ORACLE_PUBLISHER_SECRET is not set in .env");
     process.exit(1);
   }
 
@@ -116,7 +116,7 @@ async function main() {
   const server = new sorobanRpc.Server(RPC_URL);
 
   console.log("═══════════════════════════════════════════════════════");
-  console.log("  Kryon Oracle Redeployment");
+  console.log("  FloyDex Oracle Redeployment");
   console.log("═══════════════════════════════════════════════════════");
   console.log(`  Admin / Publisher : ${pubkey}`);
   console.log(`  WASM hash         : ${WASM_HASH}`);

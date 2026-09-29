@@ -21,7 +21,7 @@
  * DRY RUN BY DEFAULT. Nothing is submitted without `--execute`.
  *
  * Usage:
- *   DEPLOY_STATE_PATH=../kryon-protocol/infra/deploy/testnet-deployment-v3.json \
+ *   DEPLOY_STATE_PATH=../floydex-protocol/infra/deploy/testnet-deployment-v3.json \
  *   PROTOCOL_ADMIN_SECRET=S... npx tsx scripts/upgrade-contracts.ts
  *
  *   ... --execute            actually submit
@@ -55,7 +55,7 @@ const ONLY = args.filter((a) => a.startsWith("--only=")).map((a) => a.split("=")
 
 const ARTIFACTS = path.resolve(
   process.env.ARTIFACTS_DIR ??
-    "../kryon-protocol/target/wasm32v1-none/release/deploy"
+    "../floydex-protocol/target/wasm32v1-none/release/deploy"
 );
 
 const server = new sorobanRpc.Server(NETWORK.rpcUrl);

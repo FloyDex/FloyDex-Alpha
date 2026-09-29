@@ -75,7 +75,7 @@ const STATE_PATH = process.env.MARKETS_STATE_PATH
   ? path.resolve(process.env.MARKETS_STATE_PATH)
   : path.resolve(
       __dirname,
-      `../../kryon-protocol/infra/deploy/${NETWORK.name}-markets.json`
+      `../../floydex-protocol/infra/deploy/${NETWORK.name}-markets.json`
     );
 
 // ── args ──────────────────────────────────────────────────────────────────────
@@ -346,7 +346,7 @@ function emitGovernance(calls: GovCall[], minDelaySecs: number) {
 
   const file = path.resolve(
     __dirname,
-    `../../kryon-protocol/infra/deploy/${NETWORK.name}-market-proposals.json`
+    `../../floydex-protocol/infra/deploy/${NETWORK.name}-market-proposals.json`
   );
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({
@@ -479,7 +479,7 @@ async function main() {
   const server = new sorobanRpc.Server(NETWORK.rpcUrl);
 
   console.log("════════════════════════════════════════════════");
-  console.log("  KRYON — MARKET REGISTRATION");
+  console.log("  FLOYDEX — MARKET REGISTRATION");
   console.log(`  network : ${NETWORK.name}`);
   console.log(`  engine  : ${CONTRACTS.engine}`);
   console.log(`  oracle  : ${CONTRACTS.oracleAdapter}`);

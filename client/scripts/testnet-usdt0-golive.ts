@@ -156,7 +156,7 @@ async function main() {
   console.log(
     `\n─────────────────────────────────────────────────────────────\n` +
     `  Redeploy done. Before continuing:\n\n` +
-    `   1. Update the contract addresses in client/.env.local and every\n` +
+    `   1. Update the contract addresses in the repo-root .env and every\n` +
     `      keeper env from redeploy-core.ts's output.\n` +
     `   2. Restart the keepers with:\n` +
     `        ORACLE_PUBLISH_USDT0=true\n` +

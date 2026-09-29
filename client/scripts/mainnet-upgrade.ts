@@ -35,9 +35,9 @@ import {
 const PASS = "Public Global Stellar Network ; September 2015";
 const RPC = process.env.MAINNET_RPC_URL ?? "https://mainnet.sorobanrpc.com";
 const HORIZON = "https://horizon.stellar.org";
-const ARTIFACTS = path.resolve(__dirname, "../../kryon-protocol/target/wasm32v1-none/release/deploy");
+const ARTIFACTS = path.resolve(__dirname, "../../floydex-protocol/target/wasm32v1-none/release/deploy");
 const STATE = process.env.DEPLOY_STATE_PATH
-  ?? path.resolve(__dirname, "../../kryon-protocol/infra/deploy/mainnet-deployment-v2.json");
+  ?? path.resolve(__dirname, "../../floydex-protocol/infra/deploy/mainnet-deployment-v2.json");
 
 const GO = process.argv.includes("--go");
 const ACCEPT_KEYPAIR_ADMIN = process.argv.includes("--i-accept-keypair-admin");

@@ -153,7 +153,7 @@ async function indexMarket(
 async function run() {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
-    console.error("❌  DATABASE_URL is not set in your .env.local");
+    console.error("❌  DATABASE_URL is not set in your .env");
     process.exit(1);
   }
 

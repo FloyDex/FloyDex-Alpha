@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * testnet-deploy.ts — one-shot, resume-safe Kryon TESTNET deployment.
+ * testnet-deploy.ts — one-shot, resume-safe FloyDex TESTNET deployment.
  *
  * Adapted from mainnet-deploy.ts (same WASM artifacts — Soroban bytecode is
  * network-agnostic, only the deployed address and signing passphrase differ).
@@ -55,7 +55,7 @@ const FEE = "2000000";
 // .env.testnet.example / config/networks.ts TESTNET_DEFAULTS.
 const USDC_CONTRACT = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
 
-const PROTO = path.resolve(__dirname, "../../kryon-protocol");
+const PROTO = path.resolve(__dirname, "../../floydex-protocol");
 const ARTIFACTS = path.join(PROTO, "target/wasm32v1-none/release/deploy");
 // Overridable so a fresh deployment does not resume into (and skip past) an
 // earlier one's checkpoints — rerunning against a completed state file would
@@ -234,7 +234,7 @@ async function main() {
   const mark = (k: string) => { state.steps![k] = true; saveState(state); };
 
   console.log("════════════════════════════════════════════════");
-  console.log("  KRYON TESTNET DEPLOYMENT (fresh, v2)");
+  console.log("  FLOYDEX TESTNET DEPLOYMENT (fresh, v2)");
   console.log(`  deployer: ${admin}`);
   console.log(`  dry-run : ${DRY}`);
   console.log("════════════════════════════════════════════════\n");
@@ -390,7 +390,7 @@ async function main() {
   const order = ["perp_oracle_adapter", "perp_vault", "perp_risk", "perp_engine",
                  "perp_order_gateway", "perp_insurance", "perp_liquidation", "perp_governance"];
 
-  const saltFor = (name: string) => crypto.createHash("sha256").update(`kryon-testnet-v2:${name}`).digest();
+  const saltFor = (name: string) => crypto.createHash("sha256").update(`floydex-testnet-v2:${name}`).digest();
   const predictedId = (name: string) => {
     const preimage = xdr.HashIdPreimage.envelopeTypeContractId(
       new xdr.HashIdPreimageContractId({

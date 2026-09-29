@@ -144,7 +144,7 @@ async function main() {
   console.log(`
 ✓ Mock USDT0 live on testnet.
 
-  Add to client/.env.local (and the keeper's env):
+  Add to the repo-root .env (and the keeper's env):
 
     NEXT_PUBLIC_ASSET_USDT0=${sacAddress}
     NEXT_PUBLIC_USDT0_ISSUER=${issuer.publicKey()}

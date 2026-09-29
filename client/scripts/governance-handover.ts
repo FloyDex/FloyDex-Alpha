@@ -112,7 +112,7 @@ let simSeq = 100;
 /** Deterministic proposal id, so phase 2 can find what phase 1 queued. */
 function proposalId(contractName: string): Buffer {
   return createHash("sha256")
-    .update(`kryon:handover:${NETWORK.name}:${contractName}`)
+    .update(`floydex:handover:${NETWORK.name}:${contractName}`)
     .digest();
 }
 

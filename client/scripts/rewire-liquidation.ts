@@ -10,7 +10,7 @@
  *
  * Usage:
  *   NEW_LIQUIDATION=C... NEW_INSURANCE=C... \
- *     npx tsx --env-file=.env.local scripts/rewire-liquidation.ts
+ *     npx tsx --env-file=../.env scripts/rewire-liquidation.ts
  *
  * Optional env:
  *   INSURANCE_SEED_UNITS   USDC stroops (7 dp) to seed, default 5e9 (=500 USDC)
@@ -197,7 +197,7 @@ async function main() {
   }
 
   console.log("\n✓ Rewire complete. Next: update NEXT_PUBLIC_CONTRACT_{LIQUIDATION,INSURANCE}");
-  console.log("  everywhere (.env.local local+VM, config default, render.yaml, manifests,");
+  console.log("  everywhere (repo-root .env local+VM, config default, render.yaml, manifests,");
   console.log("  GitHub production vars), restart services, then run:");
   console.log("  STRESS_SCENARIOS=b npm run dev:stress");
 }

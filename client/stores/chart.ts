@@ -9,7 +9,7 @@ const DEFAULT_INDICATORS: IndicatorConfig[] = [
 ]
 
 // Timeframe and chart type are PER MARKET. They used to be two global values
-// under `kryon-chart-v1`, so opening a 1m view on TRX silently reset the 4h
+// under `floydex-chart-v1`, so opening a 1m view on TRX silently reset the 4h
 // view you had on BTC. Drawing tools, price mode and indicators stay global —
 // those are workspace preferences, not per-market view state.
 interface PerMarketView {
@@ -78,7 +78,7 @@ export const useChartStore = create<ChartStore>()(
       // v2: the persisted shape changed from two globals (timeframe, chartType)
       // to a per-market `views` map. A new key rather than a migration — the
       // old value carried no information worth preserving beyond a default.
-      name: 'kryon-chart-v2',
+      name: 'floydex-chart-v2',
     }
   )
 )

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
  * Keeper refill — converts protocol USDC revenue into XLM and tops up the
- * keeper wallets that pay Kryon's on-chain fees.
+ * keeper wallets that pay FloyDex's on-chain fees.
  *
  * Why this exists: the protocol earns fees in USDC but spends XLM. Nothing
  * connects the two, so the oracle keeper, matcher, liquidator and TTL keeper
@@ -105,7 +105,7 @@ async function main() {
   const server = new Horizon.Server(NETWORK.horizonUrl);
   const usdc = new Asset("USDC", ASSETS.usdcIssuer);
 
-  console.log(`Kryon keeper refill — ${EXECUTE ? "\x1b[31mEXECUTE\x1b[0m" : "dry run"}`);
+  console.log(`FloyDex keeper refill — ${EXECUTE ? "\x1b[31mEXECUTE\x1b[0m" : "dry run"}`);
   console.log(`  Network : ${NETWORK.name}`);
   console.log(`  Source  : ${sourceKp.publicKey()}`);
   console.log(`  Policy  : top up below ${KEEPER_XLM_FLOOR} XLM, up to ${KEEPER_XLM_TARGET} XLM\n`);

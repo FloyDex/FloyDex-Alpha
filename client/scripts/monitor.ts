@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Monitor — checks liveness of all Kryon testnet services every 30s.
+ * Monitor — checks liveness of all FloyDex testnet services every 30s.
  *
  * Checks:
  *   - Oracle freshness (last on-chain price age)
@@ -439,17 +439,17 @@ async function processAlerts(results: CheckResult[]): Promise<void> {
     if (!r.ok) {
       if (!prev?.failing) {
         alertStates.set(r.name, { failing: true, since: now, lastAlertAt: now, lastDetail: r.detail });
-        await postAlert(`🔴 **Kryon ${r.name}** failing: ${r.detail}`);
+        await postAlert(`🔴 **FloyDex ${r.name}** failing: ${r.detail}`);
       } else if (now - prev.lastAlertAt >= ALERT_REMINDER_MS) {
         prev.lastAlertAt = now;
         prev.lastDetail = r.detail;
-        await postAlert(`🔁 **Kryon ${r.name}** still failing after ${fmtDuration(now - prev.since)}: ${r.detail}`);
+        await postAlert(`🔁 **FloyDex ${r.name}** still failing after ${fmtDuration(now - prev.since)}: ${r.detail}`);
       } else {
         prev.lastDetail = r.detail;
       }
     } else if (prev?.failing) {
       alertStates.delete(r.name);
-      await postAlert(`🟢 **Kryon ${r.name}** recovered after ${fmtDuration(now - prev.since)} (${r.detail})`);
+      await postAlert(`🟢 **FloyDex ${r.name}** recovered after ${fmtDuration(now - prev.since)} (${r.detail})`);
     }
   }
 }
@@ -491,7 +491,7 @@ async function runChecks() {
   await processAlerts(results);
 }
 
-console.log(`✓ Kryon monitor starting`);
+console.log(`✓ FloyDex monitor starting`);
 console.log(`  App : ${APP_URL}`);
 console.log(`  WS  : ${WS_URL}`);
 console.log(`  Interval: ${CHECK_INTERVAL_MS / 1000}s`);

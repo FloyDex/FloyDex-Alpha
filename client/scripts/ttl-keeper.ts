@@ -32,7 +32,7 @@
  *   funded key can pay to extend anyone's TTL)
  *
  * Recommended cron (VM, once daily, no persistent process needed):
- *   0 6 * * * cd ~/kryon/client && DATABASE_URL= TTL_KEEPER_SECRET=$(grep LIQUIDATOR_SECRET .env.local | cut -d= -f2) npx tsx scripts/ttl-keeper.ts >> ~/kryon/ttl-keeper.log 2>&1
+ *   0 6 * * * cd ~/floydex/client && DATABASE_URL= TTL_KEEPER_SECRET=$(grep LIQUIDATOR_SECRET ../.env | cut -d= -f2) npx tsx --env-file=../.env scripts/ttl-keeper.ts >> ~/floydex/ttl-keeper.log 2>&1
  */
 
 import fs from "fs";
@@ -93,7 +93,7 @@ function loadWasmHashes(): Record<string, string> {
   // rehearsal-only so a missing file there just means "skip code entries".
   const jsonPath = path.join(
     __dirname,
-    "../../kryon-protocol/infra/deploy/mainnet-deployment.json"
+    "../../floydex-protocol/infra/deploy/mainnet-deployment.json"
   );
   if (NETWORK.name !== "mainnet" || !fs.existsSync(jsonPath)) return {};
   const data = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));

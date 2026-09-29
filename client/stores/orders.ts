@@ -14,7 +14,7 @@ import { ACTIVE_NETWORK_ID } from "@/config";
  * orders (with mainnet nonces, against mainnet contracts) inside a testnet
  * session. Namespacing the key gives each venue its own list.
  */
-const STORAGE_KEY = `kryon-orders:${ACTIVE_NETWORK_ID}`;
+const STORAGE_KEY = `floydex-orders:${ACTIVE_NETWORK_ID}`;
 
 const bigIntStorage = createJSONStorage(() => localStorage, {
   replacer: (_key, value) => (typeof value === "bigint" ? `__bigint__${value}` : value),

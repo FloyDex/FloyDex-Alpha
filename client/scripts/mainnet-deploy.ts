@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 /**
- * mainnet-deploy.ts — one-shot, resume-safe Kryon mainnet deployment.
+ * mainnet-deploy.ts — one-shot, resume-safe FloyDex mainnet deployment.
  *
  * Mirrors the testnet-proven flows (redeploy-core.ts, redeploy-oracle.ts,
  * rewire-liquidation.ts) plus the 2026-07-07 testnet dress rehearsal of the
- * exact artifacts in kryon-protocol/target/wasm32v1-none/release/deploy/.
+ * exact artifacts in floydex-protocol/target/wasm32v1-none/release/deploy/.
  *
  * Every step checkpoints to infra/deploy/mainnet-deployment.json; rerunning
  * skips completed steps, so a crash never repeats a paid upload.
@@ -52,7 +52,7 @@ const FEE = "2000000"; // 0.2 XLM max inclusion for invokes
 // Canonical mainnet assets (derived + verified live 2026-07-07)
 const USDC_CONTRACT = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75";
 
-const PROTO = path.resolve(__dirname, "../../kryon-protocol");
+const PROTO = path.resolve(__dirname, "../../floydex-protocol");
 const ARTIFACTS = path.join(PROTO, "target/wasm32v1-none/release/deploy");
 // Overridable so a new deployment does not resume into a completed one's
 // checkpoints and silently skip every step.
@@ -229,7 +229,7 @@ async function main() {
   const mark = (k: string) => { state.steps![k] = true; saveState(state); };
 
   console.log("════════════════════════════════════════════════");
-  console.log("  KRYON MAINNET DEPLOYMENT");
+  console.log("  FLOYDEX MAINNET DEPLOYMENT");
   console.log(`  deployer: ${admin}`);
   console.log(`  dry-run : ${DRY}`);
   console.log("════════════════════════════════════════════════\n");
@@ -376,7 +376,7 @@ async function main() {
   // Deterministic salt per contract → deterministic instance id, so a retry
   // after an ambiguous timeout can detect a landed deploy instead of creating
   // a duplicate instance.
-  const saltFor = (name: string) => crypto.createHash("sha256").update(`kryon-mainnet-v1:${name}`).digest();
+  const saltFor = (name: string) => crypto.createHash("sha256").update(`floydex-mainnet-v1:${name}`).digest();
   const predictedId = (name: string) => {
     const preimage = xdr.HashIdPreimage.envelopeTypeContractId(
       new xdr.HashIdPreimageContractId({

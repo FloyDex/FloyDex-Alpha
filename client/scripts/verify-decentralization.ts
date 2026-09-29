@@ -5,7 +5,7 @@
  *
  * Run AFTER `transfer-admin-to-governance.ts execute` (timelock permitting):
  *
- *   ADMIN_SECRET=S... npx tsx --env-file=.env.local scripts/verify-decentralization.ts
+ *   ADMIN_SECRET=S... npx tsx --env-file=../.env scripts/verify-decentralization.ts
  *
  * Checks per contract (simulation only — nothing is submitted on-chain
  * except the governance pause/unpause drill):

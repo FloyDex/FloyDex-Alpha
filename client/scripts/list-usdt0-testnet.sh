@@ -2,7 +2,7 @@
 #
 # list-usdt0-testnet.sh — list the mock USDT0 on the LIVE testnet vault
 # (CCFVY4IS…, the one with user traction), so it appears in the deposit dialog
-# on kryonprotocol.live's testnet toggle.
+# on floydexprotocol.live's testnet toggle.
 #
 # Everything except the keys is filled in here, because getting any of it wrong
 # is silent: a mismatched publisher makes every write_price Unauthorized, and a

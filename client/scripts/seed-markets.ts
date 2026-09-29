@@ -9,7 +9,7 @@
  * and that column can only ever be populated by state-indexer.ts's poll loop
  * if the row already exists.
  *
- * Found missing entirely on mainnet 2026-07-08: the "kryon_mainnet" database
+ * Found missing entirely on mainnet 2026-07-08: the "floydex_mainnet" database
  * was created fresh (psql CREATE DATABASE + prisma migrate deploy) but no
  * step ever ran an initial INSERT — migrations create the schema, not data.
  * Every resting limit order silently sat unmatched forever as a result.

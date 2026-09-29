@@ -24,10 +24,26 @@ interface MarketState {
   // 24h ticker data by marketId, sourced from the configured external market feed.
   priceChangePct: Record<number, number>;
   setPriceChangePct: (marketId: number, pct: number) => void;
-  ticker24h: Record<number, { highPrice: bigint; lowPrice: bigint; changePct: number }>;
+  ticker24h: Record<number, {
+    highPrice: number;
+    lowPrice: number;
+    changePct: number;
+    volumeUsd: number;
+    volume?: number;
+    openInterestUsd: number;
+    fundingRate?: number;
+  }>;
   setTicker24h: (
     marketId: number,
-    ticker: { highPrice: bigint; lowPrice: bigint; changePct: number }
+    ticker: {
+      highPrice: number;
+      lowPrice: number;
+      changePct: number;
+      volumeUsd: number;
+      volume?: number;
+      openInterestUsd: number;
+      fundingRate?: number;
+    }
   ) => void;
 
   // WebSocket connection status

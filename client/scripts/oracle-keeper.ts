@@ -232,7 +232,7 @@ async function run() {
   const secret = process.env.ORACLE_PUBLISHER_SECRET;
   if (!secret && !DRY_RUN) {
     console.error("❌  ORACLE_PUBLISHER_SECRET is not set.");
-    console.error("    Add ORACLE_PUBLISHER_SECRET=S... to your .env.local");
+    console.error("    Add ORACLE_PUBLISHER_SECRET=S... to your .env");
     process.exit(1);
   }
 

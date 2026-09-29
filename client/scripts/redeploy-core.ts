@@ -199,7 +199,7 @@ async function main() {
   const server = new sorobanRpc.Server(RPC_URL);
 
   console.log("═══════════════════════════════════════════════════════");
-  console.log("  Kryon Core Contract Redeployment");
+  console.log("  FloyDex Core Contract Redeployment");
   console.log("═══════════════════════════════════════════════════════");
   console.log(`  Admin    : ${admin}`);
   console.log(`  Oracle   : ${ORACLE_ADAPTER} (existing)`);
