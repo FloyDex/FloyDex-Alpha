@@ -1,12 +1,12 @@
 //! Compute-unit benchmark for `protocol_core::mul_div` inside SBF.
 //!
 //! Build the bench binary first:
-//!   cargo build-sbf --manifest-path programs/kryon-perps/Cargo.toml \
+//!   cargo build-sbf --manifest-path programs/floydex-perps/Cargo.toml \
 //!     --features bench --sbf-out-dir target/deploy-bench
 //! then: cargo test --manifest-path integration/Cargo.toml --test bench -- --nocapture
 
 use anchor_lang::{InstructionData, ToAccountMetas};
-use kryon_integration::svm_with_program;
+use floydex_integration::svm_with_program;
 use litesvm::LiteSVM;
 use solana_keypair::Keypair;
 use solana_message::Message;
@@ -17,8 +17,8 @@ const P: i128 = 1_000_000_000_000_000_000;
 
 fn run(svm: &mut LiteSVM, payer: &Keypair, data: Vec<u8>) -> (Vec<String>, u64) {
     let ix = anchor_lang::solana_program::instruction::Instruction {
-        program_id: kryon_perps::ID,
-        accounts: kryon_perps::accounts::Bench {}.to_account_metas(None),
+        program_id: floydex_perps::ID,
+        accounts: floydex_perps::accounts::Bench {}.to_account_metas(None),
         data,
     };
     // ComputeBudget SetComputeUnitLimit(1_400_000): tag 2 + u32 LE.
@@ -55,7 +55,7 @@ fn mul_div_compute_units() {
         ("near i128 limit /1e18", i128::MAX / 3, 2 * P, P),
     ];
     for (name, a, b, d) in cases {
-        let i256 = kryon_perps::instruction::BenchMulDiv {
+        let i256 = floydex_perps::instruction::BenchMulDiv {
             a,
             b,
             denominator: d,

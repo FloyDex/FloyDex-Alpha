@@ -2,14 +2,14 @@
 //! scaled-UI multiplier in valuation, and the extra haircut while the
 //! underlying's market is closed (`06` §6–7, `07` §6).
 
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_signer::Signer;
 
 const FEED_X: [u8; 32] = [0x42; 32];
 const XU: u64 = 100_000_000; // 8 decimals
 
-fn list(w: &mut World, mint: Pubkey, p: kryon_perps::CollateralParams) -> TxResult {
+fn list(w: &mut World, mint: Pubkey, p: floydex_perps::CollateralParams) -> TxResult {
     let i = w.add_collateral_ix(&mint, spl_token_2022::ID, p);
     w.admin_send(&[i])
 }
@@ -37,7 +37,7 @@ fn issuer_controls_and_accounting_breakers_are_refused() {
         let mint = crafted_mint(&mut w.svm, &admin, 8, &[(ty, vec![0; len])]);
         assert_err(
             list(&mut w, mint, xstock_params(FEED_X, 1_000)),
-            KryonError::UnsupportedMintExtension,
+            FloyDexError::UnsupportedMintExtension,
         );
     }
     // A scaled-UI mint with metadata, as xStocks ship, is accepted.
@@ -58,14 +58,14 @@ fn closed_haircut_config_is_validated() {
     let mut p = xstock_params(FEED_X, 9_500);
     p.closed_haircut_bps = 600; // 95% + 6% > 100%
     let m = crafted_mint(&mut w.svm, &admin, 8, &[]);
-    assert_err(list(&mut w, m, p.clone()), KryonError::InvalidConfig);
+    assert_err(list(&mut w, m, p.clone()), FloyDexError::InvalidConfig);
     let mut p = xstock_params(FEED_X, 1_000);
     p.max_closed_age_secs = 60; // must exceed the fresh age (70)
     let m = crafted_mint(&mut w.svm, &admin, 8, &[]);
-    assert_err(list(&mut w, m, p.clone()), KryonError::InvalidConfig);
+    assert_err(list(&mut w, m, p.clone()), FloyDexError::InvalidConfig);
     p.max_closed_age_secs = 6 * 86_400; // over the 5-day ceiling
     let m = crafted_mint(&mut w.svm, &admin, 8, &[]);
-    assert_err(list(&mut w, m, p), KryonError::InvalidConfig);
+    assert_err(list(&mut w, m, p), FloyDexError::InvalidConfig);
 }
 
 /// A trader holding 10 xStock tokens of `mint` (priced $100) and long
@@ -124,7 +124,7 @@ fn the_scaled_ui_multiplier_values_each_raw_token() {
     let r = risk(&mut w, &x, tsla, 0);
     assert_err(
         w.withdraw(&t, &x, &wallet, 7 * XU + XU / 2 + 1, r.clone()),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     assert_ok(w.withdraw(&t, &x, &wallet, 7 * XU + XU / 2, r));
     assert_eq!(token_balance(&w.svm, &wallet), 7 * XU + XU / 2);
@@ -139,7 +139,7 @@ fn a_scheduled_split_takes_effect_at_its_timestamp() {
     let r = risk(&mut w, &x, tsla, 0);
     assert_err(
         w.withdraw(&t, &x, &wallet, 5 * XU + 1, r.clone()),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     // After the split the same raw balance is worth twice as much.
     w.warp_to(at);
@@ -158,12 +158,12 @@ fn a_closed_market_price_is_used_with_the_extra_haircut_until_it_is_too_old() {
     let r = risk(&mut w, &x, tsla, 2 * 86_400);
     assert_err(
         w.withdraw(&t, &x, &wallet, 4 * XU + 1, r.clone()),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     assert_ok(w.withdraw(&t, &x, &wallet, 4 * XU, r));
     // Five days old: too old to value at all.
     let r = risk(&mut w, &x, tsla, 5 * 86_400);
-    assert_err(w.withdraw(&t, &x, &wallet, 1, r), KryonError::StaleOracle);
+    assert_err(w.withdraw(&t, &x, &wallet, 1, r), FloyDexError::StaleOracle);
 }
 
 #[test]
@@ -180,6 +180,6 @@ fn the_mint_account_must_match_the_collateral() {
     r[n - 1] = meta(other, false);
     assert_err(
         w.withdraw(&t, &x, &wallet, XU, r),
-        KryonError::InvalidRemainingAccounts,
+        FloyDexError::InvalidRemainingAccounts,
     );
 }

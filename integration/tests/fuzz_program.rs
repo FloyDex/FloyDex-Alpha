@@ -15,8 +15,8 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
@@ -54,20 +54,20 @@ struct Fuzz {
     stats: [u32; 10],
 }
 
-const OK_REFUSALS: &[KryonError] = &[
-    KryonError::InsufficientCollateral,
-    KryonError::OpenInterestExceeded,
-    KryonError::SessionExposureBlocked,
-    KryonError::LiquidatableReduceOffMark,
-    KryonError::NotLiquidatable,
-    KryonError::NoBadDebtToOffset,
-    KryonError::PositionNotInProfit,
-    KryonError::PostMarkTooSoon,
-    KryonError::InsufficientShares,
-    KryonError::UnstakePending,
-    KryonError::UnstakeLocked,
-    KryonError::NoPendingUnstake,
-    KryonError::PositionNotFound,
+const OK_REFUSALS: &[FloyDexError] = &[
+    FloyDexError::InsufficientCollateral,
+    FloyDexError::OpenInterestExceeded,
+    FloyDexError::SessionExposureBlocked,
+    FloyDexError::LiquidatableReduceOffMark,
+    FloyDexError::NotLiquidatable,
+    FloyDexError::NoBadDebtToOffset,
+    FloyDexError::PositionNotInProfit,
+    FloyDexError::PostMarkTooSoon,
+    FloyDexError::InsufficientShares,
+    FloyDexError::UnstakePending,
+    FloyDexError::UnstakeLocked,
+    FloyDexError::NoPendingUnstake,
+    FloyDexError::PositionNotFound,
 ];
 
 /// Ok, or refused with an error the rules allow. Anything else fails the run.
@@ -425,7 +425,7 @@ impl Fuzz {
         for (pda, size) in &self.records {
             if let Some(acc) = self.w.svm.get_account(pda) {
                 if acc.lamports > 0 {
-                    let r: kryon_perps::state::OrderRecord = fetch(&self.w.svm, pda);
+                    let r: floydex_perps::state::OrderRecord = fetch(&self.w.svm, pda);
                     assert!(r.filled <= *size, "filled {} > size {}", r.filled, size);
                 }
             }
