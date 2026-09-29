@@ -12,15 +12,15 @@ import { ACTIVE_MARKET_SYMBOLS, DEFAULT_MARKET_SYMBOL } from '@/config';
 import { useNetwork } from '@/features/network/NetworkContext';
 import { STAKE_PUBLIC } from '@/lib/market/stake';
 
+const GITHUB_REPO = 'https://github.com/FloyDex/FloyDex-Alpha';
+
 const LANDING_NAV = [
   { to: `/trade/${DEFAULT_MARKET_SYMBOL}`, label: 'Trade' },
+  { to: '/markets', label: 'Markets' },
   { to: '/portfolio', label: 'Portfolio' },
   ...(STAKE_PUBLIC ? [{ to: '/stake', label: 'Stake' }] : []),
   { to: '/leaderboard', label: 'Leaderboard' },
-  // Docs is a static Docusaurus build served from this same deployment at /docs.
-  // Use a plain anchor (hardNav) so it does a real navigation to the static site
-  // instead of client-side routing — there is no /docs route in the Next app.
-  { to: '/docs', label: 'Docs', hardNav: true },
+  { to: GITHUB_REPO, label: 'Docs', hardNav: true },
 ];
 
 const SYSTEM_STATUS = [
@@ -426,7 +426,14 @@ export function LandingPage() {
                 <button className="s5-menu-close" onClick={() => setMenuOpen(false)}>✕</button>
                 {LANDING_NAV.map(n => (
                   n.hardNav ? (
-                    <a key={n.to} href={n.to} className="s5-menu-nav-link" onClick={() => setMenuOpen(false)}>
+                    <a
+                      key={n.to}
+                      href={n.to}
+                      className="s5-menu-nav-link"
+                      target={n.to.startsWith('http') ? '_blank' : undefined}
+                      rel={n.to.startsWith('http') ? 'noopener noreferrer' : undefined}
+                      onClick={() => setMenuOpen(false)}
+                    >
                       {n.label}
                     </a>
                   ) : (
@@ -658,11 +665,18 @@ export function LandingPage() {
                 <h3 className="s5-footer-col-h">Platform</h3>
                 <ul className="s5-footer-col-list">
                   <li><span className="s5-footer-col-arrow">↳</span><Link href={`/trade/${DEFAULT_MARKET_SYMBOL}`} className="text-inherit">Trade</Link></li>
+                  <li><span className="s5-footer-col-arrow">↳</span><Link href="/markets" className="text-inherit">Markets</Link></li>
                   <li><span className="s5-footer-col-arrow">↳</span><Link href="/portfolio" className="text-inherit">Portfolio</Link></li>
                   {STAKE_PUBLIC ? (
                     <li><span className="s5-footer-col-arrow">↳</span><Link href="/stake" className="text-inherit">Stake</Link></li>
                   ) : null}
                   <li><span className="s5-footer-col-arrow">↳</span><Link href="/leaderboard" className="text-inherit">Leaderboard</Link></li>
+                  <li>
+                    <span className="s5-footer-col-arrow">↳</span>
+                    <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="text-inherit">
+                      Docs
+                    </a>
+                  </li>
                 </ul>
               </div>
               <div>

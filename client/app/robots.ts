@@ -7,5 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: ["/admin/", "/api/admin/"],
     },
+    host: "https://floydex.com",
+    sitemap: "https://floydex.com/sitemap.xml",
   };
 }

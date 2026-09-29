@@ -1,6 +1,7 @@
 # FloyDex: context for coding agents
 
-**Repo:** https://github.com/FloyDex/FloyDex-Alpha
+**Repo:** https://github.com/FloyDex/FloyDex-Alpha  
+**Website:** https://floydex.com
 
 Solana-native tokenized-stock perps. Hybrid CLOB: off-chain matching, on-chain
 settlement of user-signed intents, one Anchor program.

@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/FloyDex/FloyDex-Alpha.git"
   },
-  "homepage": "https://github.com/FloyDex/FloyDex-Alpha",
+  "homepage": "https://floydex.com",
   "scripts": {
     "build": "RUSTUP_TOOLCHAIN=1.96.1 anchor build",
     "build:bench": "cargo build-sbf --manifest-path programs/floydex-perps/Cargo.toml --features bench --sbf-out-dir target/deploy-bench",

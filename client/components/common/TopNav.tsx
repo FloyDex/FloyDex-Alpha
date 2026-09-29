@@ -14,12 +14,16 @@ import { STAKE_PUBLIC } from "@/lib/market/stake";
 import { DEFAULT_MARKET_SYMBOL } from "@/config";
 import { useTradeSettings } from "@/stores/settings";
 
+const GITHUB_REPO = "https://github.com/FloyDex/FloyDex-Alpha";
+
 const TABS = [
   { label: "Markets", href: "/markets", match: "/markets" },
   { label: "Portfolio", href: "/portfolio", match: "/portfolio" },
   ...(STAKE_PUBLIC ? [{ label: "Stake", href: "/stake", match: "/stake" }] : []),
   { label: "Leaderboard", href: "/leaderboard", match: "/leaderboard" },
 ];
+
+const EXTERNAL_LINKS = [{ label: "Docs", href: GITHUB_REPO }];
 
 export function TopNav() {
   const pathname = usePathname() ?? "";
@@ -75,6 +79,17 @@ export function TopNav() {
                 </Link>
               );
             })}
+            {EXTERNAL_LINKS.map((t) => (
+              <a
+                key={t.label}
+                href={t.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="desk-tab px-3 py-2 text-[13px]"
+              >
+                {t.label}
+              </a>
+            ))}
           </nav>
         </div>
 
@@ -124,6 +139,18 @@ export function TopNav() {
                 </Link>
               );
             })}
+            {EXTERNAL_LINKS.map((t) => (
+              <a
+                key={t.label}
+                href={t.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+                className="block rounded-[8px] px-4 py-3 text-[15px] font-medium text-[#a3a3a3] transition-colors hover:bg-[#070B0A] hover:text-[#f5f5f5]"
+              >
+                {t.label}
+              </a>
+            ))}
             <button
               type="button"
               onClick={() => {

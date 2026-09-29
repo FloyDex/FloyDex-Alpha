@@ -1,6 +1,7 @@
 # FloyDex — Trade desk
 
-Next.js frontend for [FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha):
+Next.js frontend for [FloyDex](https://floydex.com)
+([FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha)):
 Solana-native tokenized-stock perps.
 
 ## Setup

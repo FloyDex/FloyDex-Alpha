@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono"
 export const metadata: Metadata = {
   // `|| fallback` (not ??): an EMPTY NEXT_PUBLIC_APP_URL is defined but makes
   // new URL("") throw ERR_INVALID_URL and kill the whole build.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://floydex.com"),
   title: "FloyDex | Tokenized PerpDex",
   description: "Decentralised perpetual futures on Solana — tokenized-stock and crypto perps, USDC-settled",
   applicationName: "FloyDex",
@@ -33,6 +33,7 @@ export const metadata: Metadata = {
     title: "FloyDex | Tokenized PerpDex",
     description: "Decentralised perpetual futures on Solana",
     siteName: "FloyDex",
+    url: "https://floydex.com",
     images: [{ url: "/icon-512.png", width: 512, height: 512 }],
     type: "website",
   },
