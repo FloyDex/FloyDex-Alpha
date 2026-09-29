@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { NetworkProvider } from "@/features/network/NetworkContext";
+import { SolanaWalletProvider } from "@/features/wallet/SolanaWalletProvider";
 import type { NetworkId } from "@/config";
 import { useState } from "react";
 
@@ -31,12 +32,14 @@ export function Providers({ network, children }: { network: NetworkId; children:
   return (
     <ErrorBoundary>
       <NetworkProvider network={network}>
-        <QueryClientProvider client={client}>
-          <TooltipProvider delay={300}>
-            {children}
-            <Toaster position="bottom-right" theme="dark" />
-          </TooltipProvider>
-        </QueryClientProvider>
+        <SolanaWalletProvider>
+          <QueryClientProvider client={client}>
+            <TooltipProvider delay={300}>
+              {children}
+              <Toaster position="bottom-right" theme="dark" />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </SolanaWalletProvider>
       </NetworkProvider>
     </ErrorBoundary>
   );
