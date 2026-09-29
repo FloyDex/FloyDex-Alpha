@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { get as blobGet, put as blobPut } from "@vercel/blob";
 import { FEE_COLLECTOR, MARKETS, PLATFORM_FEE_BPS } from "@/config";
 import {
   giftClaimDenied,
@@ -106,6 +107,24 @@ interface VenueState {
 }
 
 const FILE = join(process.cwd(), ".data", "venue.json");
+/** Durable ledger path in the connected Vercel Blob store (survives serverless cold starts). */
+const BLOB_PATH = "venue.json";
+
+type VenueGlobal = typeof globalThis & {
+  __floydexVenue?: VenueState;
+  __floydexVenueEtag?: string;
+  __floydexVenueHydrated?: boolean;
+  __floydexVenueHydrate?: Promise<void>;
+  __floydexVenueFlush?: Promise<void>;
+};
+
+function gVenue(): VenueGlobal {
+  return globalThis as VenueGlobal;
+}
+
+function blobConfigured(): boolean {
+  return Boolean(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+}
 
 function empty(owner: string): VenueAccount {
   return {
@@ -216,15 +235,149 @@ export function principalLeft(acct: VenueAccount): number {
   return Math.max(0, (acct.fundedIn ?? 0) - (acct.fundedOut ?? 0));
 }
 
-function load(): VenueState {
-  const g = globalThis as typeof globalThis & { __floydexVenue?: VenueState };
-  if (g.__floydexVenue) return g.__floydexVenue;
+function loadFromDisk(): VenueState {
   try {
-    g.__floydexVenue = JSON.parse(readFileSync(FILE, "utf8")) as VenueState;
+    return JSON.parse(readFileSync(FILE, "utf8")) as VenueState;
   } catch {
-    g.__floydexVenue = { accounts: {} };
+    return { accounts: {} };
   }
+}
+
+function load(): VenueState {
+  const g = gVenue();
+  if (g.__floydexVenue) return g.__floydexVenue;
+  g.__floydexVenue = loadFromDisk();
   return g.__floydexVenue;
+}
+
+/**
+ * Hydrate the in-memory ledger from Blob (production) or disk (local).
+ * Call at the start of every venue API handler before reads/writes.
+ */
+export async function ensureVenueReady(): Promise<void> {
+  const g = gVenue();
+  if (g.__floydexVenueHydrated) return;
+  if (!g.__floydexVenueHydrate) {
+    g.__floydexVenueHydrate = (async () => {
+      if (blobConfigured()) {
+        try {
+          const result = await blobGet(BLOB_PATH, { access: "private", useCache: false });
+          if (result?.statusCode === 200 && result.stream) {
+            const text = await new Response(result.stream).text();
+            g.__floydexVenue = JSON.parse(text) as VenueState;
+            g.__floydexVenueEtag = result.blob.etag;
+            g.__floydexVenueHydrated = true;
+            return;
+          }
+        } catch {
+          /* fall through to disk / empty */
+        }
+      }
+      if (!g.__floydexVenue) g.__floydexVenue = loadFromDisk();
+      g.__floydexVenueHydrated = true;
+    })();
+  }
+  await g.__floydexVenueHydrate;
+}
+
+/** Await any in-flight durable flush (Blob + disk). */
+export async function flushVenue(): Promise<void> {
+  const g = gVenue();
+  if (g.__floydexVenueFlush) await g.__floydexVenueFlush;
+}
+
+async function writeBlob(state: VenueState): Promise<void> {
+  if (!blobConfigured()) return;
+  const g = gVenue();
+  const body = JSON.stringify(state);
+  const opts: Parameters<typeof blobPut>[2] = {
+    access: "private",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: "application/json",
+    cacheControlMaxAge: 60,
+  };
+  if (g.__floydexVenueEtag) opts.ifMatch = g.__floydexVenueEtag;
+  try {
+    const result = await blobPut(BLOB_PATH, body, opts);
+    g.__floydexVenueEtag = result.etag;
+  } catch (err) {
+    // Lost the race — reload and overwrite last-write-wins so deposits still land.
+    const isPrecondition =
+      err instanceof Error &&
+      (err.name === "BlobPreconditionFailedError" || /precondition/i.test(err.message));
+    if (!isPrecondition) throw err;
+    try {
+      const latest = await blobGet(BLOB_PATH, { access: "private", useCache: false });
+      if (latest?.statusCode === 200 && latest.stream) {
+        const remote = JSON.parse(await new Response(latest.stream).text()) as VenueState;
+        mergeVenueState(remote, state);
+        g.__floydexVenue = remote;
+        const retry = await blobPut(BLOB_PATH, JSON.stringify(remote), {
+          access: "private",
+          addRandomSuffix: false,
+          allowOverwrite: true,
+          contentType: "application/json",
+          cacheControlMaxAge: 60,
+        });
+        g.__floydexVenueEtag = retry.etag;
+        return;
+      }
+    } catch {
+      /* final overwrite below */
+    }
+    const retry = await blobPut(BLOB_PATH, body, {
+      access: "private",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: "application/json",
+      cacheControlMaxAge: 60,
+    });
+    g.__floydexVenueEtag = retry.etag;
+  }
+}
+
+/** Merge deposit idempotency + balances from a local write into a fresher remote snapshot. */
+function mergeVenueState(remote: VenueState, local: VenueState): void {
+  for (const [owner, localAcct] of Object.entries(local.accounts ?? {})) {
+    const remoteAcct = remote.accounts[owner];
+    if (!remoteAcct) {
+      remote.accounts[owner] = localAcct;
+      continue;
+    }
+    const seen = new Set(remoteAcct.seenDeposits ?? []);
+    for (const sig of localAcct.seenDeposits ?? []) {
+      if (seen.has(sig)) continue;
+      seen.add(sig);
+      const transfer = (localAcct.transfers ?? []).find(
+        (t) => t.kind === "deposit" && t.signature === sig,
+      );
+      const amt = transfer?.amount ?? 0;
+      remoteAcct.seenDeposits = [...(remoteAcct.seenDeposits ?? []), sig];
+      if (amt > 0) {
+        remoteAcct.deposited += amt;
+        remoteAcct.fundedIn = (remoteAcct.fundedIn ?? 0) + amt;
+        if (!remoteAcct.transfers) remoteAcct.transfers = [];
+        if (transfer) remoteAcct.transfers = [transfer, ...remoteAcct.transfers].slice(0, 200);
+      }
+    }
+    // Prefer the richer fill/transfer history when lengths differ.
+    if ((localAcct.fills?.length ?? 0) > (remoteAcct.fills?.length ?? 0)) {
+      remoteAcct.fills = localAcct.fills;
+    }
+    if ((localAcct.transfers?.length ?? 0) > (remoteAcct.transfers?.length ?? 0)) {
+      remoteAcct.transfers = localAcct.transfers;
+    }
+  }
+  if ((local.feesPending ?? 0) > (remote.feesPending ?? 0)) remote.feesPending = local.feesPending;
+  if ((local.feesSent ?? 0) > (remote.feesSent ?? 0)) remote.feesSent = local.feesSent;
+  if (local.claims && !remote.claims) remote.claims = local.claims;
+  if (local.bans) remote.bans = { ...(remote.bans ?? {}), ...local.bans };
+  if (local.payouts?.length) {
+    const byId = new Map((remote.payouts ?? []).map((p) => [p.id, p]));
+    for (const p of local.payouts) byId.set(p.id, p);
+    remote.payouts = [...byId.values()];
+  }
 }
 
 function emptyClaims(): GiftClaimStore {
@@ -237,12 +390,22 @@ function claimsOf(state: VenueState): GiftClaims {
 }
 
 function persist(state: VenueState) {
+  const g = gVenue();
+  g.__floydexVenue = state;
   try {
     mkdirSync(join(process.cwd(), ".data"), { recursive: true });
     writeFileSync(FILE, JSON.stringify(state));
   } catch {
-    /* best-effort */
+    /* best-effort on ephemeral FS */
   }
+  if (!blobConfigured()) return;
+  const prev = g.__floydexVenueFlush ?? Promise.resolve();
+  g.__floydexVenueFlush = prev
+    .catch(() => undefined)
+    .then(() => writeBlob(state))
+    .catch((err) => {
+      console.error("[venue] blob persist failed", err);
+    });
 }
 
 function normalizeOwner(owner: string): string {

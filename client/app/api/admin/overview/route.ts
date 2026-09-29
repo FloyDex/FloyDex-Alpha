@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deskOverview } from "@/lib/market/venue";
+import { deskOverview, ensureVenueReady } from "@/lib/market/venue";
 import { readAdminSessionFromRequest } from "@/lib/admin-auth";
 import { treasuryUsdcBalance } from "@/lib/solana/treasury";
 
@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  await ensureVenueReady();
   const overview = deskOverview();
   const treasury = await treasuryUsdcBalance();
 

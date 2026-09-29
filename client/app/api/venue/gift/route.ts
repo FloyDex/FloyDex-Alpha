@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { GIFT_USD, isDeviceId } from "@/lib/market/gift";
-import { claimSignupGift, snapshot, isBanned, bannedError } from "@/lib/market/venue";
+import { claimSignupGift, ensureVenueReady, flushVenue, snapshot, isBanned, bannedError } from "@/lib/market/venue";
 import { bodyTooLarge, clientIp, rateLimit, requestKey } from "@/lib/rate-limit";
 import { isSolanaAddress } from "@/lib/solana/address";
 
@@ -21,7 +21,9 @@ export async function GET(req: NextRequest) {
   if (!isSolanaAddress(owner)) {
     return NextResponse.json({ error: "invalid_owner" }, { status: 400 });
   }
+  await ensureVenueReady();
   const snap = await snapshot(owner);
+  await flushVenue();
   return NextResponse.json(
     { gift: snap.gift, amount: GIFT_USD },
     { headers: { "Cache-Control": "no-store" } },
@@ -43,6 +45,7 @@ export async function POST(req: NextRequest) {
   if (!isSolanaAddress(owner) || !device) {
     return NextResponse.json({ ok: false, error: "Connect a wallet from one device" }, { status: 400 });
   }
+  await ensureVenueReady();
   if (isBanned(owner)) {
     return NextResponse.json(bannedError(), { status: 403 });
   }
@@ -56,9 +59,11 @@ export async function POST(req: NextRequest) {
   const result = claimSignupGift(owner, hashId(`ip:${ip}`), hashId(`dev:${device}`));
   if (!result.ok) {
     const gift = result.code === "claimed_owner" ? (await snapshot(owner)).gift : null;
+    await flushVenue();
     return NextResponse.json({ ok: false, claimed: false, error: result.error, code: result.code, gift });
   }
   const snap = await snapshot(owner);
+  await flushVenue();
   return NextResponse.json({
     ok: true,
     claimed: true,

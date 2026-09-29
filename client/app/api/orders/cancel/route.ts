@@ -8,7 +8,7 @@ import { assertU64, cancelSigningMessage } from "@/lib/market/signing-message";
 import { verifySignedMessage } from "@/lib/market/signed-intent";
 import { isSolanaAddress } from "@/lib/solana/address";
 import { cancelOnBook } from "@/lib/market/onchain-book";
-import { isBanned, bannedError } from "@/lib/market/venue";
+import { ensureVenueReady, isBanned, bannedError } from "@/lib/market/venue";
 
 export async function POST(req: NextRequest) {
   const network = networkFromRequest(req);
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
   if (!validOwner) {
     return NextResponse.json({ ok: false, error: "Invalid owner address" }, { status: 400 });
   }
+  await ensureVenueReady();
   if (typeof owner === "string" && isBanned(owner)) {
     return NextResponse.json(bannedError(), { status: 403 });
   }

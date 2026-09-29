@@ -9,7 +9,7 @@ import {
   type AggregatedMapRaw,
   type LiqMapPayload,
 } from "@/lib/market/liquidation-map";
-import { listMarketPositions } from "@/lib/market/venue";
+import { ensureVenueReady, listMarketPositions } from "@/lib/market/venue";
 
 const cache = new Map<number, { at: number; data: LiqMapPayload }>();
 const CACHE_MS = 12_000;
@@ -102,6 +102,7 @@ export async function GET(
   const mark = (await fetchMarkUsd(marketId)) ?? 0;
   if (!(mark > 0)) return NextResponse.json({ error: "no_mark" }, { status: 503 });
 
+  await ensureVenueReady();
   const venue = listMarketPositions(marketId);
   const maxLev = market.maxLeverageBps / 10_000;
 

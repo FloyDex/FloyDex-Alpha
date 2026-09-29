@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deskTraders, listBans } from "@/lib/market/venue";
+import { deskTraders, ensureVenueReady, listBans } from "@/lib/market/venue";
 import { readAdminSessionFromRequest } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  await ensureVenueReady();
   const traders = deskTraders();
   const known = new Set(traders.map((t) => t.owner));
   // Ban-only wallets (never funded) still show up so they can be unbanned.

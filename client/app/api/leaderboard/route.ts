@@ -8,7 +8,7 @@ import {
   sparkBucketCount,
   type LeaderboardPeriod,
 } from "@/lib/market/leaderboard";
-import { listVenueAccounts, snapshot } from "@/lib/market/venue";
+import { ensureVenueReady, listVenueAccounts, snapshot } from "@/lib/market/venue";
 import { networkAwareCacheControl, networkFromRequest } from "@/lib/network-server";
 import { isSolanaAddress } from "@/lib/solana/address";
 
@@ -145,6 +145,7 @@ async function venueBoard(opts: {
   search?: string | null;
   watched: string[];
 }) {
+  await ensureVenueReady();
   const accounts = listVenueAccounts();
   const built = buildVenueLeaderboard({
     accounts,

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   approvePayout,
+  ensureVenueReady,
+  flushVenue,
   getPayout,
   listPayouts,
   rejectPayout,
@@ -12,6 +14,7 @@ export async function GET(req: NextRequest) {
   if (!(await readAdminSessionFromRequest(req))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  await ensureVenueReady();
   const status = req.nextUrl.searchParams.get("status") as
     | "pending"
     | "approved"
@@ -42,6 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "id and action required" }, { status: 400 });
   }
 
+  await ensureVenueReady();
   const existing = getPayout(id);
   if (!existing) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   if (existing.status !== "pending") {
@@ -50,6 +54,7 @@ export async function POST(req: NextRequest) {
 
   if (action === "reject") {
     const rejected = rejectPayout(id, body.note);
+    await flushVenue();
     return NextResponse.json(rejected);
   }
 
@@ -58,5 +63,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: sent.error }, { status: 502 });
   }
   const approved = approvePayout(id, sent.signature);
+  await flushVenue();
   return NextResponse.json(approved);
 }

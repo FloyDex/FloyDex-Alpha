@@ -7,7 +7,7 @@ import { bodyTooLarge, rateLimit, requestKey } from "@/lib/rate-limit";
 import { AMOUNT_PRECISION, PRICE_PRECISION } from "@/config";
 import { intentToResting, placeOnBook } from "@/lib/market/onchain-book";
 import { fetchMarkUsd } from "@/lib/market/marks";
-import { applyFill, checkTriggers, setTriggers, snapshot, isBanned, bannedError } from "@/lib/market/venue";
+import { applyFill, checkTriggers, ensureVenueReady, flushVenue, setTriggers, snapshot, isBanned, bannedError } from "@/lib/market/venue";
 
 export async function POST(req: NextRequest) {
   if (bodyTooLarge(req)) {
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
   const claimedOwner = typeof (body as Record<string, unknown>)?.owner === "string"
     ? ((body as Record<string, unknown>).owner as string).slice(0, 64)
     : "invalid";
+  await ensureVenueReady();
   if (isBanned(claimedOwner)) {
     return NextResponse.json(bannedError(), { status: 403 });
   }
@@ -126,6 +127,7 @@ export async function POST(req: NextRequest) {
     console.error("order intake db (book still accepted):", e);
   }
 
+  await flushVenue();
   return NextResponse.json({
     ok: true,
     book: placed.book,

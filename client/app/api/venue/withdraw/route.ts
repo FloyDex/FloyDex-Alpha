@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   creditUsdc,
+  ensureVenueReady,
+  flushVenue,
   recordFundedOut,
   requestWithdraw,
   isBanned,
@@ -21,6 +23,7 @@ export async function POST(req: NextRequest) {
   if (!isSolanaAddress(owner) || !(amount > 0)) {
     return NextResponse.json({ ok: false, error: "Invalid withdraw" }, { status: 400 });
   }
+  await ensureVenueReady();
   if (isBanned(owner)) {
     return NextResponse.json(bannedError(), { status: 403 });
   }
@@ -29,6 +32,7 @@ export async function POST(req: NextRequest) {
   if (!result.ok) return NextResponse.json(result, { status: 400 });
 
   if (result.mode === "manual") {
+    await flushVenue();
     return NextResponse.json({
       ok: true,
       mode: "manual",
@@ -41,11 +45,13 @@ export async function POST(req: NextRequest) {
   const sent = await sendTreasuryUsdc(owner, amount);
   if (!sent.ok) {
     creditUsdc(owner, amount);
+    await flushVenue();
     return NextResponse.json(
       { ok: false, error: sent.error },
       { status: sent.error.includes("not configured") ? 503 : 502 },
     );
   }
   recordFundedOut(owner, amount, sent.signature);
+  await flushVenue();
   return NextResponse.json({ ok: true, mode: "auto", signature: sent.signature });
 }

@@ -4,7 +4,7 @@ import { STAKE_PUBLIC, STAKE_TERMS, isOpenStake, type StakePosition } from "@/li
 import { bodyTooLarge, rateLimit, requestKey } from "@/lib/rate-limit";
 import { isSolanaAddress } from "@/lib/solana/address";
 import { shortenAddress } from "@/lib/format";
-import { isBanned, bannedError } from "@/lib/market/venue";
+import { ensureVenueReady, isBanned, bannedError } from "@/lib/market/venue";
 
 function snapshot(owner: string) {
   const now = Date.now();
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
   if (!isSolanaAddress(owner)) {
     return NextResponse.json({ ok: false, error: "Connect a wallet" }, { status: 400 });
   }
+  await ensureVenueReady();
   if (isBanned(owner)) {
     return NextResponse.json(bannedError(), { status: 403 });
   }

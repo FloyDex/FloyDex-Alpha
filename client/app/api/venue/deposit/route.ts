@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, PublicKey, type ParsedTransactionWithMeta } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { creditDeposit, isBanned, bannedError } from "@/lib/market/venue";
+import {
+  creditDeposit,
+  ensureVenueReady,
+  flushVenue,
+  isBanned,
+  bannedError,
+} from "@/lib/market/venue";
 import { isSolanaAddress } from "@/lib/solana/address";
 import { solanaRpcUrl } from "@/lib/solana/rpc";
 
@@ -75,6 +81,7 @@ export async function POST(req: NextRequest) {
   if (!isSolanaAddress(owner) || !signature || !(amount > 0)) {
     return NextResponse.json({ ok: false, error: "Invalid deposit" }, { status: 400 });
   }
+  await ensureVenueReady();
   if (isBanned(owner)) {
     return NextResponse.json(bannedError(), { status: 403 });
   }
@@ -102,5 +109,6 @@ export async function POST(req: NextRequest) {
   if (credited > amount * 1.0001) credited = amount;
 
   creditDeposit(owner, credited, signature);
+  await flushVenue();
   return NextResponse.json({ ok: true, credited });
 }

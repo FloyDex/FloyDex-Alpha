@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   banWallet,
+  ensureVenueReady,
+  flushVenue,
   isBanned,
   listBans,
   unbanWallet,
@@ -14,6 +16,7 @@ export async function GET(req: NextRequest) {
   if (!(await readAdminSessionFromRequest(req))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  await ensureVenueReady();
   return NextResponse.json(
     { ok: true, bans: listBans() },
     { headers: { "Cache-Control": "no-store" } },
@@ -41,8 +44,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "action must be ban or unban" }, { status: 400 });
   }
 
+  await ensureVenueReady();
   if (action === "unban") {
     const result = unbanWallet(owner);
+    await flushVenue();
     if (!result.ok) return NextResponse.json(result, { status: 400 });
     return NextResponse.json({ ok: true, banned: false, owner });
   }
@@ -51,6 +56,7 @@ export async function POST(req: NextRequest) {
     // Re-ban with same state is fine; still refresh timestamp if reason given.
   }
   const result = banWallet(owner, body.reason);
+  await flushVenue();
   if (!result.ok) return NextResponse.json(result, { status: 400 });
   return NextResponse.json({ ok: true, banned: true, ban: result.ban });
 }

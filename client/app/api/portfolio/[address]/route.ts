@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { networkAwareCacheControl, networkFromRequest } from "@/lib/network-server";
 import { rateLimit, requestKey } from "@/lib/rate-limit";
 import { isSolanaAddress } from "@/lib/solana/address";
-import { snapshot } from "@/lib/market/venue";
+import { ensureVenueReady, snapshot } from "@/lib/market/venue";
 
 const AMOUNT_SCALE = 1e7;
 const PRICE_SCALE = 1e18;
@@ -140,6 +140,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ address: st
   // Solana desk: prefer venue ledger (authoritative for paper/hybrid fills).
   if (isSolanaAddress(address)) {
     try {
+      await ensureVenueReady();
       const snap = await snapshot(address);
       const venue = venueAnalytics(snap);
       return NextResponse.json(

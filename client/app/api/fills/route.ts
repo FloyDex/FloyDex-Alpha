@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { networkFromRequest } from "@/lib/network-server";
 import { rateLimit, requestKey } from "@/lib/rate-limit";
 import { isSolanaAddress } from "@/lib/solana/address";
-import { snapshot } from "@/lib/market/venue";
+import { ensureVenueReady, snapshot } from "@/lib/market/venue";
 
 const PRICE_SCALE = 1e18;
 const AMOUNT_SCALE = 1e7;
@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
 
   // Solana desk venue — fills live in the local ledger, not the Stellar Fill table.
   if (isSolanaAddress(address)) {
+    await ensureVenueReady();
     const snap = await snapshot(address);
     const cutoff = sinceMs ?? 0;
     const fills = (snap.fills ?? [])
