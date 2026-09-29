@@ -20,10 +20,10 @@ for k in admin operator guardian calendar alice bob alice_session bob_session mi
 done
 chmod 400 "$E2E"/keys/*.json
 
-test -f target/deploy/kryon_perps.so || { echo "build first: yarn build"; exit 1; }
+test -f target/deploy/floydex_perps.so || { echo "build first: yarn build"; exit 1; }
 # The declared id, from the IDL: the validator loads the .so at this address,
 # so no program keypair is needed (CI never has one; it is never committed).
-PROGRAM_ID=$(node -p 'JSON.parse(require("fs").readFileSync("target/idl/kryon_perps.json", "utf8")).address')
+PROGRAM_ID=$(node -p 'JSON.parse(require("fs").readFileSync("target/idl/floydex_perps.json", "utf8")).address')
 
 # Mocked Pyth TSLA/USD at $250.00, 0.01% conf, published now.
 NOW=$(date +%s)
@@ -32,7 +32,7 @@ node tests/e2e/mock-pyth.mts "$E2E/pyth-tsla.json" "$FEED" 0 25000000000 -8 2500
 node tests/e2e/mock-pyth.mts "$E2E/pyth-nvda.json" "$FEED2" 0 10000000000 -8 1000000 "$NOW" >/dev/null
 
 solana-test-validator --reset --quiet --ledger "$E2E/ledger" \
-  --upgradeable-program "$PROGRAM_ID" target/deploy/kryon_perps.so "$E2E/keys/admin.json" \
+  --upgradeable-program "$PROGRAM_ID" target/deploy/floydex_perps.so "$E2E/keys/admin.json" \
   --account - "$E2E/pyth-tsla.json" \
   --account - "$E2E/pyth-nvda.json" \
   >"$E2E/validator.log" 2>&1 &

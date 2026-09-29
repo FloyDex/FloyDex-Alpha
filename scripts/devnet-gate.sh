@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 2 gate, part 2 (09): deploy (or upgrade) kryon_perps on devnet at its
+# Phase 2 gate, part 2 (09): deploy (or upgrade) floydex_perps on devnet at its
 # declared id, then execute a real liquidation against Pyth's sponsored
 # shard-0 SOL/USD feed (tests/e2e/devnet.mts).
 #
@@ -16,16 +16,16 @@ cd "$(dirname "$0")/.."
 : "${USDC_MINT:?set USDC_MINT}"
 DEPLOYER="${DEPLOYER:-$HOME/.config/solana/id.json}"
 
-test -f target/deploy/kryon_perps.so || { echo "build first: yarn build"; exit 1; }
-PROGRAM_ID=$(node -p 'JSON.parse(require("fs").readFileSync("target/idl/kryon_perps.json", "utf8")).address')
-KEYPAIR_ID=$(solana-keygen pubkey target/deploy/kryon_perps-keypair.json)
+test -f target/deploy/floydex_perps.so || { echo "build first: yarn build"; exit 1; }
+PROGRAM_ID=$(node -p 'JSON.parse(require("fs").readFileSync("target/idl/floydex_perps.json", "utf8")).address')
+KEYPAIR_ID=$(solana-keygen pubkey target/deploy/floydex_perps-keypair.json)
 [ "$PROGRAM_ID" = "$KEYPAIR_ID" ] || { echo "declared id $PROGRAM_ID != program keypair $KEYPAIR_ID"; exit 1; }
 
 echo "deployer $(solana-keygen pubkey "$DEPLOYER"): $(solana balance -u "$RPC_URL" -k "$DEPLOYER")"
 solana program deploy -u "$RPC_URL" -k "$DEPLOYER" \
-  --program-id target/deploy/kryon_perps-keypair.json \
+  --program-id target/deploy/floydex_perps-keypair.json \
   --with-compute-unit-price 10000 --max-sign-attempts 20 \
-  target/deploy/kryon_perps.so
+  target/deploy/floydex_perps.so
 
 RPC_URL="$RPC_URL" USDC_MINT="$USDC_MINT" DEPLOYER="$DEPLOYER" USDC_FUNDER="${USDC_FUNDER:-$DEPLOYER}" \
   node tests/e2e/devnet.mts

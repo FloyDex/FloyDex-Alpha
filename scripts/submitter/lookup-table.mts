@@ -60,7 +60,7 @@ async function main() {
   const connection = new Connection(process.env.RPC_URL ?? `https://api.${deployment.cluster}.solana.com`, "confirmed");
   const authority = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(process.env.OPERATOR_KEYPAIR_FILE!, "utf8"))));
 
-  const idl = JSON.parse(readFileSync("target/idl/kryon_perps.json", "utf8"));
+  const idl = JSON.parse(readFileSync("target/idl/floydex_perps.json", "utf8"));
   const provider = new AnchorProvider(connection, new Wallet(authority), { commitment: "confirmed" });
   const program = new Program(idl, provider);
 

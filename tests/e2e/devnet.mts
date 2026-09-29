@@ -76,7 +76,7 @@ const K = Object.fromEntries(names.map((n) => [n, key(n)])) as Record<(typeof na
 const deployer = readKey(DEPLOYER);
 const funder = readKey(FUNDER);
 
-const idl = JSON.parse(readFileSync("target/idl/kryon_perps.json", "utf8"));
+const idl = JSON.parse(readFileSync("target/idl/floydex_perps.json", "utf8"));
 const program = new Program(idl, new AnchorProvider(connection, new Wallet(deployer), { commitment: "confirmed" }));
 const PROGRAM_ID = program.programId;
 
@@ -197,7 +197,7 @@ async function main() {
   // --- exchange (once), USDC, market, insurance ---
   if (!(await connection.getAccountInfo(exchangePda))) {
     const init = await program.methods
-      .initializeExchange({ domain: Array.from(domain), guardian: K.guardian.publicKey, calendarAuthority: K.calendar.publicKey, feeConfig: { makerFeeBps: 2, takerFeeBps: 5 }, maxTotalOiPolicyBps: 100_000 })
+      .initializeExchange({ domain: Array.from(domain), guardian: K.guardian.publicKey, calendarAuthority: K.calendar.publicKey, feeConfig: { makerFeeBps: 100, takerFeeBps: 100 }, maxTotalOiPolicyBps: 100_000 })
       .accountsStrict({
         exchange: exchangePda, authority: deployer.publicKey, program: PROGRAM_ID,
         programData: PublicKey.findProgramAddressSync([PROGRAM_ID.toBuffer()], new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111"))[0],

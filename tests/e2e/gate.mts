@@ -57,7 +57,7 @@ const [carol, dave, carolSession, daveSession, keeperKey, stakerKey] = [
   "carol", "dave", "carol_session", "dave_session", "keeper", "staker",
 ].map(key);
 
-const idl = JSON.parse(readFileSync("target/idl/kryon_perps.json", "utf8"));
+const idl = JSON.parse(readFileSync("target/idl/floydex_perps.json", "utf8"));
 const provider = new AnchorProvider(connection, new Wallet(admin), { commitment: "confirmed" });
 const program = new Program(idl, provider);
 const PROGRAM_ID = program.programId;
@@ -191,7 +191,7 @@ async function bootstrap() {
       domain: Array.from(domain),
       guardian: guardian.publicKey,
       calendarAuthority: calendar.publicKey,
-      feeConfig: { makerFeeBps: 2, takerFeeBps: 5 },
+      feeConfig: { makerFeeBps: 100, takerFeeBps: 100 },
       maxTotalOiPolicyBps: 100_000,
     })
     .accountsStrict({
