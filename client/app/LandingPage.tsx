@@ -771,6 +771,12 @@ export function LandingPage() {
                 </ul>
               </div>
             </div>
+            <p className="s5-footer-ca">
+              <span>$FLOYDEX CA</span>
+              <a href={FLOYDEX_TOKEN.dexscreener} target="_blank" rel="noopener noreferrer">
+                {FLOYDEX_TOKEN.mint}
+              </a>
+            </p>
             <svg className="s5-footer-wordmark" viewBox="0 0 1000 220" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
               <text x="10" y="205" fontSize="190" fontFamily="Archivo, sans-serif" fontWeight="600" fill="#14F195" letterSpacing="-8" textLength="980" lengthAdjust="spacingAndGlyphs">FLOYDEX</text>
             </svg>

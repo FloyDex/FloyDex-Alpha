@@ -1281,12 +1281,39 @@
   transform: translateY(2px);
   flex-shrink: 0;
 }
+.s5-footer-ca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px 16px;
+  margin: 28px 0 0;
+  padding: 0 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.45;
+  letter-spacing: 0;
+  user-select: text;
+}
+.s5-footer-ca span {
+  font-family: var(--font-poppins), 'Poppins', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7c74;
+}
+.s5-footer-ca a {
+  color: #14F195;
+  word-break: break-all;
+  text-decoration: none;
+}
+.s5-footer-ca a:hover { text-decoration: underline; }
 .s5-footer-wordmark {
   display: block;
   width: 100%;
   max-width: 100%;
   height: auto;
-  margin-top: -30px;
+  margin-top: 8px;
   overflow: hidden;
   user-select: none;
   position: relative;
