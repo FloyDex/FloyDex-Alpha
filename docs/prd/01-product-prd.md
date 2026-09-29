@@ -1,10 +1,10 @@
-# 01 — Product Requirements: Kryon on Solana (tokenized-stock perps)
+# 01 — Product Requirements: FloyDex on Solana (tokenized-stock perps)
 
-Status: draft v1 · 2026-09-26 · owner: Kryon core team
+Status: draft v1 · 2026-09-26 · owner: FloyDex core team
 
 ## 1. One line
 
-**Kryon is a Solana-native order-book perps exchange for US stocks, ETFs and
+**FloyDex is a Solana-native order-book perps exchange for US stocks, ETFs and
 other real-world assets. You can post your tokenized stocks as margin, and the
 risk engine is built around stock-market hours, including weekends and closed
 sessions.**
@@ -20,7 +20,7 @@ Numbers are as of Sept 2026. Links are in `../sources.md`.
   tokenized-equity DEX volume, $5.8B in Q2 2026, and xStocks at 190k+ holders
   and $500M+ AUM.
 - So Solana holds the stocks, and most of the leverage on those stocks trades
-  somewhere else. Kryon's job is to bring that leverage to where the stocks
+  somewhere else. FloyDex's job is to bring that leverage to where the stocks
   already are, and to let the stocks themselves be margin.
 - The main competitor on Solana is **Jupiter**, which added order-book (GUM
   engine) perps for SPCX/SNDK/SKHYNIX on 2026-09-22. Solayer Margin Trade
@@ -31,11 +31,11 @@ Numbers are as of Sept 2026. Links are in `../sources.md`.
 
 ## 3. Users
 
-| Persona | Needs | What Kryon gives them |
+| Persona | Needs | What FloyDex gives them |
 |---|---|---|
-| Crypto-native trader | Trade NVDA/TSLA/SPY with leverage around the clock, no broker, no KYC wall (outside restricted regions) | 24/7 order book, gasless popup-free trading, USDC margin |
+| Crypto-native trader | Trade NVDA/TSLA/SPY with leverage around the clock, no broker, no KYC wall | 24/7 order book, gasless popup-free trading, USDC margin |
 | xStocks holder | Earn on idle stock tokens; hedge through a weekend or earnings | Post xStocks as margin; one-click "hold + short perp = earn funding" |
-| Market maker | Tight quotes need a fast, fair, cheap venue with an API | Off-chain matching, maker rebates, SDK (reuse KryonSDK), signed intents |
+| Market maker | Tight quotes need a fast, fair, cheap venue with an API | Off-chain matching, maker rebates, SDK (reuse FloyDexSDK), signed intents |
 | Launch speculator | Trade an IPO or new listing before it exists as a token | Pre-listing perps (phase 3) |
 
 ## 4. Scope
@@ -72,14 +72,14 @@ Numbers are as of Sept 2026. Links are in `../sources.md`.
 - **Pre-listing markets** for IPOs and upcoming token launches. The book sets
   the price, OI caps are hard, and the market converts to oracle pricing once
   the asset lists.
-- The KRY token and governance (see `08`).
+- Protocol token (ticker TBD) and governance (see `08`).
 
 ### Not doing (explicitly)
 - No spot trading venue. Spot routing goes through Jupiter and Raydium.
 - No issuing our own tokenized stocks. We use xStocks, Backpack and other
   issuers.
-- No serving of US persons or other restricted regions (see `10`).
 - No cross-chain deployment in v1.
+- No country geofencing — the desk is open to any user worldwide.
 
 ## 5. Functional requirements
 
@@ -95,7 +95,7 @@ Numbers are as of Sept 2026. Links are in `../sources.md`.
 | F8 | Permissionless liquidation with a capped reward; insurance covers deficits; ADL only against recorded bad debt | Same invariants as the Stellar audit fixes C1/H5/Q4 |
 | F9 | Emergency pause by the guardian; parameter changes by multisig with a timelock | Squads v4 with a time lock of at least 48h (matches Stellar H8) |
 | F10 | Indexer that projects chain state into Postgres for the UI | UI never waits on RPC for reads |
-| F11 | Geofencing and sanctions screening at the frontend and API | See `10` |
+| F11 | Public desk — no country geofence; optional operator wallet bans only | Anyone can load the UI; admin bans are per-wallet, not by jurisdiction |
 
 ## 6. Non-functional requirements
 
