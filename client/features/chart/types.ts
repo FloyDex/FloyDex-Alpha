@@ -71,21 +71,3 @@ export type Drawing =
   | RectShape | FibShape
   | TextLabel | ArrowLine | BrushPath
   | PositionShape | RulerShape
-
-// ── Trading overlay data ─────────────────────────────────
-export interface PositionOverlay {
-  side: 'long' | 'short'
-  entryPrice: number
-  liquidationPrice: number
-  tpPrice?: number
-  slPrice?: number
-  unrealizedPnl?: number
-  leverage?: number
-}
-
-export interface OrderOverlay {
-  price: number
-  side: 'buy' | 'sell'
-  size: number
-  label?: string
-}

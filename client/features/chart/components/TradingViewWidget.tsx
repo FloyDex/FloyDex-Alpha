@@ -37,10 +37,10 @@ function loadScript(): Promise<void> {
   });
 }
 
-// Kryon dark palette, matched to the order ticket surface.
-const BG = "#19191A";
+// FloyDex dark palette, matched to the order ticket surface.
+const BG = "#070B0A";
 const GRID = "#25252B";
-const SCALE_LINE = "#2A2A31";
+const SCALE_LINE = "#1A2A26";
 const SCALE_TEXT = "#a3a3a3";
 const UP = "#1fae5b";
 const DOWN = "#e34c4c";
@@ -49,12 +49,14 @@ export const TradingViewWidget = memo(function TradingViewWidget({
   symbol,
   interval = "60",
   chartStyle = "1",
+  extendedHours = false,
 }: {
   // REQUIRED. This defaulted to "COINBASE:XLMUSD", so any caller that failed
   // to thread a symbol through charted XLM under another market's header.
   symbol: string;
   interval?: string;
   chartStyle?: string;
+  extendedHours?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const mountId = `tv_${useId().replace(/[^a-zA-Z0-9_-]/g, "_")}`;
@@ -73,8 +75,7 @@ export const TradingViewWidget = memo(function TradingViewWidget({
     const inner = document.createElement("div");
     inner.id = mountId;
     inner.style.width = "100%";
-    // Push TradingView's bottom branding bar just out of view
-    inner.style.height = "calc(100% + 32px)";
+    inner.style.height = "100%";
     host.appendChild(inner);
 
     const loaderFallback = setTimeout(() => {
@@ -88,7 +89,7 @@ export const TradingViewWidget = memo(function TradingViewWidget({
           autosize: true,
           symbol,
           interval,
-          timezone: "Etc/UTC",
+          timezone: extendedHours ? "America/New_York" : "Etc/UTC",
           theme: "dark",
           style: chartStyle,
           locale: "en",
@@ -98,29 +99,60 @@ export const TradingViewWidget = memo(function TradingViewWidget({
           custom_css_url: `${window.location.origin}/tradingview-overrides.css`,
           enable_publishing: false,
           allow_symbol_change: false,
-          hide_top_toolbar: true,
+          hide_top_toolbar: false,
           hide_side_toolbar: false,
           hide_legend: false,
-          save_image: false,
-          withdateranges: false,
+          hide_volume: false,
+          volume_pane_size: "tiny",
+          save_image: true,
+          withdateranges: true,
           details: false,
           calendar: false,
+          hide_date_ranges: false,
+          extended_hours: extendedHours,
+          sessionid: extendedHours ? "extended" : "regular",
           container_id: mountId,
           loading_screen: { backgroundColor: BG, foregroundColor: SCALE_TEXT },
           disabled_features: [
-            "timeframes_toolbar",
             "header_symbol_search",
-            "header_compare",
             "use_localstorage_for_settings",
+            "pre_post_market_sessions",
+            "pre_post_market_price_line",
+          ],
+          enabled_features: [
+            "header_widget",
+            "header_indicators",
+            "header_compare",
+            "header_undo_redo",
+            "header_screenshot",
+            "header_fullscreen_button",
+            "timeframes_toolbar",
+            "adaptive_logo",
           ],
           overrides: {
             "paneProperties.background": BG,
             "paneProperties.backgroundType": "solid",
+            "paneProperties.backgroundGradientStartColor": BG,
+            "paneProperties.backgroundGradientEndColor": BG,
+            "paneProperties.topMargin": 8,
+            "paneProperties.bottomMargin": 6,
             "paneProperties.vertGridProperties.color": GRID,
             "paneProperties.horzGridProperties.color": GRID,
             "scalesProperties.backgroundColor": BG,
             "scalesProperties.lineColor": SCALE_LINE,
             "scalesProperties.textColor": SCALE_TEXT,
+            "mainSeriesProperties.sessionId": extendedHours ? "extended" : "regular",
+            // Keep extended-hours candles; hide the yellow/blue session bands.
+            "backgrounds.preMarket.visible": false,
+            "backgrounds.preMarket.transparency": 100,
+            "backgrounds.preMarket.color": BG,
+            "backgrounds.postMarket.visible": false,
+            "backgrounds.postMarket.transparency": 100,
+            "backgrounds.postMarket.color": BG,
+            "backgrounds.outOfSession.visible": false,
+            "backgrounds.outOfSession.transparency": 100,
+            "backgrounds.outOfSession.color": BG,
+            "vertlines.sessBreaks.visible": false,
             "mainSeriesProperties.candleStyle.upColor": UP,
             "mainSeriesProperties.candleStyle.downColor": DOWN,
             "mainSeriesProperties.candleStyle.borderUpColor": UP,
@@ -148,27 +180,42 @@ export const TradingViewWidget = memo(function TradingViewWidget({
       clearTimeout(loaderFallback);
       if (host) host.innerHTML = "";
     };
-  }, [symbol, interval, chartStyle, mountId, retryNonce]);
+  }, [symbol, interval, chartStyle, mountId, retryNonce, extendedHours]);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    let t = 0;
+    const ro = new ResizeObserver(() => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => window.dispatchEvent(new Event("resize")), 80);
+    });
+    ro.observe(host);
+    return () => {
+      window.clearTimeout(t);
+      ro.disconnect();
+    };
+  }, []);
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <div ref={hostRef} className="h-full w-full" />
+      <div ref={hostRef} className="absolute inset-0" />
       {(loading || error) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#19191A]">
+        <div className="absolute inset-0 flex items-center justify-center bg-[#070B0A]">
           {error ? (
             <div className="flex flex-col items-center gap-3">
               <span className="text-xs font-mono text-[#a3a3a3]">Chart unavailable</span>
               <span className="max-w-[260px] text-center text-[11px] text-[#737373]">{error}</span>
               <button
                 onClick={() => setRetryNonce((v) => v + 1)}
-                className="rounded-[6px] bg-[#19191A] border border-[#334155] px-3 py-1.5 text-[11px] font-medium text-[#f5f5f5] hover:border-[#4a4a4a] transition-colors"
+                className="rounded-[6px] bg-[#070B0A] border border-[#1C332C] px-3 py-1.5 text-[11px] font-medium text-[#f5f5f5] hover:border-[#4a4a4a] transition-colors"
               >
                 Retry
               </button>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 pointer-events-none">
-              <div className="w-5 h-5 border-2 border-[#19191A] border-t-[#a3a3a3] rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-[#070B0A] border-t-[#a3a3a3] rounded-full animate-spin" />
               <span className="text-[#737373] text-xs font-mono">Loading chart…</span>
             </div>
           )}
