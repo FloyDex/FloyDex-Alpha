@@ -124,6 +124,10 @@ test("tvSymbol is a well-formed EXCHANGE:TICKER pair", () => {
 
 test("priceSourceSymbol is the Binance pair for baseAsset", () => {
   for (const [, m] of entries) {
+    if (m.kind === "equity") {
+      assert.equal(m.priceSourceSymbol, m.baseAsset, `${m.symbol}: equity ticker`);
+      continue;
+    }
     assert.equal(m.priceSourceSymbol, `${m.baseAsset}USDT`, `${m.symbol}: priceSourceSymbol mismatch`);
   }
 });

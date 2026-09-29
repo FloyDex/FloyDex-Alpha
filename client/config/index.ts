@@ -8,7 +8,7 @@
 //
 // ── How the active network is chosen ─────────────────────────────────────────
 // In the browser this is evaluated once per page load, from `?network=` or the
-// `kryon_network` cookie (see lib/network-resolve.ts). Switching networks in the
+// `floydex_network` cookie (see lib/network-resolve.ts). Switching networks in the
 // navbar performs a full reload, which re-evaluates this module — that is what
 // makes a static const safe here, and it is deliberate: a full reload is the
 // only way to guarantee no mainnet state survives into a testnet view. The
@@ -80,6 +80,11 @@ export const COLLATERAL = ACTIVE.collateral;
 export const SETTLEMENT_ASSET =
   ACTIVE.collateral.find((c) => c.settlement) ?? ACTIVE.collateral[0];
 
+/** Trading fee charged on every fill, both sides (buy and sell). 100 bps = 1%. */
+export const PLATFORM_FEE_BPS = 100;
+/** USDC destination for collected platform fees. */
+export const FEE_COLLECTOR = "HPXzdeaarrnLL8PKGi11PT2BBd8HY5yty7WwDBZavCbn";
+
 export const MARKETS: Record<string, MarketConfig> = {
   "XLM-PERP": {
     marketId: 1,
@@ -91,7 +96,7 @@ export const MARKETS: Record<string, MarketConfig> = {
     priceSourceSymbol: "XLMUSDT",
     reflectorSymbol: "XLM",
     settlementAsset: ASSETS.usdc,
-    tvSymbol: "COINBASE:XLMUSD",
+    tvSymbol: "BINANCE:XLMUSDT",
     maxLeverageBps: 100000, // 10x — 1e8/initialMarginBps; matches on-chain engine max_leverage_bps
     initialMarginBps: 1000,  // 10%
     maintenanceMarginBps: 500, // 5%
@@ -112,7 +117,7 @@ export const MARKETS: Record<string, MarketConfig> = {
     priceSourceSymbol: "BTCUSDT",
     reflectorSymbol: "BTC",
     settlementAsset: ASSETS.usdc,
-    tvSymbol: "COINBASE:BTCUSD",
+    tvSymbol: "BINANCE:BTCUSDT",
     maxLeverageBps: 500000, // 50x
     initialMarginBps: 200,   // 2%
     maintenanceMarginBps: 100, // 1%
@@ -133,7 +138,7 @@ export const MARKETS: Record<string, MarketConfig> = {
     priceSourceSymbol: "ETHUSDT",
     reflectorSymbol: "ETH",
     settlementAsset: ASSETS.usdc,
-    tvSymbol: "COINBASE:ETHUSD",
+    tvSymbol: "BINANCE:ETHUSDT",
     maxLeverageBps: 200000, // 20x
     initialMarginBps: 500,   // 5%
     maintenanceMarginBps: 250, // 2.5%
@@ -175,7 +180,7 @@ export const MARKETS: Record<string, MarketConfig> = {
     priceSourceSymbol: "XRPUSDT",
     reflectorSymbol: "XRP",
     settlementAsset: ASSETS.usdc,
-    tvSymbol: "COINBASE:XRPUSD",
+    tvSymbol: "BINANCE:XRPUSDT",
     maxLeverageBps: 100000, // 10x
     initialMarginBps: 1000,  // 10%
     maintenanceMarginBps: 500, // 5%
@@ -196,7 +201,7 @@ export const MARKETS: Record<string, MarketConfig> = {
     priceSourceSymbol: "ADAUSDT",
     reflectorSymbol: "ADA",
     settlementAsset: ASSETS.usdc,
-    tvSymbol: "COINBASE:ADAUSD",
+    tvSymbol: "BINANCE:ADAUSDT",
     maxLeverageBps: 50000,  // 5x
     initialMarginBps: 2000,  // 20%
     maintenanceMarginBps: 1000, // 10%
@@ -256,11 +261,240 @@ export const MARKETS: Record<string, MarketConfig> = {
     maxOpenInterestBase: 575_000,     // ≈ $200k @ $0.3456 (ref 2026-08-22)
     maxOpenInterestUsd: 200_000,
   },
+  "TSLA-PERP": {
+    marketId: 9,
+    symbol: "TSLA-PERP",
+    displayName: "TSLA-PERP",
+    kind: "equity",
+    baseAsset: "TSLA",
+    quoteAsset: "USDC",
+    oracleSymbol: "TSLA",
+    priceSourceSymbol: "TSLA",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "NASDAQ:TSLA",
+    maxLeverageBps: 100000,
+    initialMarginBps: 1000,
+    maintenanceMarginBps: 500,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 700,
+    maxOpenInterestUsd: 300_000,
+  },
+  "NVDA-PERP": {
+    marketId: 10,
+    symbol: "NVDA-PERP",
+    displayName: "NVDA-PERP",
+    kind: "equity",
+    baseAsset: "NVDA",
+    quoteAsset: "USDC",
+    oracleSymbol: "NVDA",
+    priceSourceSymbol: "NVDA",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "NASDAQ:NVDA",
+    maxLeverageBps: 100000,
+    initialMarginBps: 1000,
+    maintenanceMarginBps: 500,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 1_600,
+    maxOpenInterestUsd: 300_000,
+  },
+  "AAPL-PERP": {
+    marketId: 11,
+    symbol: "AAPL-PERP",
+    displayName: "AAPL-PERP",
+    kind: "equity",
+    baseAsset: "AAPL",
+    quoteAsset: "USDC",
+    oracleSymbol: "AAPL",
+    priceSourceSymbol: "AAPL",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "NASDAQ:AAPL",
+    maxLeverageBps: 100000,
+    initialMarginBps: 1000,
+    maintenanceMarginBps: 500,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 1_300,
+    maxOpenInterestUsd: 300_000,
+  },
+  "SPY-PERP": {
+    marketId: 12,
+    symbol: "SPY-PERP",
+    displayName: "SPY-PERP",
+    kind: "equity",
+    baseAsset: "SPY",
+    quoteAsset: "USDC",
+    oracleSymbol: "SPY",
+    priceSourceSymbol: "SPY",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "AMEX:SPY",
+    maxLeverageBps: 50000,
+    initialMarginBps: 2000,
+    maintenanceMarginBps: 1000,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 500,
+    maxOpenInterestUsd: 300_000,
+  },
+  "META-PERP": {
+    marketId: 13,
+    symbol: "META-PERP",
+    displayName: "META-PERP",
+    kind: "equity",
+    baseAsset: "META",
+    quoteAsset: "USDC",
+    oracleSymbol: "META",
+    priceSourceSymbol: "META",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "NASDAQ:META",
+    maxLeverageBps: 100000,
+    initialMarginBps: 1000,
+    maintenanceMarginBps: 500,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 500,
+    maxOpenInterestUsd: 300_000,
+  },
+  "AMZN-PERP": {
+    marketId: 14,
+    symbol: "AMZN-PERP",
+    displayName: "AMZN-PERP",
+    kind: "equity",
+    baseAsset: "AMZN",
+    quoteAsset: "USDC",
+    oracleSymbol: "AMZN",
+    priceSourceSymbol: "AMZN",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "NASDAQ:AMZN",
+    maxLeverageBps: 100000,
+    initialMarginBps: 1000,
+    maintenanceMarginBps: 500,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 1_500,
+    maxOpenInterestUsd: 300_000,
+  },
+  "QQQ-PERP": {
+    marketId: 15,
+    symbol: "QQQ-PERP",
+    displayName: "QQQ-PERP",
+    kind: "equity",
+    baseAsset: "QQQ",
+    quoteAsset: "USDC",
+    oracleSymbol: "QQQ",
+    priceSourceSymbol: "QQQ",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "NASDAQ:QQQ",
+    maxLeverageBps: 50000, // 5x — index ETF, same band as SPY
+    initialMarginBps: 2000,
+    maintenanceMarginBps: 1000,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 600,
+    maxOpenInterestUsd: 300_000,
+  },
+  "MSFT-PERP": {
+    marketId: 16,
+    symbol: "MSFT-PERP",
+    displayName: "MSFT-PERP",
+    kind: "equity",
+    baseAsset: "MSFT",
+    quoteAsset: "USDC",
+    oracleSymbol: "MSFT",
+    priceSourceSymbol: "MSFT",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "NASDAQ:MSFT",
+    maxLeverageBps: 100000,
+    initialMarginBps: 1000,
+    maintenanceMarginBps: 500,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 700,
+    maxOpenInterestUsd: 300_000,
+  },
+  "COIN-PERP": {
+    marketId: 17,
+    symbol: "COIN-PERP",
+    displayName: "COIN-PERP",
+    kind: "equity",
+    baseAsset: "COIN",
+    quoteAsset: "USDC",
+    oracleSymbol: "COIN",
+    priceSourceSymbol: "COIN",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "NASDAQ:COIN",
+    maxLeverageBps: 100000,
+    initialMarginBps: 1000,
+    maintenanceMarginBps: 500,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 1_200,
+    maxOpenInterestUsd: 300_000,
+  },
+  "MSTR-PERP": {
+    marketId: 18,
+    symbol: "MSTR-PERP",
+    displayName: "MSTR-PERP",
+    kind: "equity",
+    baseAsset: "MSTR",
+    quoteAsset: "USDC",
+    oracleSymbol: "MSTR",
+    priceSourceSymbol: "MSTR",
+    settlementAsset: ASSETS.usdc,
+    tvSymbol: "NASDAQ:MSTR",
+    maxLeverageBps: 100000,
+    initialMarginBps: 1000,
+    maintenanceMarginBps: 500,
+    liquidationFeeBps: 50,
+    priceDecimals: 2,
+    sizeDecimals: 3,
+    tickSizes: [0.01, 0.1, 1, 5],
+    maxOpenInterestBase: 800,
+    maxOpenInterestUsd: 300_000,
+  },
 };
 
 // The intended production set. A missing NEXT_PUBLIC_ACTIVE_MARKETS must not
 // silently collapse the venue to a single market (it did until 2026-08-22).
-const DEFAULT_ACTIVE_MARKETS = Object.keys(MARKETS).join(",");
+const DEFAULT_ACTIVE_MARKETS = [
+  "TSLA-PERP",
+  "NVDA-PERP",
+  "AAPL-PERP",
+  "SPY-PERP",
+  "META-PERP",
+  "AMZN-PERP",
+  "QQQ-PERP",
+  "MSFT-PERP",
+  "COIN-PERP",
+  "MSTR-PERP",
+  "SOL-PERP",
+  "BTC-PERP",
+  "ETH-PERP",
+  "XLM-PERP",
+  "XRP-PERP",
+  "ADA-PERP",
+  "BNB-PERP",
+  "TRX-PERP",
+].join(",");
 
 function parseActiveMarketSymbols(raw: string | undefined): string[] {
   const symbols = (raw ?? DEFAULT_ACTIVE_MARKETS)
@@ -331,6 +565,8 @@ export interface MarketConfig {
    * no feed for the asset, which disables the guard for that market.
    */
   reflectorSymbol?: string;
+  /** Crypto (Binance spot pair) vs tokenized equity (Yahoo / Binance RWA). */
+  kind?: "crypto" | "equity";
   /**
    * On-chain `max_open_interest`, in whole base-asset units (registered as
    * PRECISION * units). A fixed unit cap sized to `maxOpenInterestUsd` at the
@@ -343,7 +579,7 @@ export interface MarketConfig {
 
 // Precision: oracle prices and PnL values use 1e18 scale; USDC amounts use 1e7 (Stellar stroop-equivalent)
 export const PRICE_PRECISION = BigInt("1000000000000000000"); // 1e18
-export const AMOUNT_PRECISION = BigInt("10000000"); // 1e7 (Stellar 7 decimal places)
+export const AMOUNT_PRECISION = BigInt("1000000"); // 1e6 (USDC decimals)
 export const BPS_PRECISION = 10000;
 
 // ─── Off-chain service endpoints ─────────────────────────────────────────────
