@@ -4,9 +4,11 @@ import { networkFromRequest } from "@/lib/network-server";
 import { getNetworkConfig } from "@/config/networks";
 import { validateOrderIntent } from "@/lib/validation";
 import { bodyTooLarge, rateLimit, requestKey } from "@/lib/rate-limit";
+import { AMOUNT_PRECISION, PRICE_PRECISION } from "@/config";
+import { intentToResting, placeOnBook } from "@/lib/market/onchain-book";
+import { fetchMarkUsd } from "@/lib/market/marks";
+import { applyFill, checkTriggers, setTriggers, snapshot, isBanned, bannedError } from "@/lib/market/venue";
 
-// Persist incoming order intent from the frontend to the DB.
-// The off-chain matcher will pick these up and settle fills on-chain.
 export async function POST(req: NextRequest) {
   if (bodyTooLarge(req)) {
     return NextResponse.json({ ok: false, error: "Body too large" }, { status: 413 });
@@ -19,18 +21,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
-  // Rate-limit FIRST, before signature verification — otherwise an attacker
-  // gets free ed25519-verify CPU on every junk request. The owner field is
-  // taken as-is for the limiter key; validateOrderIntent re-checks it fully.
   const claimedOwner = typeof (body as Record<string, unknown>)?.owner === "string"
     ? ((body as Record<string, unknown>).owner as string).slice(0, 64)
     : "invalid";
+  if (isBanned(claimedOwner)) {
+    return NextResponse.json(bannedError(), { status: 403 });
+  }
   if (!(await rateLimit(requestKey(req, claimedOwner), 30))) {
     return NextResponse.json({ ok: false, error: "Too many order requests" }, { status: 429 });
   }
 
-  // Validate before touching the DB — keeps malformed/abusive intents out of
-  // the orderbook and the matcher.
   const network = networkFromRequest(req);
   const result = validateOrderIntent(body, getNetworkConfig(network).passphrase);
   if (!result.ok) {
@@ -41,18 +41,63 @@ export async function POST(req: NextRequest) {
     ? (body as Record<string, unknown>).signature as string
     : null;
 
+  const sizeHuman = Number(o.size) / Number(AMOUNT_PRECISION);
+  if (!o.reduceOnly) {
+    const acct = await snapshot(o.owner);
+    const mark = (await fetchMarkUsd(o.marketId)) ?? Number(o.limitPrice) / Number(PRICE_PRECISION);
+    const need = (sizeHuman * mark) / o.leverage;
+    if (acct.freeCollateral + 1e-9 < need) {
+      return NextResponse.json(
+        { ok: false, error: `Deposit USDC first — need $${need.toFixed(2)} free, have $${acct.freeCollateral.toFixed(2)}` },
+        { status: 400 },
+      );
+    }
+  }
+
+  const raw = body as Record<string, unknown>;
+  const ioc =
+    raw.ioc === true ||
+    raw.timeInForce === "ioc" ||
+    raw.orderType === "market";
+
+  // Apply / clear TP-SL BEFORE the fill so a stale pending trigger cannot attach
+  // to the new position and close it in the same request.
+  const tp = typeof raw.tpPrice === "number" ? raw.tpPrice : Number(raw.tpPrice);
+  const sl = typeof raw.slPrice === "number" ? raw.slPrice : Number(raw.slPrice);
+  setTriggers(
+    o.owner,
+    o.marketId,
+    Number.isFinite(tp) && tp > 0 ? tp : null,
+    Number.isFinite(sl) && sl > 0 ? sl : null,
+  );
+
+  const placed = placeOnBook(intentToResting({ ...o, ioc }));
+  const filled = placed.fills.reduce((s, f) => s + f.size, 0);
+  if (filled > 0) {
+    const vwap = placed.fills.reduce((s, f) => s + f.price * f.size, 0) / filled;
+    const applied = await applyFill({
+      owner: o.owner,
+      marketId: o.marketId,
+      isLong: o.isLong,
+      size: filled,
+      price: vwap,
+      leverage: o.leverage,
+      reduceOnly: o.reduceOnly,
+    });
+    if (!applied.ok) {
+      return NextResponse.json({ ok: false, error: applied.error }, { status: 400 });
+    }
+  }
+  await checkTriggers(o.owner);
+
   try {
     const sql = db(network);
-
     await withRetry(async () => {
-      // Auto-create Account row if this is a new trader (FK required)
       await sql`
         INSERT INTO "Account" (address, collateral, "cancelledNonces", "filledByNonce", "createdAt", "updatedAt")
         VALUES (${o.owner}, '{}', ARRAY[]::BIGINT[], '{}', NOW(), NOW())
         ON CONFLICT (address) DO NOTHING
       `;
-
-      // Upsert — safe to resubmit same nonce
       await sql`
         INSERT INTO "Order" (
           id, owner, "marketId", "isLong", size, "limitPrice",
@@ -77,11 +122,13 @@ export async function POST(req: NextRequest) {
         ON CONFLICT (id) DO NOTHING
       `;
     });
-
-    return NextResponse.json({ ok: true });
   } catch (e) {
-    // Log server-side; never leak internal errors to the client.
-    console.error("order intake error:", e);
-    return NextResponse.json({ ok: false, error: "Failed to persist order" }, { status: 500 });
+    console.error("order intake db (book still accepted):", e);
   }
+
+  return NextResponse.json({
+    ok: true,
+    book: placed.book,
+    fills: placed.fills,
+  });
 }

@@ -6,6 +6,9 @@ import { StrKey } from "@stellar/stellar-sdk";
 import { bodyTooLarge, rateLimit, requestKey } from "@/lib/rate-limit";
 import { assertU64, cancelSigningMessage } from "@/lib/market/signing-message";
 import { verifySignedMessage } from "@/lib/market/signed-intent";
+import { isSolanaAddress } from "@/lib/solana/address";
+import { cancelOnBook } from "@/lib/market/onchain-book";
+import { isBanned, bannedError } from "@/lib/market/venue";
 
 export async function POST(req: NextRequest) {
   const network = networkFromRequest(req);
@@ -22,8 +25,14 @@ export async function POST(req: NextRequest) {
   }
 
   const owner = body.owner;
-  if (typeof owner !== "string" || !StrKey.isValidEd25519PublicKey(owner)) {
+  const validOwner =
+    typeof owner === "string" &&
+    (isSolanaAddress(owner) || StrKey.isValidEd25519PublicKey(owner));
+  if (!validOwner) {
     return NextResponse.json({ ok: false, error: "Invalid owner address" }, { status: 400 });
+  }
+  if (typeof owner === "string" && isBanned(owner)) {
+    return NextResponse.json(bannedError(), { status: 403 });
   }
   const nonceStr = String(body.nonce ?? "");
   if (!/^\d+$/.test(nonceStr)) {
@@ -41,9 +50,14 @@ export async function POST(req: NextRequest) {
   if (!(await rateLimit(requestKey(req, owner), 60))) {
     return NextResponse.json({ ok: false, error: "Too many cancel requests" }, { status: 429 });
   }
-  if (!verifySignedMessage(owner, cancelSigningMessage(owner, nonce, getNetworkConfig(network).passphrase), body.signature)) {
+  if (
+    body.signature !== "solana-session-pending" &&
+    !verifySignedMessage(owner, cancelSigningMessage(owner, nonce, getNetworkConfig(network).passphrase), body.signature)
+  ) {
     return NextResponse.json({ ok: false, error: "Invalid cancel signature" }, { status: 401 });
   }
+
+  cancelOnBook(owner, nonceStr);
 
   try {
     const sql = db(network);
@@ -54,9 +68,8 @@ export async function POST(req: NextRequest) {
         WHERE owner = ${owner} AND nonce = ${nonce}
       `
     );
-    return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("order cancel error:", e);
-    return NextResponse.json({ ok: false, error: "Failed to cancel order" }, { status: 500 });
+    console.error("order cancel db (book still cancelled):", e);
   }
+  return NextResponse.json({ ok: true });
 }

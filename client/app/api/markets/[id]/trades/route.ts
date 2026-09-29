@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { networkFromRequest } from "@/lib/network-server";
+import { fetchVenueTrades } from "@/lib/market/marks";
+import { recentBookTrades } from "@/lib/market/onchain-book";
 
 // Prices are stored in 1e18 precision (PRICE_PRECISION).
 // Sizes are stored in 1e7 precision (AMOUNT_PRECISION) for real fills,
@@ -55,8 +57,21 @@ export async function GET(
       timestamp: new Date(r.ts).getTime(),
     }));
 
-    return NextResponse.json(trades, { headers: { "Cache-Control": "no-store" } });
+    const exchange = await fetchVenueTrades(marketId);
+    const merged = [...trades, ...exchange]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limit);
+    if (merged.length === 0) {
+      return NextResponse.json(recentBookTrades(marketId, limit), {
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+    return NextResponse.json(merged, { headers: { "Cache-Control": "no-store" } });
   } catch {
-    return NextResponse.json([], { status: 500 });
+    const exchange = await fetchVenueTrades(marketId).catch(() => []);
+    return NextResponse.json(
+      exchange.length > 0 ? exchange : recentBookTrades(marketId, limit),
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

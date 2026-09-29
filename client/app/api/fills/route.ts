@@ -3,25 +3,22 @@ import { StrKey } from "@stellar/stellar-sdk";
 import { db } from "@/lib/db";
 import { networkFromRequest } from "@/lib/network-server";
 import { rateLimit, requestKey } from "@/lib/rate-limit";
+import { isSolanaAddress } from "@/lib/solana/address";
+import { snapshot } from "@/lib/market/venue";
 
-const PRICE_SCALE  = 1e18;
+const PRICE_SCALE = 1e18;
 const AMOUNT_SCALE = 1e7;
 
-// GET /api/fills?address=G...&since=<unix-ms>&limit=10
+// GET /api/fills?address=…&since=<unix-ms>&limit=10
 export async function GET(req: NextRequest) {
   const address = req.nextUrl.searchParams.get("address");
-  if (!address || !StrKey.isValidEd25519PublicKey(address)) {
+  if (!address) {
     return NextResponse.json([], { status: 400 });
   }
   if (!(await rateLimit(requestKey(req, address), 120))) {
     return NextResponse.json([], { status: 429 });
   }
 
-  // Reject a bad value rather than passing NaN into the query. `parseInt("x")`
-  // is NaN, `Math.min(NaN, 50)` is NaN, and `LIMIT NaN` reaches Postgres as a
-  // type error — so a malformed query string produced a 500 that read like a
-  // server fault instead of a 400 that names the caller's mistake. Same for
-  // `since`, where an unparseable value became an Invalid Date.
   const limitRaw = req.nextUrl.searchParams.get("limit");
   const limitNum = limitRaw === null ? 20 : Number(limitRaw);
   if (!Number.isInteger(limitNum) || limitNum < 1) {
@@ -33,6 +30,32 @@ export async function GET(req: NextRequest) {
   const sinceMs = since === null ? null : Number(since);
   if (sinceMs !== null && !Number.isFinite(sinceMs)) {
     return NextResponse.json({ error: "invalid_since" }, { status: 400 });
+  }
+
+  // Solana desk venue — fills live in the local ledger, not the Stellar Fill table.
+  if (isSolanaAddress(address)) {
+    const snap = await snapshot(address);
+    const cutoff = sinceMs ?? 0;
+    const fills = (snap.fills ?? [])
+      .filter((f) => f.at >= cutoff)
+      .slice(0, limit)
+      .map((f) => ({
+        id: f.id,
+        marketId: f.marketId,
+        isMaker: false,
+        isLong: f.isLong,
+        price: f.price,
+        size: f.size,
+        pnl: f.pnl,
+        reason: f.reason,
+        txHash: `venue:${f.reason}`,
+        createdAt: f.at,
+      }));
+    return NextResponse.json(fills, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  if (!StrKey.isValidEd25519PublicKey(address)) {
+    return NextResponse.json([], { status: 400 });
   }
 
   try {
@@ -60,12 +83,12 @@ export async function GET(req: NextRequest) {
     `;
 
     const fills = rows.map((r) => ({
-      id:        String(r.id),
-      marketId:  Number(r.market_id),
-      isMaker:   r.maker === address,
-      price:     (Number(r.fill_price) / PRICE_SCALE).toFixed(4),
-      size:      (Number(r.fill_size)  / AMOUNT_SCALE).toFixed(4),
-      txHash:    String(r.tx_hash),
+      id: String(r.id),
+      marketId: Number(r.market_id),
+      isMaker: r.maker === address,
+      price: (Number(r.fill_price) / PRICE_SCALE).toFixed(4),
+      size: (Number(r.fill_size) / AMOUNT_SCALE).toFixed(4),
+      txHash: String(r.tx_hash),
       createdAt: new Date(r.created_at).getTime(),
     }));
 
