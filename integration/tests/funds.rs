@@ -1,8 +1,8 @@
 //! (c) init_user, deposit, withdraw (SPL + Token-2022), deposit caps, the
 //! withdraw health check and the paused escape hatch.
 
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_signer::Signer;
 
 const USDC: u64 = 1_000_000; // 6 decimals
@@ -61,7 +61,7 @@ fn init_user_creates_independent_sub_accounts() {
         ki::InitUser { sub_id: 3 },
     );
     assert_ok(send(&mut w.svm, &[i], &t.kp, &[]));
-    let u3: kryon_perps::state::UserAccount = fetch_zc(&w.svm, &sub3);
+    let u3: floydex_perps::state::UserAccount = fetch_zc(&w.svm, &sub3);
     assert_eq!(u3.sub_id, 3);
 }
 
@@ -100,13 +100,13 @@ fn cannot_withdraw_more_than_the_balance() {
     assert_ok(w.deposit(&t, &usdc, &wallet, 10 * USDC));
     assert_err(
         w.withdraw(&t, &usdc, &wallet, 10 * USDC + 1, vec![]),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     assert_err(
         w.withdraw(&t, &usdc, &wallet, 0, vec![]),
-        KryonError::InvalidAmount,
+        FloyDexError::InvalidAmount,
     );
-    assert_err(w.deposit(&t, &usdc, &wallet, 0), KryonError::InvalidAmount);
+    assert_err(w.deposit(&t, &usdc, &wallet, 0), FloyDexError::InvalidAmount);
 }
 
 #[test]
@@ -120,7 +120,7 @@ fn deposit_cap_is_enforced_and_withdrawals_free_headroom() {
     assert_ok(w.deposit(&a, &usdc, &wa, 60 * USDC));
     assert_err(
         w.deposit(&b, &usdc, &wb, 41 * USDC),
-        KryonError::DepositCapExceeded,
+        FloyDexError::DepositCapExceeded,
     );
     assert_ok(w.deposit(&b, &usdc, &wb, 40 * USDC));
     assert_ok(w.withdraw(&a, &usdc, &wa, 10 * USDC, vec![]));
@@ -170,7 +170,7 @@ fn paused_blocks_deposits_but_not_idle_withdrawals() {
     let wallet = w.wallet(&t, &usdc, 100 * USDC);
     assert_ok(w.deposit(&t, &usdc, &wallet, 50 * USDC));
     pause(&mut w);
-    assert_err(w.deposit(&t, &usdc, &wallet, USDC), KryonError::Paused);
+    assert_err(w.deposit(&t, &usdc, &wallet, USDC), FloyDexError::Paused);
     // Escape hatch: idle collateral can always leave (05 §7.6).
     assert_ok(w.withdraw(&t, &usdc, &wallet, 50 * USDC, vec![]));
 }
@@ -204,7 +204,7 @@ fn withdraw_with_positions_keeps_initial_margin() {
     // Equity 1,000, initial margin 500: 500 is free, 500.000001 is not.
     assert_err(
         w.withdraw(&t, &usdc, &wallet, 500 * USDC + 1, market_accounts(feed)),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     assert_ok(w.withdraw(&t, &usdc, &wallet, 500 * USDC, market_accounts(feed)));
     assert_eq!(w.user(&t).balance(0), 500 * P);
@@ -218,7 +218,7 @@ fn withdraw_health_uses_unrealized_pnl() {
     let feed = mock_usd(&mut w.svm, FEED_TSLA, 230.0, now);
     assert_err(
         w.withdraw(&t, &usdc, &wallet, 340 * USDC + 1, market_accounts(feed)),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     assert_ok(w.withdraw(&t, &usdc, &wallet, 340 * USDC, market_accounts(feed)));
 }
@@ -228,14 +228,14 @@ fn withdraw_with_positions_requires_the_market_accounts() {
     let (mut w, usdc, t, wallet, feed) = leveraged();
     assert_err(
         w.withdraw(&t, &usdc, &wallet, USDC, vec![]),
-        KryonError::InvalidRemainingAccounts,
+        FloyDexError::InvalidRemainingAccounts,
     );
     // Extra accounts are refused too: the layout is exact.
     let mut extra = market_accounts(feed);
     extra.push(meta(feed, false));
     assert_err(
         w.withdraw(&t, &usdc, &wallet, USDC, extra),
-        KryonError::InvalidRemainingAccounts,
+        FloyDexError::InvalidRemainingAccounts,
     );
     // The market must be the one the position is in.
     let i = w.create_market_ix(2, default_market_params());
@@ -248,7 +248,7 @@ fn withdraw_with_positions_requires_the_market_accounts() {
             USDC,
             vec![meta(market_pda(2), false), meta(feed, false)],
         ),
-        KryonError::InvalidRemainingAccounts,
+        FloyDexError::InvalidRemainingAccounts,
     );
 }
 
@@ -260,21 +260,21 @@ fn withdraw_rejects_a_foreign_or_spoofed_price_account() {
     let other = mock_usd(&mut w.svm, [0x99; 32], 250.0, now);
     assert_err(
         w.withdraw(&t, &usdc, &wallet, USDC, market_accounts(other)),
-        KryonError::InvalidOracleAccount,
+        FloyDexError::InvalidOracleAccount,
     );
     // The right address but not owned by the Pyth receiver.
-    let addr = kryon_perps::oracle::push_feed_address(0, &FEED_TSLA);
+    let addr = floydex_perps::oracle::push_feed_address(0, &FEED_TSLA);
     let data = w.svm.get_account(&addr).unwrap().data;
     mock_price_with(&mut w.svm, addr, anchor_lang::system_program::ID, data);
     assert_err(
         w.withdraw(&t, &usdc, &wallet, USDC, market_accounts(addr)),
-        KryonError::InvalidOracleAccount,
+        FloyDexError::InvalidOracleAccount,
     );
     // The same feed on another shard is a different account.
     let shard1 = mock_price(&mut w.svm, 1, FEED_TSLA, 250_0000_0000, 1, -8, now);
     assert_err(
         w.withdraw(&t, &usdc, &wallet, USDC, market_accounts(shard1)),
-        KryonError::InvalidOracleAccount,
+        FloyDexError::InvalidOracleAccount,
     );
 }
 
@@ -287,16 +287,16 @@ fn a_stale_oracle_in_a_scheduled_session_halts_at_the_last_price() {
     let feed = mock_usd(&mut w.svm, FEED_TSLA, 250.0, now - 120);
     assert_err(
         w.withdraw(&t, &usdc, &wallet, USDC, market_accounts(feed)),
-        KryonError::StaleOracle,
+        FloyDexError::StaleOracle,
     );
     // With a last valid price, Halted uses it and margin doubles (×2):
     // IM = 2,500 × 40% = 1,000 = equity → nothing is free.
-    patch_zc::<kryon_perps::state::Market>(&mut w.svm, &market_pda(1), |m| {
+    patch_zc::<floydex_perps::state::Market>(&mut w.svm, &market_pda(1), |m| {
         m.last_oracle_price.set(250 * P)
     });
     assert_err(
         w.withdraw(&t, &usdc, &wallet, 1, market_accounts(feed)),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
 }
 
@@ -316,7 +316,7 @@ fn a_wide_confidence_interval_is_refused_in_session() {
     );
     assert_err(
         w.withdraw(&t, &usdc, &wallet, USDC, market_accounts(feed)),
-        KryonError::OracleConfidenceTooWide,
+        FloyDexError::OracleConfidenceTooWide,
     );
 }
 
@@ -326,7 +326,7 @@ fn paused_blocks_withdrawals_for_accounts_with_positions() {
     pause(&mut w);
     assert_err(
         w.withdraw(&t, &usdc, &wallet, USDC, market_accounts(feed)),
-        KryonError::Paused,
+        FloyDexError::Paused,
     );
 }
 
@@ -343,7 +343,7 @@ fn xstock_collateral_is_priced_and_haircut() {
     assert_ok(w.deposit(&t, &x, &xw, 10 * 100_000_000));
     // Long 10 TSLA @ 250: IM 500. Also a -100 USDC debt from a realized loss.
     inject_position(&mut w.svm, &t.user, 1, true, 10 * P, 250 * P);
-    patch_zc::<kryon_perps::state::UserAccount>(&mut w.svm, &t.user, |u| {
+    patch_zc::<floydex_perps::state::UserAccount>(&mut w.svm, &t.user, |u| {
         u.apply_balance(0, -100 * P).unwrap();
     });
     let now = w.now();
@@ -361,14 +361,14 @@ fn xstock_collateral_is_priced_and_haircut() {
     // ($200 before haircut) is exactly the limit; 2 shares + 1 unit is over.
     assert_err(
         w.withdraw(&t, &x, &xw, 2 * 100_000_000 + 1, accs(xfeed)),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     assert_ok(w.withdraw(&t, &x, &xw, 2 * 100_000_000, accs(xfeed)));
     // A stale xStock price blocks it: collateral needs a fresh price.
     let stale = mock_usd(&mut w.svm, FEED_XSTOCK, 100.0, now - 600);
     assert_err(
         w.withdraw(&t, &x, &xw, 1, accs(stale)),
-        KryonError::StaleOracle,
+        FloyDexError::StaleOracle,
     );
     let _ = (usdc, uw);
 }

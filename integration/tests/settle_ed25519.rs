@@ -4,8 +4,8 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
@@ -37,7 +37,7 @@ fn tamper_wrong_program() {
     fake.data = vec![3, 0, 0, 0, 0, 0, 0, 0, 0]; // SetComputeUnitPrice(0)
     assert_err(
         b.w.settle_with(1, &[p], fake),
-        KryonError::Ed25519WrongProgram,
+        FloyDexError::Ed25519WrongProgram,
     );
 }
 
@@ -74,7 +74,7 @@ fn tamper_offsets_point_at_another_instruction() {
         &op,
         &[],
     );
-    assert_err(r, KryonError::Ed25519OffsetIndex);
+    assert_err(r, FloyDexError::Ed25519OffsetIndex);
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn tamper_wrong_pubkey() {
     let p = plan(&b.alice, &b.bob, mo, to, W, PX);
     assert_err(
         b.w.settle_with(1, &[p], ed25519_ix(&[m, t])),
-        KryonError::Ed25519PubkeyMismatch,
+        FloyDexError::Ed25519PubkeyMismatch,
     );
 }
 
@@ -108,7 +108,7 @@ fn tamper_expired_or_revoked_delegate() {
     let p = plan(&b.alice, &b.bob, mo, to, W, PX);
     assert_err(
         b.w.settle_with(1, &[p], ed25519_ix(&[m, t])),
-        KryonError::Ed25519PubkeyMismatch,
+        FloyDexError::Ed25519PubkeyMismatch,
     );
 
     // A delegate at the exact second it expires (expiry is exclusive).
@@ -128,7 +128,7 @@ fn tamper_expired_or_revoked_delegate() {
     let p = plan(&b.alice, &b.bob, mo, to, W, PX);
     assert_err(
         b.w.settle_with(1, &[p], ed25519_ix(&[m, t])),
-        KryonError::Ed25519PubkeyMismatch,
+        FloyDexError::Ed25519PubkeyMismatch,
     );
 }
 
@@ -144,7 +144,7 @@ fn tamper_wrong_message() {
     let p = plan(&b.alice, &b.bob, mo, to, 5 * W, PX);
     assert_err(
         b.w.settle_with(1, &[p], ed25519_ix(&[m, t])),
-        KryonError::Ed25519MessageMismatch,
+        FloyDexError::Ed25519MessageMismatch,
     );
 }
 
@@ -158,7 +158,7 @@ fn tamper_wrong_domain() {
     let p = plan(&b.alice, &b.bob, mo, to, W, PX);
     assert_err(
         b.w.settle_with(1, &[p], ed25519_ix(&[m, t])),
-        KryonError::Ed25519MessageMismatch,
+        FloyDexError::Ed25519MessageMismatch,
     );
 }
 
@@ -173,7 +173,7 @@ fn tamper_truncated_message() {
     let p = plan(&b.alice, &b.bob, mo, to, W, PX);
     assert_err(
         b.w.settle_with(1, &[p], ed25519_ix(&[m, t])),
-        KryonError::Ed25519MessageMismatch,
+        FloyDexError::Ed25519MessageMismatch,
     );
     // …and neither is a longer message that starts with the order.
     let mut b = Book::new();
@@ -185,7 +185,7 @@ fn tamper_truncated_message() {
     let p = plan(&b.alice, &b.bob, mo, to, W, PX);
     assert_err(
         b.w.settle_with(1, &[p], ed25519_ix(&[m, t])),
-        KryonError::Ed25519MessageMismatch,
+        FloyDexError::Ed25519MessageMismatch,
     );
 }
 
@@ -221,7 +221,7 @@ fn tamper_signature_index_out_of_range() {
         &op,
         &[],
     );
-    assert_err(r, KryonError::Ed25519Malformed);
+    assert_err(r, FloyDexError::Ed25519Malformed);
 }
 
 #[test]
@@ -233,6 +233,6 @@ fn swapping_maker_and_taker_signatures_fails() {
     let p = plan(&b.alice, &b.bob, mo, to, W, PX);
     assert_err(
         b.w.settle_with(1, &[p], ed25519_ix(&[t, m])),
-        KryonError::Ed25519MessageMismatch,
+        FloyDexError::Ed25519MessageMismatch,
     );
 }

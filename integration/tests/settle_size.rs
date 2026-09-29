@@ -2,7 +2,7 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
+use floydex_integration::*;
 use solana_message::Message;
 use solana_signer::Signer;
 use solana_transaction::Transaction;

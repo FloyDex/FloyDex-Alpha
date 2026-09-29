@@ -2,8 +2,8 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_signer::Signer;
 
 #[test]
@@ -38,7 +38,7 @@ fn a_fill_opens_both_sides_charges_fees_and_records_orders() {
         "a Regular fill records the oracle price"
     );
 
-    let r: kryon_perps::state::OrderRecord =
+    let r: floydex_perps::state::OrderRecord =
         fetch(&b.w.svm, &order_pda(&b.alice.key(), 0, mo.nonce));
     assert_eq!(r.filled, 2 * P);
     assert_eq!(r.expiry_ts, mo.expiry_ts);
@@ -65,12 +65,12 @@ fn owner_keys_sign_too() {
 fn rule_fill_size_and_price_must_be_positive() {
     let mut b = Book::new();
     let (mo, to) = b.pair(true, W, PX);
-    assert_err(b.fill(mo, to, 0, PX), KryonError::InvalidAmount);
-    assert_err(b.fill(mo, to, W, 0), KryonError::InvalidAmount);
+    assert_err(b.fill(mo, to, 0, PX), FloyDexError::InvalidAmount);
+    assert_err(b.fill(mo, to, W, 0), FloyDexError::InvalidAmount);
     // An order with zero size is invalid too (Stellar validate_order).
     let e = b.expiry();
     let zero = order_args(1, true, 0, PX, 99, e);
-    assert_err(b.fill(zero, to, W, PX), KryonError::InvalidAmount);
+    assert_err(b.fill(zero, to, W, PX), FloyDexError::InvalidAmount);
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn rule_self_trade_is_refused_across_sub_accounts() {
     let (mo, to) = b.pair(true, W, PX);
     let plan = plan(&b.alice, &alice1, mo, to, W, PX);
     let (ak, ok) = (b.alice.kp.insecure_clone(), b.alice.kp.insecure_clone());
-    assert_err(b.w.settle(1, &[plan], &[(&ak, &ok)]), KryonError::SelfTrade);
+    assert_err(b.w.settle(1, &[plan], &[(&ak, &ok)]), FloyDexError::SelfTrade);
 }
 
 #[test]
@@ -108,17 +108,17 @@ fn rule_both_orders_must_be_for_this_nonzero_market() {
     assert_ok(b.w.admin_send(&[i]));
     let (mo, mut to) = b.pair(true, W, PX);
     to.market_id = 2;
-    assert_err(b.fill(mo, to, W, PX), KryonError::InvalidConfig);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::InvalidConfig);
     // Both for market 2 but settled in market 1.
     let (mut mo, mut to) = b.pair(true, W, PX);
     mo.market_id = 2;
     to.market_id = 2;
-    assert_err(b.fill(mo, to, W, PX), KryonError::InvalidConfig);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::InvalidConfig);
     // Market id 0 is never valid.
     let (mut mo, mut to) = b.pair(true, W, PX);
     mo.market_id = 0;
     to.market_id = 0;
-    assert_err(b.fill(mo, to, W, PX), KryonError::InvalidConfig);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::InvalidConfig);
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn rule_directions_must_differ() {
     let mut b = Book::new();
     let (mo, mut to) = b.pair(true, W, PX);
     to.flags = mo.flags; // both long
-    assert_err(b.fill(mo, to, W, PX), KryonError::DirectionMismatch);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::DirectionMismatch);
 }
 
 #[test]
@@ -135,9 +135,9 @@ fn rule_expiry_must_be_between_now_and_seven_days() {
     let now = b.w.now() as u64;
     let (mut mo, to) = b.pair(true, W, PX);
     mo.expiry_ts = now - 1;
-    assert_err(b.fill(mo, to, W, PX), KryonError::OrderExpired);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::OrderExpired);
     mo.expiry_ts = now + 7 * 86_400 + 1;
-    assert_err(b.fill(mo, to, W, PX), KryonError::OrderExpired);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::OrderExpired);
     // Exactly now and exactly now + 7d are both fine.
     mo.expiry_ts = now;
     let (_, to) = b.pair(true, W, PX);
@@ -160,7 +160,7 @@ fn rule_cancelled_orders_never_fill() {
             order_record: order_pda(&k.pubkey(), 0, mo.nonce),
             system_program: anchor_lang::system_program::ID,
             event_authority: event_authority(),
-            program: kryon_perps::ID,
+            program: floydex_perps::ID,
         },
         ki::CancelOrder {
             sub_id: 0,
@@ -169,7 +169,7 @@ fn rule_cancelled_orders_never_fill() {
         },
     );
     assert_ok(send(&mut b.w.svm, &[i], &k, &[]));
-    assert_err(b.fill(mo, to, W, PX), KryonError::OrderCancelled);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::OrderCancelled);
 
     // cancel_all: every nonce below the watermark is dead.
     let (mo, to) = b.pair(true, W, PX);
@@ -178,21 +178,21 @@ fn rule_cancelled_orders_never_fill() {
             owner: k.pubkey(),
             user_account: b.alice.user,
             event_authority: event_authority(),
-            program: kryon_perps::ID,
+            program: floydex_perps::ID,
         },
         ki::CancelAll {
             below_nonce: mo.nonce + 1,
         },
     );
     assert_ok(send(&mut b.w.svm, &[i], &k, &[]));
-    assert_err(b.fill(mo, to, W, PX), KryonError::OrderCancelled);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::OrderCancelled);
     // The watermark never moves back.
     let i = ix(
         ka::OwnerOnly {
             owner: k.pubkey(),
             user_account: b.alice.user,
             event_authority: event_authority(),
-            program: kryon_perps::ID,
+            program: floydex_perps::ID,
         },
         ki::CancelAll { below_nonce: 0 },
     );
@@ -209,15 +209,15 @@ fn rule_cancelled_orders_never_fill() {
 fn rule_an_order_cannot_be_overfilled() {
     let mut b = Book::new();
     let (mo, to) = b.pair(true, 3 * W, PX);
-    assert_err(b.fill(mo, to, 3 * W + 1, PX), KryonError::OrderOverfilled);
+    assert_err(b.fill(mo, to, 3 * W + 1, PX), FloyDexError::OrderOverfilled);
     // Partial fills add up to exactly the size, then stop.
     assert_ok(b.fill(mo, to, 2 * W, PX));
     assert_ok(b.fill(mo, to, W, PX));
-    let r: kryon_perps::state::OrderRecord =
+    let r: floydex_perps::state::OrderRecord =
         fetch(&b.w.svm, &order_pda(&b.alice.key(), 0, mo.nonce));
     assert_eq!(r.filled, 3 * P);
     // Replaying the same signed orders fails.
-    assert_err(b.fill(mo, to, 1, PX), KryonError::OrderOverfilled);
+    assert_err(b.fill(mo, to, 1, PX), FloyDexError::OrderOverfilled);
 }
 
 #[test]
@@ -227,13 +227,13 @@ fn rule_fill_price_respects_both_limits() {
     let (mo, to) = b.pair(true, W, PX);
     assert_err(
         b.fill(mo, to, W, PX + W / 100),
-        KryonError::PriceOutsideBand,
+        FloyDexError::PriceOutsideBand,
     );
     // Short limit 250, fill at 249.99: receives less than signed.
     let (mo, to) = b.pair(false, W, PX);
     assert_err(
         b.fill(mo, to, W, PX - W / 100),
-        KryonError::PriceOutsideBand,
+        FloyDexError::PriceOutsideBand,
     );
     // Inside both limits fills.
     let e = b.expiry();
@@ -251,12 +251,52 @@ fn rule_fill_price_stays_within_the_band_around_the_mark() {
     let to = order_args(1, false, 2 * W, 240 * W, b.nonce(), e);
     assert_err(
         b.fill(mo, to, W, 252 * W + W / 2 + 1),
-        KryonError::PriceOutsideBand,
+        FloyDexError::PriceOutsideBand,
     );
     assert_err(
         b.fill(mo, to, W, 247 * W + W / 2 - 1),
-        KryonError::PriceOutsideBand,
+        FloyDexError::PriceOutsideBand,
     );
     assert_ok(b.fill(mo, to, W, 252 * W + W / 2));
     assert_ok(b.fill(mo, to, W, 247 * W + W / 2));
+}
+
+#[test]
+fn platform_fee_is_one_percent_on_both_sides_and_collects_to_the_wallet() {
+    let mut b = Book::new();
+    let i = b.w.admin_ix(ki::SetFeeConfig {
+        fee_config: floydex_perps::FeeConfig::PLATFORM,
+    });
+    assert_ok(b.w.admin_send(&[i]));
+
+    let (mo, to) = b.pair(true, 2 * W, PX);
+    assert_ok(b.fill(mo, to, 2 * W, PX));
+    // Notional $500; 1% each side = $5.
+    let fee = 5 * P;
+    assert_eq!(b.w.user(&b.alice).balance(0), 10_000 * P - fee);
+    assert_eq!(b.w.user(&b.bob).balance(0), 10_000 * P - fee);
+    assert_eq!(b.w.collateral(&b.usdc).fees_accrued, 2 * fee);
+
+    let collector = funded(&mut b.w.svm);
+    let dest = create_token_account(
+        &mut b.w.svm,
+        &b.w.admin,
+        b.usdc.token_program,
+        &b.usdc.mint,
+        &collector.pubkey(),
+    );
+    let i = b.w.admin_ix(ki::SetFeeCollector {
+        collector: collector.pubkey(),
+    });
+    assert_ok(b.w.admin_send(&[i]));
+
+    let before_vault = token_balance(&b.w.svm, &vault_pda(&b.usdc.mint));
+    assert_ok(b.w.collect_fees(&b.usdc, &dest));
+    assert_eq!(b.w.collateral(&b.usdc).fees_accrued, 0);
+    assert_eq!(token_balance(&b.w.svm, &dest), 10 * USDC);
+    assert_eq!(
+        token_balance(&b.w.svm, &vault_pda(&b.usdc.mint)),
+        before_vault - 10 * USDC
+    );
+    assert_solvent(&b.w, &b.usdc, &[&b.alice, &b.bob], 1, 250 * P);
 }

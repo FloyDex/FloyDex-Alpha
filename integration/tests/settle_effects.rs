@@ -3,8 +3,8 @@
 
 mod common;
 use common::*;
-use kryon_integration::*;
-use kryon_perps::error::KryonError;
+use floydex_integration::*;
+use floydex_perps::error::FloyDexError;
 use solana_signer::Signer;
 
 #[test]
@@ -39,11 +39,11 @@ fn reduce_only_orders_cannot_open_or_flip() {
     let mut b = Book::new();
     let (mut mo, to) = b.pair(true, W, PX);
     mo.flags |= protocol_core::FLAG_REDUCE_ONLY;
-    assert_err(b.fill(mo, to, W, PX), KryonError::PositionNotFound);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::PositionNotFound);
     assert_ok(b.trade(true, W, PX));
     let (mut mo, to) = b.pair(false, 2 * W, PX);
     mo.flags |= protocol_core::FLAG_REDUCE_ONLY;
-    assert_err(b.fill(mo, to, 2 * W, PX), KryonError::InvalidAmount);
+    assert_err(b.fill(mo, to, 2 * W, PX), FloyDexError::InvalidAmount);
     assert_ok(b.fill(mo, to, W, PX)); // exactly closes
     assert!(b.position(&b.alice).is_none());
 }
@@ -55,7 +55,7 @@ fn a_fill_that_breaks_initial_margin_is_refused() {
     // minus fees. 199 fits, 200 does not (the fee tips it over).
     assert_err(
         b.trade(true, 200 * W, PX),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     assert_ok(b.trade(true, 199 * W, PX));
 }
@@ -65,7 +65,7 @@ fn a_fill_that_breaks_initial_margin_is_refused() {
 fn below_initial_margin_after_the_close() -> Book {
     let mut b = Book::new();
     assert_ok(b.trade(true, 100 * W, PX));
-    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
+    patch_zc::<floydex_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
         m.calendar = Default::default()
     });
     b
@@ -75,7 +75,7 @@ fn below_initial_margin_after_the_close() -> Book {
 fn below_initial_margin_a_reduce_that_improves_health_goes_through() {
     let mut b = below_initial_margin_after_the_close();
     // Adding is refused…
-    assert_err(b.trade(true, W, PX), KryonError::InsufficientCollateral);
+    assert_err(b.trade(true, W, PX), FloyDexError::InsufficientCollateral);
     // …a small reduce is fine even though the account stays below initial margin.
     assert_ok(b.trade(false, W, PX));
     assert_eq!(b.position(&b.alice).unwrap().size.get(), 99 * P);
@@ -85,14 +85,14 @@ fn below_initial_margin_a_reduce_that_improves_health_goes_through() {
 fn below_initial_margin_a_reduce_that_worsens_health_is_refused() {
     let mut b = below_initial_margin_after_the_close();
     // Widen the band so a terrible price is otherwise acceptable.
-    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
+    patch_zc::<floydex_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
         m.max_execution_deviation_bps = 5_000
     });
     // Alice sells 1 at $140 while the mark is $250: she realizes −110 and
     // frees only 100 of margin (40% of 250), so her health falls.
     assert_err(
         b.trade(false, W, 140 * W),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
     // At $200 she loses 50 and frees 100: health improves, allowed.
     assert_ok(b.trade(false, W, 200 * W));
@@ -105,7 +105,7 @@ fn below_initial_margin_a_flip_gets_no_relief() {
     // margin: new exposure gets no reduce-only relief.
     assert_err(
         b.trade(false, 201 * W, PX),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
 }
 
@@ -130,7 +130,7 @@ fn a_liquidatable_account_cannot_sell_below_mark_to_an_accomplice() {
     // worsen" relief lets it through.
     assert_err(
         b.trade(false, 99 * W, 14_949 * W / 100),
-        KryonError::LiquidatableReduceOffMark,
+        FloyDexError::LiquidatableReduceOffMark,
     );
     // Slightly off-mark is fine when she still meets initial margin after the
     // fill: her equity stays positive, so nobody but Alice pays for it.
@@ -152,7 +152,7 @@ fn a_liquidatable_short_cannot_buy_above_mark() {
     mock_usd(&mut b.w.svm, FEED_TSLA, 349.0, now); // −9,900: liquidatable
     assert_err(
         b.trade(true, 99 * W, 35_249 * W / 100),
-        KryonError::LiquidatableReduceOffMark,
+        FloyDexError::LiquidatableReduceOffMark,
     );
     assert_ok(b.trade(true, 50 * W, 349 * W));
     assert_eq!(b.position(&b.alice).unwrap().size.get(), 50 * P);
@@ -173,7 +173,7 @@ fn halted_markets_are_reduce_only() {
     // Oracle goes stale inside the Regular window → Halted.
     let now = b.w.now();
     mock_usd(&mut b.w.svm, FEED_TSLA, 250.0, now - 600);
-    assert_err(b.trade(true, W, PX), KryonError::SessionExposureBlocked);
+    assert_err(b.trade(true, W, PX), FloyDexError::SessionExposureBlocked);
     // Reducing is allowed (at the last valid price, margin ×2).
     assert_ok(b.trade(false, W, PX));
     assert_eq!(b.position(&b.alice).unwrap().size.get(), P);
@@ -184,33 +184,33 @@ fn closed_markets_cap_open_interest_and_double_margin() {
     let mut b = Book::new();
     assert_ok(b.trade(true, W, PX)); // records the last oracle price
                                      // Remove the calendar: outside every window is Closed.
-    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
+    patch_zc::<floydex_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
         m.calendar = Default::default();
         m.max_open_interest.set(10 * P);
     });
     // Closed OI cap = 50% of 10 = 5 total (long + short); 2 open now.
-    assert_err(b.trade(true, 2 * W, PX), KryonError::OpenInterestExceeded);
+    assert_err(b.trade(true, 2 * W, PX), FloyDexError::OpenInterestExceeded);
     assert_ok(b.trade(true, W, PX)); // total 4
     let m = b.w.market(1);
     assert_ne!(m.closed_since, 0, "the close time is recorded");
     // Closed margin is 40%: 10,000 supports 25,000 notional ≈ 100 shares.
-    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
+    patch_zc::<floydex_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
         m.max_open_interest.set(1_000_000 * P)
     });
     assert_err(
         b.trade(true, 100 * W, PX),
-        KryonError::InsufficientCollateral,
+        FloyDexError::InsufficientCollateral,
     );
 }
 
 #[test]
 fn regular_markets_cap_open_interest() {
     let mut b = Book::new();
-    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
+    patch_zc::<floydex_perps::state::Market>(&mut b.w.svm, &market_pda(1), |m| {
         m.max_open_interest.set(4 * P)
     });
     assert_ok(b.trade(true, 2 * W, PX)); // long 2 + short 2 = 4
-    assert_err(b.trade(true, W, PX), KryonError::OpenInterestExceeded);
+    assert_err(b.trade(true, W, PX), FloyDexError::OpenInterestExceeded);
     assert_ok(b.trade(false, W, PX)); // reducing is always fine
 }
 
@@ -231,7 +231,7 @@ fn only_operators_settle_and_pause_stops_them() {
         &stranger,
         &[],
     );
-    assert_err(r, KryonError::NotOperator);
+    assert_err(r, FloyDexError::NotOperator);
 
     let g = b.w.guardian.insecure_clone();
     let i = ix(
@@ -242,7 +242,7 @@ fn only_operators_settle_and_pause_stops_them() {
         ki::Pause {},
     );
     assert_ok(send(&mut b.w.svm, &[i], &g, &[]));
-    assert_err(b.fill(mo, to, W, PX), KryonError::Paused);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::Paused);
 }
 
 #[test]
@@ -270,8 +270,8 @@ fn positions_in_other_markets_need_their_accounts() {
     let i = b.w.create_market_ix(2, p2);
     assert_ok(b.w.admin_send(&[i]));
     let now = b.w.now();
-    patch_zc::<kryon_perps::state::Market>(&mut b.w.svm, &market_pda(2), |m| {
-        m.calendar[0] = kryon_perps::state::SessionWindowPod {
+    patch_zc::<floydex_perps::state::Market>(&mut b.w.svm, &market_pda(2), |m| {
+        m.calendar[0] = floydex_perps::state::SessionWindowPod {
             start: (now - 60) as u64,
             end: (now + 86_400) as u64,
             session: 0,
@@ -282,7 +282,7 @@ fn positions_in_other_markets_need_their_accounts() {
     inject_position(&mut b.w.svm, &b.alice.user, 2, true, 10 * P, 100 * P);
 
     let (mo, to) = b.pair(true, W, PX);
-    assert_err(b.fill(mo, to, W, PX), KryonError::InvalidRemainingAccounts);
+    assert_err(b.fill(mo, to, W, PX), FloyDexError::InvalidRemainingAccounts);
     let mut p = plan(&b.alice, &b.bob, mo, to, W, PX);
     p.maker_risk = vec![meta(market_pda(2), false), meta(price2, false)];
     let (ak, bk) = (b.alice_key.insecure_clone(), b.bob_key.insecure_clone());
@@ -315,7 +315,7 @@ fn order_records_are_reclaimed_only_after_expiry() {
         let anyone = funded(&mut b.w.svm);
         send(&mut b.w.svm, &[i], &anyone, &[])
     };
-    assert_err(reclaim(&mut b), KryonError::NotReclaimable);
+    assert_err(reclaim(&mut b), FloyDexError::NotReclaimable);
     let before = b.w.svm.get_balance(&op).unwrap();
     b.w.warp_to(mo.expiry_ts as i64 + 1);
     assert_ok(reclaim(&mut b));
@@ -344,7 +344,7 @@ fn a_tombstone_outlives_the_order_it_cancels() {
             order_record: rec,
             system_program: anchor_lang::system_program::ID,
             event_authority: event_authority(),
-            program: kryon_perps::ID,
+            program: floydex_perps::ID,
         },
         ki::CancelOrder {
             sub_id: 0,
@@ -353,7 +353,7 @@ fn a_tombstone_outlives_the_order_it_cancels() {
         },
     );
     assert_ok(send(&mut b.w.svm, &[i], &k, &[]));
-    let r: kryon_perps::state::OrderRecord = fetch(&b.w.svm, &rec);
+    let r: floydex_perps::state::OrderRecord = fetch(&b.w.svm, &rec);
     assert!(
         r.cancelled_until >= mo.expiry_ts,
         "tombstone reaches past the order's expiry"
