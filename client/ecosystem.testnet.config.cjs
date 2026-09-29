@@ -6,7 +6,7 @@
  * ── Why a separate file, not more apps in ecosystem.config.cjs ───────────────
  * Each keeper process serves exactly one network. The oracle publisher, matcher
  * operator and liquidator are distinct funded Stellar accounts per network, the
- * contract ids differ, and the database is a different one (`kryon_testnet`) —
+ * contract ids differ, and the database is a different one (`floydex_testnet`) —
  * all of which arrive through `--env-file`. Running both fleets therefore means
  * running two sets of processes with two env files, and keeping them in
  * separate ecosystem files means `pm2 start`/`pm2 stop` can address one network
@@ -18,7 +18,7 @@
  *     funded testnet accounts — one role per key, none of them the contract
  *     admin — and none may be reused from mainnet.
  *  2. Friendbot-fund each of them.
- *  3. Ensure the `kryon_testnet` database exists and is migrated.
+ *  3. Ensure the `floydex_testnet` database exists and is migrated.
  *
  * ── Capacity warning ─────────────────────────────────────────────────────────
  * The current services VM is a VM.Standard.E2.1.Micro with 945MB RAM, already
@@ -63,9 +63,9 @@ const SERVICES = [
 
 module.exports = {
   apps: SERVICES.map((svc) => ({
-    // `kryon-testnet-*` so `pm2 status` distinguishes the two fleets at a glance
-    // and `pm2 restart /kryon-testnet-/` addresses only this one.
-    name: `kryon-testnet-${svc.name}`,
+    // `floydex-testnet-*` so `pm2 status` distinguishes the two fleets at a glance
+    // and `pm2 restart /floydex-testnet-/` addresses only this one.
+    name: `floydex-testnet-${svc.name}`,
     script: "npx",
     args: `tsx --env-file=${ENV_FILE} scripts/${svc.script}`,
     cwd: __dirname,

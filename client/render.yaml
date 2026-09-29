@@ -1,7 +1,7 @@
-# Render blueprint for the Kryon off-chain services.
+# Render blueprint for the FloyDex off-chain services.
 #
 # ⚠ CONTRACT ADDRESSES: these must match the CURRENT deployment
-#   (kryon-protocol/infra/deploy/testnet-deployment.toml / redeploy-core.ts
+#   (floydex-protocol/infra/deploy/testnet-deployment.toml / redeploy-core.ts
 #   output). Stale addresses here mean services silently run against old,
 #   unpatched contract instances. Re-generate this block on every redeploy.
 #
@@ -13,7 +13,7 @@
 
 services:
   - type: web
-    name: kryon-ws-server
+    name: floydex-ws-server
     runtime: node
     buildCommand: npm install
     startCommand: npx tsx scripts/ws-server.ts
@@ -49,7 +49,7 @@ services:
         sync: false # set in Render dashboard — do not commit secrets
 
   - type: worker
-    name: kryon-oracle-keeper
+    name: floydex-oracle-keeper
     runtime: node
     buildCommand: npm install
     startCommand: npx tsx scripts/oracle-keeper.ts
@@ -73,7 +73,7 @@ services:
         sync: false # its own key — NEVER the admin or matcher key
 
   - type: worker
-    name: kryon-matcher
+    name: floydex-matcher
     runtime: node
     buildCommand: npm install
     startCommand: npx tsx scripts/matcher-service.ts
@@ -103,7 +103,7 @@ services:
         sync: false
 
   - type: worker
-    name: kryon-state-indexer
+    name: floydex-state-indexer
     runtime: node
     buildCommand: npm install
     startCommand: npx tsx scripts/state-indexer.ts
@@ -129,7 +129,7 @@ services:
         sync: false
 
   - type: worker
-    name: kryon-reconciler
+    name: floydex-reconciler
     runtime: node
     buildCommand: npm install
     startCommand: npx tsx scripts/settlement-reconciler.ts
@@ -151,7 +151,7 @@ services:
         sync: false
 
   - type: worker
-    name: kryon-liquidator
+    name: floydex-liquidator
     runtime: node
     buildCommand: npm install
     startCommand: npx tsx scripts/liquidation-keeper.ts
@@ -183,7 +183,7 @@ services:
         sync: false # its own key — never shared with any other role
 
   - type: worker
-    name: kryon-monitor
+    name: floydex-monitor
     runtime: node
     buildCommand: npm install
     startCommand: npx tsx scripts/monitor.ts

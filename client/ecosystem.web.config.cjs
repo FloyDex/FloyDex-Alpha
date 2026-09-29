@@ -17,7 +17,7 @@
 module.exports = {
   apps: [
     {
-      name: "kryon-web",
+      name: "floydex-web",
       cwd: __dirname,
       script: "npm",
       // -H is passed as a flag, NOT via the HOSTNAME env var: `next start`

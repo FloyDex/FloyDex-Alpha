@@ -1,7 +1,7 @@
 version: "3.9"
 
-# Runs all Kryon background services locally in production mode.
-# Secrets are read from .env.local — never commit that file.
+# Runs all FloyDex background services locally in production mode.
+# Secrets are read from the repo-root .env — never commit that file.
 #
 # Usage:
 #   docker compose up --build
@@ -11,7 +11,7 @@ x-common: &common
   build:
     context: .
     dockerfile: Dockerfile.services
-  env_file: .env.local
+  env_file: ../.env
   restart: unless-stopped
 
 services:

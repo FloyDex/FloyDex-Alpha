@@ -1,4 +1,4 @@
-// PM2 ecosystem config — runs all Kryon background services.
+// PM2 ecosystem config — runs all FloyDex background services.
 // Usage: pm2 start ecosystem.config.cjs
 //        pm2 stop all
 //        pm2 logs
@@ -7,9 +7,9 @@
 module.exports = {
   apps: [
     {
-      name: "kryon-oracle",
+      name: "floydex-oracle",
       script: "npx",
-      args: "tsx --env-file=.env.local scripts/oracle-keeper.ts",
+      args: "tsx --env-file=../.env scripts/oracle-keeper.ts",
       cwd: __dirname,
       restart_delay: 5000,
       max_restarts: 20,
@@ -19,9 +19,9 @@ module.exports = {
       error_file: "./logs/oracle.error.log",
     },
     {
-      name: "kryon-matcher",
+      name: "floydex-matcher",
       script: "npx",
-      args: "tsx --env-file=.env.local scripts/matcher-service.ts",
+      args: "tsx --env-file=../.env scripts/matcher-service.ts",
       cwd: __dirname,
       restart_delay: 3000,
       max_restarts: 20,
@@ -31,9 +31,9 @@ module.exports = {
       error_file: "./logs/matcher.error.log",
     },
     {
-      name: "kryon-indexer",
+      name: "floydex-indexer",
       script: "npx",
-      args: "tsx --env-file=.env.local scripts/state-indexer.ts",
+      args: "tsx --env-file=../.env scripts/state-indexer.ts",
       cwd: __dirname,
       restart_delay: 5000,
       max_restarts: 20,
@@ -43,9 +43,9 @@ module.exports = {
       error_file: "./logs/indexer.error.log",
     },
     {
-      name: "kryon-ws",
+      name: "floydex-ws",
       script: "npx",
-      args: "tsx --env-file=.env.local scripts/ws-server.ts",
+      args: "tsx --env-file=../.env scripts/ws-server.ts",
       cwd: __dirname,
       env: { PORT: "8080" },
       restart_delay: 3000,
@@ -56,9 +56,9 @@ module.exports = {
       error_file: "./logs/ws.error.log",
     },
     {
-      name: "kryon-liquidator",
+      name: "floydex-liquidator",
       script: "npx",
-      args: "tsx --env-file=.env.local scripts/liquidation-keeper.ts",
+      args: "tsx --env-file=../.env scripts/liquidation-keeper.ts",
       cwd: __dirname,
       restart_delay: 5000,
       max_restarts: 20,
@@ -68,9 +68,9 @@ module.exports = {
       error_file: "./logs/liquidator.error.log",
     },
     {
-      name: "kryon-reconciler",
+      name: "floydex-reconciler",
       script: "npx",
-      args: "tsx --env-file=.env.local scripts/settlement-reconciler.ts",
+      args: "tsx --env-file=../.env scripts/settlement-reconciler.ts",
       cwd: __dirname,
       restart_delay: 10000,
       max_restarts: 10,
@@ -80,11 +80,11 @@ module.exports = {
       error_file: "./logs/reconciler.error.log",
     },
     {
-      name: "kryon-monitor",
+      name: "floydex-monitor",
       script: "npx",
-      args: "tsx --env-file=.env.local scripts/monitor.ts",
+      args: "tsx --env-file=../.env scripts/monitor.ts",
       cwd: __dirname,
-      // The local WS server, not the public NEXT_PUBLIC_WS_URL from .env.local.
+      // The local WS server, not the public NEXT_PUBLIC_WS_URL from ../.env.
       env: { MONITOR_WS_URL: "ws://localhost:8080" },
       restart_delay: 10000,
       max_restarts: 20,

@@ -1,4 +1,4 @@
-// Cloudflare Workers config for the Kryon trading client (Next.js 16 via
+// Cloudflare Workers config for the FloyDex trading client (Next.js 16 via
 // @opennextjs/cloudflare). Build with `npm run cf:build`, deploy with
 // `npm run cf:deploy`.
 //
@@ -8,7 +8,7 @@
 // environment, not from this file.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "kryon-client",
+  "name": "floydex-client",
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-05-05",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
