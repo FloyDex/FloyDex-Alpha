@@ -111,7 +111,7 @@ export function AdminShell({
       <main className="relative mx-auto max-w-6xl px-4 pb-16 pt-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-[28px] font-bold tracking-tight">{title}</h1>
+            <h1 className="text-[22px] font-bold tracking-tight sm:text-[28px]">{title}</h1>
             {subtitle && (
               <p className="mt-1.5 max-w-2xl text-[13px] leading-relaxed text-[#8A9B94]">{subtitle}</p>
             )}

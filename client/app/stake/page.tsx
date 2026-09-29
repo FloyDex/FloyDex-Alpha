@@ -173,7 +173,7 @@ export default function StakePage() {
           </div>
         </section>
 
-        <div className="flex gap-3 overflow-x-auto pb-0.5 lg:grid lg:grid-cols-5 lg:overflow-visible">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {STAKE_TERMS.map((t) => {
             const row = quoteStake(preview, t);
             const on = t.days === term.days;
@@ -182,7 +182,7 @@ export default function StakePage() {
                 key={t.days}
                 type="button"
                 onClick={() => setDays(t.days)}
-                className={`min-w-[148px] shrink-0 rounded-[12px] border px-4 py-3 text-left transition-colors lg:min-w-0 ${
+                className={`rounded-[12px] border px-4 py-3 text-left transition-colors ${
                   on ? "border-[#14F195]/50 bg-[#0E1614]" : "border-[#1C332C] bg-[#070B0A] hover:border-[#2A4A40]"
                 }`}
               >

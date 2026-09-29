@@ -13,6 +13,7 @@ import { useNetwork } from '@/features/network/NetworkContext';
 import { STAKE_PUBLIC } from '@/lib/market/stake';
 
 const GITHUB_REPO = 'https://github.com/FloyDex/FloyDex-Alpha';
+const TELEGRAM = 'https://t.me/floydex_com';
 
 const LANDING_NAV = [
   { to: `/trade/${DEFAULT_MARKET_SYMBOL}`, label: 'Trade' },
@@ -21,6 +22,7 @@ const LANDING_NAV = [
   ...(STAKE_PUBLIC ? [{ to: '/stake', label: 'Stake' }] : []),
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: GITHUB_REPO, label: 'Docs', hardNav: true },
+  { to: TELEGRAM, label: 'Telegram', hardNav: true },
 ];
 
 const SYSTEM_STATUS = [
@@ -694,7 +696,11 @@ export function LandingPage() {
                   <li><span className="s5-footer-col-arrow">↳</span><a href="#">Company</a></li>
                   <li><span className="s5-footer-col-arrow">↳</span><a href="#">Careers</a></li>
                   <li style={{ marginTop: '8px' }}><a href="#">Insights</a></li>
-                  <li><a href="#">Contact</a></li>
+                  <li>
+                    <a href={TELEGRAM} target="_blank" rel="noopener noreferrer">
+                      Telegram
+                    </a>
+                  </li>
                 </ul>
               </div>
             </div>

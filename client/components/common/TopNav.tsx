@@ -15,6 +15,7 @@ import { DEFAULT_MARKET_SYMBOL } from "@/config";
 import { useTradeSettings } from "@/stores/settings";
 
 const GITHUB_REPO = "https://github.com/FloyDex/FloyDex-Alpha";
+const TELEGRAM = "https://t.me/floydex_com";
 
 const TABS = [
   { label: "Markets", href: "/markets", match: "/markets" },
@@ -23,7 +24,10 @@ const TABS = [
   { label: "Leaderboard", href: "/leaderboard", match: "/leaderboard" },
 ];
 
-const EXTERNAL_LINKS = [{ label: "Docs", href: GITHUB_REPO }];
+const EXTERNAL_LINKS = [
+  { label: "Docs", href: GITHUB_REPO },
+  { label: "Telegram", href: TELEGRAM },
+];
 
 export function TopNav() {
   const pathname = usePathname() ?? "";
@@ -43,8 +47,8 @@ export function TopNav() {
       className="relative z-40 shrink-0 border-b border-[#15221E] bg-[#0B1210]"
       style={{ paddingTop: "max(6px, env(safe-area-inset-top))" }}
     >
-      <div className="flex items-center justify-between gap-2 px-3 py-[6px] sm:px-[14px]">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-[12px]">
+      <div className="flex items-center justify-between gap-1.5 px-2.5 py-[6px] sm:gap-2 sm:px-[14px]">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-[12px]">
           <button
             type="button"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
@@ -55,10 +59,10 @@ export function TopNav() {
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
 
-          <Link href="/" className="flex shrink-0 items-center gap-[8px] select-none">
-            <FloyDexLogo size={28} className="text-[#14F195]" />
+          <Link href="/" className="flex shrink-0 items-center gap-[6px] select-none sm:gap-[8px]">
+            <FloyDexLogo size={26} className="text-[#14F195]" />
             <span
-              className="text-[18px] font-bold text-[#f5f5f5]"
+              className="hidden text-[18px] font-bold text-[#f5f5f5] sm:inline"
               style={{ fontFamily: "var(--font-poppins), 'Poppins', system-ui, sans-serif" }}
             >
               FLOYDEX
@@ -93,16 +97,17 @@ export function TopNav() {
           </nav>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-[10px]">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-[10px]">
+          {/* Guide lives in the mobile drawer — keep the header lean on phones. */}
           <button
             type="button"
             onClick={openDeskGuide}
             aria-label="Desk guide"
             title="Desk guide"
-            className="inline-flex h-[34px] items-center gap-1.5 rounded-[7px] px-2 text-[#a3a3a3] transition-colors hover:bg-[#070B0A] hover:text-[#f5f5f5] sm:px-2.5"
+            className="hidden h-[34px] items-center gap-1.5 rounded-[7px] px-2.5 text-[#a3a3a3] transition-colors hover:bg-[#070B0A] hover:text-[#f5f5f5] md:inline-flex"
           >
             <CircleHelp size={15} />
-            <span className="hidden text-[12px] font-medium sm:inline">Guide</span>
+            <span className="text-[12px] font-medium">Guide</span>
           </button>
           <WalletConnect />
           <NotificationBell />

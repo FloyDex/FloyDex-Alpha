@@ -132,8 +132,8 @@ export function MarketHeader({
 
   return (
     <div className="flex h-[48px] items-center border-b border-[#15221E] bg-[#070B0A]">
-      <div className="relative flex h-full shrink-0 items-center gap-2 px-3">
-        <div className="flex items-center gap-2">
+      <div className="relative flex h-full shrink-0 items-center gap-1.5 px-2 sm:gap-2 sm:px-3">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <FavoriteStar symbol={market.symbol} />
           <button
             type="button"
@@ -149,7 +149,7 @@ export function MarketHeader({
               <CaretIcon />
             </span>
           </button>
-          <span className="rounded-[4px] bg-[#0E1614] px-1.5 py-[1px] font-mono text-[10px] font-semibold uppercase tracking-[.08em] text-[#8A9B94]">
+          <span className="hidden rounded-[4px] bg-[#0E1614] px-1.5 py-[1px] font-mono text-[10px] font-semibold uppercase tracking-[.08em] text-[#8A9B94] sm:inline">
             Perp
           </span>
           <span className="rounded-[4px] bg-[#0E1614] px-1.5 py-[1px] font-mono text-[10px] font-semibold text-[#f5f5f5]">
@@ -161,6 +161,7 @@ export function MarketHeader({
               onClick={onToggleDetails}
               aria-pressed={detailsOpen}
               title="Symbol details"
+              aria-label="Symbol details"
               className={`grid h-7 w-7 place-items-center rounded-[6px] transition-colors ${
                 detailsOpen
                   ? "bg-[#15221E] text-[#f5f5f5]"
@@ -180,7 +181,7 @@ export function MarketHeader({
         <div className={`flex h-full shrink-0 items-center gap-2.5 px-3 ${flash === "up" ? "floy-flash-up" : flash === "down" ? "floy-flash-down" : ""}`}>
           <span className="floy-live-dot" aria-hidden />
           <span
-            className={`font-mono text-[20px] font-semibold leading-none tabular ${
+            className={`font-mono text-[16px] font-semibold leading-none tabular sm:text-[20px] ${
               changeUp ? "text-[#14F195]" : "text-[#FF5C6A]"
             }`}
           >
@@ -223,8 +224,8 @@ export function MarketHeader({
 function MarketPairLabel({ baseSymbol, quoteAsset }: { baseSymbol: string; quoteAsset: string }) {
   return (
     <span className="flex items-center gap-[7px]">
-      {logoFor(baseSymbol, 24)}
-      <span className="flex items-center gap-[3px] text-[15px] font-semibold text-[#f5f5f5]" style={{ letterSpacing: ".01em" }}>
+      {logoFor(baseSymbol, 22)}
+      <span className="flex items-center gap-[3px] text-[13px] font-semibold text-[#f5f5f5] sm:text-[15px]" style={{ letterSpacing: ".01em" }}>
         {baseSymbol}
         <span className="font-normal text-[#737373]">/</span>
         <span>{quoteAsset}</span>

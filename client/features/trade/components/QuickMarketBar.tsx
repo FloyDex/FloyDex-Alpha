@@ -53,6 +53,7 @@ export function QuickMarketBar({ market }: { market: MarketConfig }) {
   });
   const [ready, setReady] = useState(false);
   const [grabbing, setGrabbing] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -65,6 +66,14 @@ export function QuickMarketBar({ market }: { market: MarketConfig }) {
   widthRef.current = width;
 
   useEffect(() => setReady(true), []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const sync = () => setIsMobile(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     if (resizing.current) return;
@@ -281,7 +290,7 @@ export function QuickMarketBar({ market }: { market: MarketConfig }) {
     window.addEventListener("pointercancel", onUp);
   }
 
-  if (!ready) return null;
+  if (!ready || isMobile) return null;
 
   if (hidden) {
     return createPortal(

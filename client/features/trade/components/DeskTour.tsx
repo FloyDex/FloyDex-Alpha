@@ -93,7 +93,7 @@ export function DeskTour({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:px-4">
       <button
         type="button"
         aria-label="Dismiss guide"
@@ -104,7 +104,8 @@ export function DeskTour({
         role="dialog"
         aria-modal="true"
         aria-labelledby="desk-tour-title"
-        className="relative z-[81] w-full max-w-[540px] overflow-hidden rounded-[16px] border border-[#1A2A26] bg-[#0C1412] shadow-[0_24px_80px_rgba(0,0,0,.75)]"
+        className="relative z-[81] max-h-[min(92dvh,720px)] w-full max-w-[540px] overflow-y-auto rounded-t-[16px] border border-[#1A2A26] bg-[#0C1412] shadow-[0_24px_80px_rgba(0,0,0,.75)] sm:rounded-[16px]"
+        style={{ paddingBottom: "max(0px, env(safe-area-inset-bottom))" }}
       >
         <div className="flex justify-end px-2 pt-1.5">
           <button

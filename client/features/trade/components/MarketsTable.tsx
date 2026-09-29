@@ -297,7 +297,7 @@ function OverviewCard({
   ready: boolean;
 }) {
   return (
-    <section className="min-w-[280px] flex-1 overflow-hidden rounded-[12px] border border-[#1C332C] bg-[#070B0A] lg:min-w-0">
+    <section className="w-full overflow-hidden rounded-[12px] border border-[#1C332C] bg-[#070B0A]">
       <div className="flex items-center justify-between border-b border-[#15221E] px-3 py-2.5">
         <h2 className="text-[13px] font-semibold text-[#f5f5f5]">{title}</h2>
         <button
@@ -466,7 +466,7 @@ export function MarketsTable({ markets }: { markets: MarketConfig[] }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-3 overflow-x-auto pb-0.5 lg:grid lg:grid-cols-3 lg:overflow-visible">
+      <div className="flex flex-col gap-3 lg:grid lg:grid-cols-3">
         <OverviewCard
           title="Hot"
           rows={ready ? boards.hot : []}
@@ -501,7 +501,7 @@ export function MarketsTable({ markets }: { markets: MarketConfig[] }) {
 
       <div className="overflow-hidden rounded-[12px] border border-[#1C332C] bg-[#070B0A]">
         <div className="flex flex-col gap-2.5 border-b border-[#15221E] px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 flex-wrap items-center" role="tablist" aria-label="Filter markets">
+          <div className="flex min-w-0 flex-nowrap items-center overflow-x-auto no-scrollbar" role="tablist" aria-label="Filter markets">
             {tabs.map((t) => (
               <button
                 key={t.id}

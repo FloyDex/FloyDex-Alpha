@@ -71,6 +71,24 @@ export function TradeTerminalGrid({ market }: { market: MarketConfig }) {
     if (!showLiqMap && chartTab === "liq") setChartTab("chart");
   }, [showLiqMap, chartTab]);
 
+  // Symbol details is a side rail on desktop; on phones it covers the chart.
+  // Close it whenever the user leaves the chart tab so Long/Short stay usable.
+  useEffect(() => {
+    if (mobileTab !== "chart" && detailsOpen) setSymbolDetailsOpen(false);
+  }, [mobileTab, detailsOpen, setSymbolDetailsOpen]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const sync = () => {
+      if (mq.matches && useTradeSettings.getState().symbolDetailsOpen) {
+        setSymbolDetailsOpen(false);
+      }
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [setSymbolDetailsOpen]);
+
   useEffect(() => {
     const onWinResize = () => {
       if (dragging.current) return;
@@ -233,11 +251,11 @@ export function TradeTerminalGrid({ market }: { market: MarketConfig }) {
             <div
               className={`overflow-hidden transition-[width] duration-300 ease-out lg:h-full lg:shrink-0 ${
                 detailsOpen
-                  ? "absolute inset-0 z-20 bg-[#070B0A] lg:static lg:z-auto lg:w-[260px] lg:bg-transparent"
+                  ? "absolute inset-0 z-20 flex flex-col bg-[#070B0A] max-lg:pb-[68px] lg:static lg:z-auto lg:w-[260px] lg:bg-transparent lg:pb-0"
                   : "hidden lg:block lg:w-0"
               }`}
             >
-              <div className="h-full w-full lg:w-[260px]">
+              <div className="h-full w-full min-h-0 lg:w-[260px]">
                 <SymbolDetails market={market} onClose={() => setSymbolDetailsOpen(false)} />
               </div>
             </div>
@@ -261,7 +279,7 @@ export function TradeTerminalGrid({ market }: { market: MarketConfig }) {
       {!hideOrderBook && (
         <div
           style={{ gridArea: "book" }}
-          className={`${vis("book")} min-h-0 flex-1 flex-col overflow-hidden border-[#15221E] bg-[#070B0A] lg:flex lg:h-auto lg:border-l`}
+        className={`${vis("book")} min-h-0 flex-1 flex-col overflow-hidden border-[#15221E] bg-[#070B0A] lg:flex lg:h-auto lg:border-l`}
         >
           <OrderBook market={market} />
         </div>
@@ -270,7 +288,7 @@ export function TradeTerminalGrid({ market }: { market: MarketConfig }) {
       {/* ── Order ticket ── */}
       <div
         style={{ gridArea: "ticket" }}
-        className={`${vis("ticket")} relative flex-col border-[#15221E] bg-[#070B0A] pb-[max(16px,env(safe-area-inset-bottom))] lg:flex lg:overflow-y-auto lg:border-l lg:pb-0`}
+        className={`${vis("ticket")} relative min-h-0 flex-1 flex-col overflow-y-auto border-[#15221E] bg-[#070B0A] pb-[max(16px,env(safe-area-inset-bottom))] lg:flex lg:overflow-y-auto lg:border-l lg:pb-0`}
       >
         <AccountBar />
         <OrderEntry market={market} side={side} setSide={setSide} />
@@ -279,7 +297,7 @@ export function TradeTerminalGrid({ market }: { market: MarketConfig }) {
       {/* ── Positions / open orders / history ── */}
       <div
         style={{ gridArea: "pos" }}
-        className={`${vis("positions")} relative min-h-0 flex-col overflow-hidden border-[#15221E] max-lg:pb-[68px] lg:flex lg:h-full lg:border-t`}
+        className={`${vis("positions")} relative min-h-0 flex-1 flex-col overflow-hidden border-[#15221E] max-lg:pb-[68px] lg:flex lg:h-full lg:border-t`}
       >
         <button
           type="button"

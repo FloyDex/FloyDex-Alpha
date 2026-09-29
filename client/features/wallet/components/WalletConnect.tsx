@@ -31,9 +31,14 @@ export function WalletConnect() {
         <button
           onClick={() => setVisible(true)}
           disabled={connecting}
-          className="shrink-0 whitespace-nowrap rounded-[7px] bg-[#14F195] px-3 py-[7px] text-[12.5px] font-semibold text-[#050807] transition-colors hover:bg-[#3DFFB0] disabled:opacity-50 sm:px-4 sm:py-[8px] sm:text-[13px]"
+          className="shrink-0 whitespace-nowrap rounded-[7px] bg-[#14F195] px-2.5 py-[7px] text-[12.5px] font-semibold text-[#050807] transition-colors hover:bg-[#3DFFB0] disabled:opacity-50 sm:px-4 sm:py-[8px] sm:text-[13px]"
         >
-          {connecting ? "Connecting…" : "Connect Wallet"}
+          {connecting ? "Connecting…" : (
+            <>
+              <span className="sm:hidden">Connect</span>
+              <span className="hidden sm:inline">Connect Wallet</span>
+            </>
+          )}
         </button>
       </div>
     );
@@ -75,9 +80,9 @@ function GiftBonusMark({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       title={label}
       aria-label={label}
-      className="relative grid h-9 w-9 shrink-0 place-items-center overflow-visible transition-transform hover:scale-105"
+      className="relative grid h-8 w-8 shrink-0 place-items-center overflow-visible transition-transform hover:scale-105 sm:h-9 sm:w-9"
     >
-      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden className="overflow-visible">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden className="overflow-visible sm:h-[30px] sm:w-[30px]">
         <ellipse cx="16" cy="29.4" rx="8.5" ry="1.3" fill="#050807" opacity="0.4" />
         <rect x="6.5" y="15" width="19" height="13" rx="2.2" fill="#12C77A" />
         <rect x="6.5" y="15" width="19" height="4.2" fill="#14F195" />

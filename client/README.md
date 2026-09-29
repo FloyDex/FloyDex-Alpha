@@ -2,7 +2,7 @@
 
 Next.js frontend for [FloyDex](https://floydex.com)
 ([FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha)):
-Solana-native tokenized-stock perps.
+Solana-native tokenized-stock perps. Telegram: [t.me/floydex_com](https://t.me/floydex_com).
 
 ## Setup
 

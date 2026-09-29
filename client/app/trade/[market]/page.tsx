@@ -18,10 +18,10 @@ export default async function TradePage({
     <MarketDataProvider market={marketConfig}>
       <SettlementModal />
 
-      {/* Mobile/tablet: the page scrolls vertically (min-h-dvh). Desktop (lg+):
-          a fixed-height terminal that never scrolls the page — only its panels. */}
+      {/* Fixed-height terminal on every breakpoint so the chart / book / ticket
+          panels can share the remaining viewport. Inner panels scroll. */}
       <div
-        className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden"
+        className="flex h-dvh flex-col overflow-hidden"
         style={{ background: "#070B0A", fontFamily: "var(--font-poppins), 'Poppins', system-ui, sans-serif" }}
       >
         <TopNav />

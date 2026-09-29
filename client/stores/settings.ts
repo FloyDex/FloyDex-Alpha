@@ -57,7 +57,8 @@ const DEFAULTS = {
   animateOrderBook: true,
   skipOrderConfirms: false,
   favoriteSymbols: [] as string[],
-  symbolDetailsOpen: true,
+  // Closed by default — on mobile a true value covers the entire chart.
+  symbolDetailsOpen: false,
   popularTickerHidden: false,
   aiPanelWidth: 380,
   aiPanelHeightPct: 100,
@@ -164,7 +165,7 @@ export const useTradeSettings = create<TradeSettings>()(
     }),
     {
       name: "floydex-settings",
-      version: 13,
+      version: 14,
       partialize: (s) => {
         const out: Record<string, unknown> = {}
         for (const [k, v] of Object.entries(s)) {
@@ -204,6 +205,8 @@ export const useTradeSettings = create<TradeSettings>()(
           ...(version < 13
             ? { ticketSizeMode: fromQuote ? "quote" : DEFAULTS.ticketSizeMode }
             : {}),
+          // Close symbol details so mobile chart isn't covered by the panel.
+          ...(version < 14 ? { symbolDetailsOpen: false } : {}),
         }
       },
     }
