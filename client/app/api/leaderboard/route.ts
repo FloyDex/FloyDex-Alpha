@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import {
   buildVenueLeaderboard,
   cumulativeSpark,
+  LEADERBOARD_PUBLIC,
   periodSinceMs,
   sampleCurve,
   sparkBucketCount,
@@ -185,6 +186,9 @@ async function venueBoard(opts: {
 
 // GET /api/leaderboard?period=MONTH&metric=pnl&limit=50&offset=0&search=…&addresses=a,b
 export async function GET(req: NextRequest) {
+  if (!LEADERBOARD_PUBLIC) {
+    return NextResponse.json({ error: "leaderboard_disabled" }, { status: 404 });
+  }
   const sp = req.nextUrl.searchParams;
   const period = coercePeriod(sp.get("period") ?? "MONTH");
   const metric = (sp.get("metric") ?? "pnl").toLowerCase();

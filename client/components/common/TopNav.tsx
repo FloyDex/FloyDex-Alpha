@@ -12,6 +12,7 @@ import { FuturesDrawerLinks, FuturesMenu } from "@/features/navbar/components/Fu
 import { PopularTicker } from "@/features/navbar/components/PopularTicker";
 import { FLOYDEX_TOKEN } from "@/config/token";
 import { STAKE_PUBLIC } from "@/lib/market/stake";
+import { LEADERBOARD_PUBLIC } from "@/lib/market/leaderboard";
 import { DEFAULT_MARKET_SYMBOL } from "@/config";
 import { useTradeSettings } from "@/stores/settings";
 
@@ -24,7 +25,7 @@ const TABS = [
   { label: "Markets", href: "/markets", match: "/markets" },
   { label: "Portfolio", href: "/portfolio", match: "/portfolio" },
   ...(STAKE_PUBLIC ? [{ label: "Stake", href: "/stake", match: "/stake" }] : []),
-  { label: "Leaderboard", href: "/leaderboard", match: "/leaderboard" },
+  ...(LEADERBOARD_PUBLIC ? [{ label: "Leaderboard", href: "/leaderboard", match: "/leaderboard" }] : []),
 ];
 
 const EXTERNAL_LINKS = [{ label: "Docs", href: GITHUB_REPO }];
@@ -96,7 +97,7 @@ export function TopNav() {
                 <Link
                   key={t.label}
                   href={t.href}
-                  className={`desk-tab px-3 py-2 text-[13px] ${t.label === "Leaderboard" ? "hidden xl:inline" : ""} ${active ? "is-on" : ""}`}
+                  className={`desk-tab px-3 py-2 text-[13px] ${active ? "is-on" : ""}`}
                 >
                   {t.label}
                 </Link>

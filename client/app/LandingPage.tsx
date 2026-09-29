@@ -12,6 +12,7 @@ import { ACTIVE_MARKET_SYMBOLS, DEFAULT_MARKET_SYMBOL } from '@/config';
 import { FLOYDEX_TOKEN } from '@/config/token';
 import { useNetwork } from '@/features/network/NetworkContext';
 import { STAKE_PUBLIC } from '@/lib/market/stake';
+import { LEADERBOARD_PUBLIC } from '@/lib/market/leaderboard';
 
 const GITHUB_REPO = 'https://github.com/FloyDex/FloyDex-Alpha';
 const TELEGRAM = 'https://t.me/floydex_com';
@@ -23,7 +24,7 @@ const LANDING_NAV = [
   { to: '/markets', label: 'Markets' },
   { to: '/portfolio', label: 'Portfolio' },
   ...(STAKE_PUBLIC ? [{ to: '/stake', label: 'Stake' }] : []),
-  { to: '/leaderboard', label: 'Leaderboard' },
+  ...(LEADERBOARD_PUBLIC ? [{ to: '/leaderboard', label: 'Leaderboard' }] : []),
   { to: GITHUB_REPO, label: 'Docs', hardNav: true },
 ];
 
@@ -725,7 +726,9 @@ export function LandingPage() {
                   {STAKE_PUBLIC ? (
                     <li><span className="s5-footer-col-arrow">↳</span><Link href="/stake" className="text-inherit">Stake</Link></li>
                   ) : null}
-                  <li><span className="s5-footer-col-arrow">↳</span><Link href="/leaderboard" className="text-inherit">Leaderboard</Link></li>
+                  {LEADERBOARD_PUBLIC ? (
+                    <li><span className="s5-footer-col-arrow">↳</span><Link href="/leaderboard" className="text-inherit">Leaderboard</Link></li>
+                  ) : null}
                   <li>
                     <span className="s5-footer-col-arrow">↳</span>
                     <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="text-inherit">
