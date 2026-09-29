@@ -11,7 +11,7 @@
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { PublicKey, type Connection } from "@solana/web3.js";
 import type { Idl } from "@coral-xyz/anchor";
-import type { PrismaClient } from "@kryon/db";
+import type { PrismaClient } from "@floydex/db";
 import type { Logger } from "../../kit/src/logger.ts";
 import type { Alerter } from "../../kit/src/alerter.ts";
 import { validateOrderPayload } from "./validate.ts";

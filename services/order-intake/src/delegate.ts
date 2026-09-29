@@ -4,7 +4,7 @@
  * Stellar's per-request auth check, but here it reads `UserAccount` directly
  * rather than trusting a client-asserted delegate.
  *
- * `UserAccount` is `#[account(zero_copy)]` (`programs/kryon-perps/src/state/user.rs`);
+ * `UserAccount` is `#[account(zero_copy)]` (`programs/floydex-perps/src/state/user.rs`);
  * its Borsh-coded field names come back from the IDL verbatim (snake_case),
  * same gotcha as `services/kit/src/deployments.ts` — see that file's comment
  * and its regression test for how this was confirmed.

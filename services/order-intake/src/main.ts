@@ -1,5 +1,5 @@
 import { Connection, PublicKey } from "@solana/web3.js";
-import { PrismaClient } from "@kryon/db";
+import { PrismaClient } from "@floydex/db";
 import { bootEnv } from "../../kit/src/env.ts";
 import { createLogger } from "../../kit/src/logger.ts";
 import { createAlerter } from "../../kit/src/alerter.ts";
@@ -16,7 +16,7 @@ async function main() {
 
   const deployment = loadDeployment(env.DEPLOYMENT_FILE);
   const connection = new Connection(env.RPC_URL, "confirmed");
-  const idl = JSON.parse(readFileSync(new URL("../../../target/idl/kryon_perps.json", import.meta.url), "utf8"));
+  const idl = JSON.parse(readFileSync(new URL("../../../target/idl/floydex_perps.json", import.meta.url), "utf8"));
 
   // 11 L3: refuse to start against stale or split-brain chain state.
   await assertDeploymentMatchesChain({ connection, idl, deployment });
