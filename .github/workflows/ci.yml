@@ -107,20 +107,20 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: kryon
-          POSTGRES_PASSWORD: kryon
-          POSTGRES_DB: kryon
+          POSTGRES_USER: floydex
+          POSTGRES_PASSWORD: floydex
+          POSTGRES_DB: floydex
         ports: ["5433:5432"]
         options: >-
-          --health-cmd "pg_isready -U kryon"
+          --health-cmd "pg_isready -U floydex"
           --health-interval 2s
           --health-timeout 2s
           --health-retries 20
     env:
-      DATABASE_URL: postgresql://kryon:kryon@localhost:5433/kryon
+      DATABASE_URL: postgresql://floydex:floydex@localhost:5433/floydex
       # No pooler in front of this Postgres, so the direct connection is the
       # same URL (schema.prisma requires DIRECT_URL for `migrate deploy`).
-      DIRECT_URL: postgresql://kryon:kryon@localhost:5433/kryon
+      DIRECT_URL: postgresql://floydex:floydex@localhost:5433/floydex
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
