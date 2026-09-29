@@ -10,7 +10,7 @@ resolution = false
 skip-lint = false
 
 [programs.localnet]
-kryon_perps = "2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB"
+floydex_perps = "2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB"
 
 [registry]
 url = "https://api.apr.dev"

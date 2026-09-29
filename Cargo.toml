@@ -12,7 +12,7 @@ exclude = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Kryon Protocol"]
+authors = ["FloyDex"]
 license = "MIT OR Apache-2.0"
 # platform-tools v1.43 (solana-cli 2.1.0) ships rustc/cargo 1.79.
 rust-version = "1.79"
