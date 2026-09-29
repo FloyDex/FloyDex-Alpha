@@ -8,3 +8,4 @@ test-ledger/
 .e2e/
 .backtest-cache/
 .devnet/
+.mainnet/
