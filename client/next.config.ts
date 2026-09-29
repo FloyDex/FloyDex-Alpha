@@ -79,12 +79,8 @@ const csp = [
 
 const nextConfig: NextConfig = {
   env: publicEnv,
-  // The web tier runs on a 945MB micro instance, which cannot run `next build`
-  // — the compile alone wants well over a gigabyte. Standalone emits a
-  // self-contained server plus only the node_modules it actually traces, so the
-  // build happens on a developer machine and ~50MB ships to the box instead of
-  // a full npm install. `next start` never compiles, so serving stays cheap.
-  output: "standalone",
+  // Self-host / Docker: standalone. Vercel supplies its own output — leave unset there.
+  ...(process.env.VERCEL ? {} : { output: "standalone" as const }),
   reactCompiler: true,
   poweredByHeader: false,
   turbopack: {
