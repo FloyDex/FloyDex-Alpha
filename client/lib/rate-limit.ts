@@ -53,13 +53,12 @@ function localRateLimit(key: string, limit: number): boolean {
 export async function rateLimit(key: string, limit: number): Promise<boolean> {
   const distributed = await distributedRateLimit(key, limit).catch(() => false);
   if (distributed !== null) return distributed;
-  // No distributed limiter configured. The in-memory fallback is per-instance
-  // (per-isolate on serverless platforms), so under horizontal scale it is
-  // effectively no limit at all. In production that is not acceptable for
-  // state-mutating routes — fail closed and surface the misconfiguration.
+  // No Upstash configured. Prefer a per-instance bucket over fail-closed so the
+  // desk stays tradable; warn loudly so we still wire distributed limits ASAP.
   if (process.env.NODE_ENV === "production") {
-    console.error("rate-limit: UPSTASH_REDIS_REST_URL/TOKEN not configured in production — denying request");
-    return false;
+    console.error(
+      "rate-limit: UPSTASH_REDIS_REST_URL/TOKEN not configured — using in-memory fallback",
+    );
   }
   return localRateLimit(key, limit);
 }
