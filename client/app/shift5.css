@@ -1,4 +1,4 @@
-/* ═══ KRYON LANDING — full animations ═══ */
+/* ═══ FLOYDEX LANDING — full animations ═══ */
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&display=swap');
@@ -21,7 +21,7 @@
 #s5-loader {
   position: fixed;
   inset: 0;
-  background-color: rgb(32, 32, 32);
+  background-color: #050807;
   pointer-events: all;
   z-index: 99999;
   clip-path: inset(0% 0% 0% 0%);
@@ -114,21 +114,21 @@
   right: 0;
   width: 6px;
   height: 100vh;
-  background: rgba(181,153,229,0.12);
+  background: rgba(20,241,149,0.12);
   z-index: 500;
 }
 .s5-scrollbar-thumb {
   width: 100%;
-  background: #b599e5;
+  background: #14F195;
   transition: height 0.05s linear;
   min-height: 0;
 }
 
 /* ── PAGE ── */
 .s5-page {
-  background: #d4d4d4;
+  background: #C5D4CC;
   font-family: 'Inter', -apple-system, sans-serif;
-  color: #b599e5;
+  color: #14F195;
   /* overflow-x: clip instead of hidden — clip does not create a scroll container,
      so position:sticky on descendants keeps working. hidden would silently break it. */
   overflow-x: clip;
@@ -158,7 +158,7 @@
   transition: opacity .2s;
 }
 .s5-nav-logo-link:hover { opacity: .7 }
-.s5-nav-logo-img  { width:44px; height:44px; object-fit:contain; }
+.s5-nav-logo-img  { width:44px; height:44px; object-fit:contain; display:block; flex-shrink:0; }
 .s5-nav-logo-text { font-size:1.375rem; font-weight:700; letter-spacing:normal; color:#f5f5f5 }
 
 .s5-menu-pill {
@@ -166,7 +166,7 @@
   align-items: center;
   gap: 0.45rem;
   background: rgba(22,22,22,.88);
-  color: #b599e5;
+  color: #14F195;
   border: none;
   border-radius: 50px;
   padding: .48rem 1rem .48rem .85rem;
@@ -192,7 +192,7 @@
   justify-content: flex-end;
 }
 .s5-menu-panel {
-  background: #111;
+  background: #050807;
   width: min(420px, 90vw);
   height: 100%;
   padding: 4rem 3rem;
@@ -205,29 +205,29 @@
   align-self: flex-end;
   background: none;
   border: none;
-  color: rgba(181,153,229,0.55);
+  color: rgba(20,241,149,0.55);
   font-size: 1.25rem;
   cursor: pointer;
   margin-bottom: 2rem;
   transition: color .2s;
 }
-.s5-menu-close:hover { color: #b599e5 }
+.s5-menu-close:hover { color: #14F195 }
 .s5-menu-nav-link {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #b599e5;
+  color: #14F195;
   text-decoration: none;
   padding: .65rem 0;
   border-bottom: 1px solid rgba(255,255,255,.07);
   letter-spacing: .02em;
   transition: color .2s;
 }
-.s5-menu-nav-link:hover { color: #b599e5 }
+.s5-menu-nav-link:hover { color: #14F195 }
 .s5-menu-divider { height:1px; background:rgba(255,255,255,.08); margin:1rem 0 }
 .s5-menu-connect-btn {
   padding: .7rem 1.75rem;
-  background: #1d0d2b;
-  color: #b599e5;
+  background: #14F195;
+  color: #050807;
   border: none;
   border-radius: 50px;
   font-family: 'Inter', sans-serif;
@@ -240,7 +240,7 @@
   margin-top: .5rem;
   transition: background .2s;
 }
-.s5-menu-connect-btn:hover { background: #2d1a4a }
+.s5-menu-connect-btn:hover { background: #3DFFB0 }
 .s5-menu-connect-btn:disabled { opacity:.5; cursor:not-allowed }
 
 /* ══════════════════════════════════════════
@@ -255,8 +255,8 @@
      (the sticky right col is shorter than the left), matching the dark
      left side. Border only on the bottom edge marks where the grid ends
      and both columns scroll together past it. */
-  background: #111;
-  border-bottom: 1px solid rgba(181,153,229,0.35);
+  background: #050807;
+  border-bottom: 1px solid rgba(20,241,149,0.35);
 }
 .s5-left-col {
   display: flex;
@@ -280,10 +280,10 @@
 /* Hero left — first block inside .s5-left-col */
 
 .s5-hero-left {
-  background: #1d0d2b;
+  background: #050807;
   /* Desktop hero composition (was inline in JSX — moved here so breakpoints can
      override it). The extra top padding clears the fixed nav; the fixed height +
-     internal translateY offsets create the staggered "Perps / Reimagined." look. */
+     internal translateY offsets create the staggered "Tokenized Perps / Reimagined." look. */
   padding: calc(6.5rem + 60px) 3rem 4.5rem;
   display: flex;
   flex-direction: column;
@@ -316,13 +316,21 @@
   align-items: baseline;
   flex-shrink: 0;
 }
+.s5-op-slash-group--stack {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.s5-op-perps-row {
+  display: inline-flex;
+  align-items: baseline;
+}
 
 /* The large "Op" text — chars animated individually */
 .s5-hero-op {
   font-family: 'Inter', sans-serif;
   font-size: clamp(6.5rem, 15vw, 13rem);
   font-weight: 600;
-  color: #b599e5;
+  color: #14F195;
   letter-spacing: -.04em;
   line-height: .87;
 }
@@ -338,7 +346,7 @@
   font-family: 'ABC Favorit', 'Inter', sans-serif;
   font-size: clamp(6rem, 13.5vw, 11.5rem);
   font-weight: 300;
-  color: #b599e5;
+  color: #14F195;
   letter-spacing: 0;
   line-height: .87;
   margin-left: .18em;
@@ -347,7 +355,7 @@
   font-family: 'Inter', sans-serif;
   font-size: 1.05rem;
   font-weight: 500;
-  color: #b599e5;
+  color: #14F195;
   line-height: 1.5;
   max-width: 210px;
   margin-left: 2rem;
@@ -361,14 +369,14 @@
   font-family: 'ABC Favorit', 'Inter', sans-serif;
   font-size: clamp(6rem, 13.5vw, 11.5rem);
   font-weight: 500;
-  color: #b599e5;
+  color: #14F195;
   letter-spacing: -.04em;
   line-height: .87;
   white-space: nowrap;
 }
 
 .s5-hero-right {
-  background: #d4d4d4;
+  background: #C5D4CC;
   padding: 2rem 2.75rem 2rem;
   flex: 0 0 50vh;
   display: flex;
@@ -402,14 +410,14 @@
   font-size: .6rem;
   font-weight: 600;
   letter-spacing: .1em;
-  color: #b599e5;
+  color: #14F195;
   text-transform: uppercase;
   position: relative;
 }
 .s5-live-dot {
   width: 7px; height: 7px;
   border-radius: 50%;
-  background: #b599e5;
+  background: #14F195;
   position: relative;
 }
 .s5-live-dot::after {
@@ -417,14 +425,14 @@
   position: absolute;
   inset: -2px;
   border-radius: 50%;
-  background: #b599e5;
+  background: #14F195;
   opacity: 0;
   animation: s5LivePing 1.6s cubic-bezier(0,0,.2,1) infinite;
 }
 .s5-live-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: .65rem;
-  color: rgba(181,153,229,0.65);
+  color: rgba(20,241,149,0.65);
   text-transform: uppercase;
   letter-spacing: .06em;
 }
@@ -435,7 +443,7 @@
 .s5-video-block {
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #111;
+  background: #050807;
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
@@ -475,7 +483,7 @@
   padding: 2.75rem 2.25rem;
   border: 1.2px solid #000;
   border-left: none;
-  background: #b9b9b9;
+  background: #B3C4BB;
   text-decoration: none;
   color: #1a1a1a;
   display: flex;
@@ -483,7 +491,7 @@
   min-height: 190px;
 }
 .s5-headline-card:first-child { border-left: 1px solid #000 }
-.s5-headline-card:hover { background: #a8a8a8 }
+.s5-headline-card:hover { background: #9BB0A6 }
 .s5-headline-title {
   font-family: 'Inter', sans-serif;
   font-size: 1.5rem;
@@ -508,7 +516,7 @@
   transition: color .25s, transform .25s;
 }
 .s5-headline-card:hover .s5-card-arrow {
-  color: #b599e5;
+  color: #14F195;
   transform: translate(3px, -3px);
 }
 
@@ -526,7 +534,7 @@
   font-family: 'Inter', sans-serif;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #b599e5;
+  color: #14F195;
   text-transform: none;
   letter-spacing: 0;
   margin-bottom: 1rem;
@@ -544,13 +552,13 @@
   align-items: center;
   font-family: 'JetBrains Mono', monospace;
   font-size: .68rem;
-  color: rgba(181,153,229,0.5);
+  color: rgba(20,241,149,0.5);
   padding: .32rem 0;
   text-transform: uppercase;
   letter-spacing: .06em;
   transition: color .35s;
 }
-.s5-stats-item--active { color: #b599e5; }
+.s5-stats-item--active { color: #14F195; }
 .s5-stats-dot {
   width: 6px; height: 6px;
   border-radius: 50%;
@@ -559,8 +567,8 @@
   transition: background .35s, box-shadow .35s;
 }
 .s5-stats-dot--active {
-  background: #b599e5;
-  box-shadow: 0 0 8px rgba(181,153,229,.6);
+  background: #14F195;
+  box-shadow: 0 0 8px rgba(20,241,149,.6);
   animation: s5DotPulse 1.8s infinite;
 }
 
@@ -604,7 +612,7 @@
 /* Orange CTA — fixed height at bottom of sticky right */
 .s5-right-cta {
   flex: 0 0 46vh;
-  background: #1d0d2b;
+  background: #07140F;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -621,22 +629,23 @@
   height: 140px;
   object-fit: contain;
   align-self: flex-end;
+  filter: invert(77%) sepia(48%) saturate(520%) hue-rotate(93deg) brightness(1.08);
 }
 .s5-right-cta .s5-explore-text {
   font-family: 'Inter', sans-serif;
   font-size: 1.55rem;
   font-weight: 400;
-  color: #b599e5;
+  color: #14F195;
   letter-spacing: -.02em;
   line-height: 1.2;
 }
-.s5-right-cta:hover { background: #2d1a4a; }
+.s5-right-cta:hover { background: #0D2A1C; }
 .s5-right-cta:hover .s5-explore-text { letter-spacing: -.01em; }
 
 /* Legacy CTA class */
 .s5-right-btm {
   flex: 0 0 120px;
-  background: #1d0d2b;
+  background: #07140F;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -647,7 +656,7 @@
   transition: background .3s;
   overflow: hidden;
 }
-.s5-right-btm:hover { background: #2d1a4a }
+.s5-right-btm:hover { background: #0D2A1C }
 
 /* SVG arrow — stroke-dashoffset draw on hover */
 .s5-cta-arrow-wrap {
@@ -656,7 +665,7 @@
 .s5-arrow-icon {
   width: 80px;
   height: 80px;
-  color: #b599e5;
+  color: #14F195;
   display: block;
 }
 .s5-arrow-path {
@@ -684,7 +693,7 @@
   font-family: 'Inter', sans-serif;
   font-size: 1.25rem;
   font-weight: 700;
-  color: #b599e5;
+  color: #14F195;
   text-align: center;
   line-height: 1.35;
   transition: letter-spacing .3s;
@@ -695,7 +704,7 @@
    SOLUTIONS — infinite carousel
    ══════════════════════════════════════════ */
 .s5-solutions {
-  background: #b9b9b9;
+  background: #B3C4BB;
   overflow: hidden;
 }
 .s5-solutions-header {
@@ -721,7 +730,7 @@
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   transition: background .2s, transform .2s;
-  color: #b599e5;
+  color: #14F195;
 }
 .s5-arrow-btn:hover { background:#333; transform:scale(1.06) }
 .s5-arr-svg { width:16px; height:16px; }
@@ -748,7 +757,7 @@
   border-top: 0.5px solid #000;
   border-bottom: 0.5px solid #000;
   border-right: 0.5px solid #000;
-  background: #b9b9b9;
+  background: #B3C4BB;
   display: flex;
   flex-direction: column;
   transition: background .45s ease, color .45s ease;
@@ -757,13 +766,13 @@
   color: rgba(80,80,80,0.5);
 }
 .s5-solution-card:hover {
-  background: #1d0d2b;
-  color: #b599e5;
+  background: #07140F;
+  color: #14F195;
 }
-.s5-solution-card:hover .s5-solution-name { color: #b599e5 }
-.s5-solution-card:hover .s5-solution-desc { color: #b599e5; opacity: 1 }
-.s5-solution-card:hover .s5-explore-btn { color: #b599e5; border-color: rgba(181,153,229,0.5) }
-.s5-solution-card--active { background: #b9b9b9; color: rgba(26,26,26,0.7); }
+.s5-solution-card:hover .s5-solution-name { color: #14F195 }
+.s5-solution-card:hover .s5-solution-desc { color: #14F195; opacity: 1 }
+.s5-solution-card:hover .s5-explore-btn { color: #14F195; border-color: rgba(20,241,149,0.5) }
+.s5-solution-card--active { background: #B3C4BB; color: rgba(26,26,26,0.7); }
 
 .s5-solution-illustration {
   flex: 1;
@@ -838,7 +847,7 @@
 }
 
 .s5-insights-featured {
-  background: #202020;
+  background: #0A1210;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -858,7 +867,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: .18;
+  opacity: .55;
 }
 .s5-insights-featured-art-img svg { width: 90%; height: 90% }
 .s5-insights-featured-content {
@@ -870,7 +879,7 @@
 .s5-insights-featured-cat {
   font-family: 'JetBrains Mono', monospace;
   font-size: .6rem;
-  color: #b599e5;
+  color: #14F195;
   text-transform: uppercase;
   letter-spacing: .08em;
   margin-bottom: 1rem;
@@ -878,7 +887,7 @@
 .s5-insights-featured-title {
   font-size: 1.75rem;
   font-weight: 400;
-  color: #b599e5;
+  color: #14F195;
   line-height: 1.25;
   margin-bottom: .9rem;
   letter-spacing: -.01em;
@@ -886,7 +895,7 @@
 .s5-insights-featured-date {
   font-family: 'JetBrains Mono', monospace;
   font-size: .6rem;
-  color: rgba(181,153,229,0.55);
+  color: rgba(20,241,149,0.55);
   text-transform: uppercase;
   letter-spacing: .06em;
   margin-bottom: .65rem;
@@ -894,7 +903,7 @@
 .s5-insights-featured-desc {
   font-family: 'JetBrains Mono', monospace;
   font-size: .6rem;
-  color: rgba(181,153,229,0.65);
+  color: rgba(20,241,149,0.65);
   text-transform: uppercase;
   letter-spacing: .04em;
   line-height: 1.8;
@@ -909,19 +918,19 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .08em;
-  color: #b599e5;
+  color: #14F195;
   background: transparent;
-  border: 1.5px solid rgba(181,153,229,0.4);
+  border: 1.5px solid rgba(20,241,149,0.4);
   border-radius: 50px;
   cursor: pointer;
   transition: border-color .25s, color .25s;
 }
-.s5-readmore-btn:hover { border-color:#b599e5; color:#b599e5 }
+.s5-readmore-btn:hover { border-color:#14F195; color:#14F195 }
 
 .s5-insights-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #b599e5;
+  background: #14F195;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -935,7 +944,7 @@
   text-decoration: none;
   color: #444;
   transition: background .25s, color .25s;
-  background: #b599e5;
+  background: #14F195;
   display: flex;
   flex-direction: column;
   gap: .5rem;
@@ -944,7 +953,7 @@
 .s5-insight-card:nth-child(-n+2) { border-top: 0.5px solid rgba(0,0,0,0.15) }
 
 .s5-insight-card:hover {
-  background: #202020;
+  background: #0A1210;
   color: #888;
 }
 .s5-insight-card:hover .s5-insight-title { color: #888 }
@@ -985,7 +994,7 @@
    CTA
    ══════════════════════════════════════════ */
 .s5-cta {
-  background: #1d0d2b;
+  background: #050807;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -998,7 +1007,7 @@
   font-family: 'Inter', sans-serif;
   font-size: clamp(3rem, 5.5vw, 5.25rem);
   font-weight: 400;
-  color: #b599e5;
+  color: #14F195;
   line-height: 1.08;
   margin-bottom: 3rem;
   letter-spacing: -.02em;
@@ -1016,25 +1025,25 @@
 .s5-cta-bracket {
   font-size: 5.5rem;
   font-weight: 200;
-  color: #b599e5;
+  color: #14F195;
   line-height: 1;
   opacity: .7;
 }
 .s5-cta-input {
   background: transparent;
   border: none;
-  border-bottom: 1.5px solid rgba(181,153,229,.35);
+  border-bottom: 1.5px solid rgba(20,241,149,.35);
   padding: .6rem 0;
   font-size: 1.1rem;
   font-family: 'Inter', sans-serif;
-  color: #b599e5;
+  color: #14F195;
   outline: none;
   min-width: 300px;
   text-align: center;
   transition: border-color .3s;
 }
-.s5-cta-input:focus { border-color: #b599e5 }
-.s5-cta-input::placeholder { color: rgba(181,153,229,.42) }
+.s5-cta-input:focus { border-color: #14F195 }
+.s5-cta-input::placeholder { color: rgba(20,241,149,.42) }
 .s5-continue-btn {
   padding: .6rem 2.5rem;
   font-family: 'JetBrains Mono', monospace;
@@ -1042,19 +1051,19 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .1em;
-  color: #b599e5;
+  color: #14F195;
   background: transparent;
-  border: 1.5px solid rgba(181,153,229,.5);
+  border: 1.5px solid rgba(20,241,149,.5);
   border-radius: 50px;
   cursor: pointer;
   transition: background .22s, border-color .22s;
   margin-bottom: 4rem;
 }
-.s5-continue-btn:hover { background: rgba(181,153,229,.1); border-color:#b599e5 }
+.s5-continue-btn:hover { background: rgba(20,241,149,.1); border-color:#14F195 }
 .s5-cta-divider {
   width: 100%;
   border: none;
-  border-top: 1px solid rgba(181,153,229,.18);
+  border-top: 1px solid rgba(20,241,149,.18);
   margin: 0;
 }
 .s5-cta-contact {
@@ -1069,19 +1078,19 @@
   font-size: .6rem;
   text-transform: uppercase;
   letter-spacing: .07em;
-  color: rgba(181,153,229,.5);
+  color: rgba(20,241,149,.5);
   margin-bottom: .4rem;
 }
 .s5-cta-contact-val {
   font-size: 1.05rem;
   font-weight: 400;
-  color: #b599e5;
+  color: #14F195;
   letter-spacing: -.01em;
 }
 .s5-cta-contact-val-sm {
   font-size: .9rem;
   font-weight: 400;
-  color: #b599e5;
+  color: #14F195;
   margin-top: .2rem;
 }
 .s5-cta-contact-row { display: flex; flex-direction: column }
@@ -1092,8 +1101,8 @@
 /* ── NEW FOOTER ────────────────────────────────────── */
 .s5-footer {
   position: relative;
-  background: #1d0d2b;
-  color: #b599e5;
+  background: #050807;
+  color: #14F195;
   padding: 56px;
   font-family: 'Archivo', system-ui, sans-serif;
 }
@@ -1121,7 +1130,7 @@
   font-size: 14px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #b599e5;
+  color: #14F195;
   margin: 0 0 14px;
 }
 .s5-footer-signup-field {
@@ -1132,33 +1141,33 @@
   line-height: 1;
   border: 0;
   background: transparent;
-  color: #b599e5;
+  color: #14F195;
   width: 100%;
   outline: none;
   padding: 0;
 }
-.s5-footer-signup-field::placeholder { color: #b599e5; opacity: 0.45; }
+.s5-footer-signup-field::placeholder { color: #14F195; opacity: 0.45; }
 .s5-footer-subscribe-btn {
   font-family: 'Space Mono', monospace;
   font-size: 14px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #b599e5;
+  color: #14F195;
   background: transparent;
-  border: 1.5px solid rgba(181,153,229,0.45);
+  border: 1.5px solid rgba(20,241,149,0.45);
   padding: 22px 38px;
   border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
   transition: transform .15s ease, background .2s ease, color .2s ease, border-color .2s ease;
 }
-.s5-footer-subscribe-btn:hover { background: rgba(181,153,229,0.12); color: #b599e5; border-color: #b599e5; transform: translateY(-1px); }
+.s5-footer-subscribe-btn:hover { background: rgba(20,241,149,0.12); color: #14F195; border-color: #14F195; transform: translateY(-1px); }
 .s5-footer-subscribe-btn:disabled { opacity: 0.7; cursor: default; }
 .s5-footer-panel {
   position: relative;
   z-index: 1;
-  background: #202020;
-  color: #b599e5;
+  background: #0A1210;
+  color: #14F195;
   border-radius: 28px;
   padding: 64px 64px 62px;
   overflow: hidden;
@@ -1186,7 +1195,7 @@
 .s5-footer-logo {
   width: 64px;
   height: 64px;
-  color: #b599e5;
+  color: #14F195;
 }
 .s5-footer-col-h {
   font-family: 'Archivo', sans-serif;
@@ -1194,7 +1203,7 @@
   font-size: 28px;
   letter-spacing: -0.01em;
   margin: 0 0 18px;
-  color: #b599e5;
+  color: #14F195;
   line-height: 1;
 }
 .s5-footer-col-h sup {
@@ -1217,14 +1226,14 @@
   font-weight: 600;
   font-size: 28px;
   letter-spacing: -0.01em;
-  color: #b599e5;
+  color: #14F195;
   line-height: 1.05;
   display: inline-flex;
   align-items: center;
   gap: 10px;
 }
 .s5-footer-col-list li a {
-  color: #b599e5;
+  color: #14F195;
   text-decoration: none;
   transition: opacity .15s ease;
 }
@@ -1238,8 +1247,10 @@
 .s5-footer-wordmark {
   display: block;
   width: 100%;
+  max-width: 100%;
+  height: auto;
   margin-top: -30px;
-  overflow: visible;
+  overflow: hidden;
   user-select: none;
   position: relative;
 }
@@ -1377,6 +1388,6 @@
   .s5-footer-signup { padding: 0 0 40px; }
   .s5-footer-signup-field { font-size: clamp(24px, 8vw, 40px); }
   .s5-footer-subscribe-btn { padding: 14px 24px; }
-  /* Keep the giant KRYON wordmark clear of the link grid with a real gap. */
+  /* Keep the giant FLOYDEX wordmark clear of the link grid with a real gap. */
   .s5-footer-wordmark { margin-top: 12px; }
 }

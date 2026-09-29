@@ -16,27 +16,36 @@ export const metadata: Metadata = {
   // `|| fallback` (not ??): an EMPTY NEXT_PUBLIC_APP_URL is defined but makes
   // new URL("") throw ERR_INVALID_URL and kill the whole build.
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
-  title: "Kryon | Perpetuals DEX",
-  description: "Decentralised perpetual futures on Stellar/Soroban — BTC, ETH, XLM, SOL, XRP, ADA, BNB and TRX perpetuals",
-  applicationName: "Kryon",
+  title: "FloyDex | Tokenized PerpDex",
+  description: "Decentralised perpetual futures on Solana — tokenized-stock and crypto perps, USDC-settled",
+  applicationName: "FloyDex",
   icons: {
     icon: [
-      { url: "/favicon.png", type: "image/png" },
-      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", type: "image/png", sizes: "48x48" },
+      { url: "/icon.png", type: "image/png", sizes: "64x64" },
+      { url: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
     ],
     apple: { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
+    shortcut: "/favicon.ico",
   },
   openGraph: {
-    title: "Kryon | Perpetuals DEX",
-    description: "Decentralised perpetual futures on Stellar/Soroban",
-    siteName: "Kryon",
+    title: "FloyDex | Tokenized PerpDex",
+    description: "Decentralised perpetual futures on Solana",
+    siteName: "FloyDex",
     images: [{ url: "/icon-512.png", width: 512, height: 512 }],
     type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "FloyDex | Tokenized PerpDex",
+    description: "Decentralised perpetual futures on Solana",
+    images: ["/icon-512.png"],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#19191A",
+  themeColor: "#070B0A",
   width: "device-width",
   initialScale: 1,
   // Allow pinch-zoom for accessibility; iOS input auto-zoom is prevented via a
@@ -54,7 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en" className={`${poppins.variable} ${geistMono.variable} dark h-full`}>
-      <body className="min-h-dvh bg-[#19191A] text-[#f5f5f5] antialiased">
+      <body className="min-h-dvh bg-[#070B0A] text-[#f5f5f5] antialiased">
         <Providers network={network}>{children}</Providers>
       </body>
     </html>

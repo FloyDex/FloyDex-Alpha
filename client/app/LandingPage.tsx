@@ -3,16 +3,19 @@
 import './shift5.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { FloyDexLogo } from '@/components/common/FloyDexLogo';
 import { useWalletStore } from '@/stores/wallet';
-import { freighterIsInstalled } from '@/lib/stellar/freighter';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { toast } from 'sonner';
-import { ACTIVE_MARKET_SYMBOLS, DEFAULT_MARKET_SYMBOL, NETWORK_LABEL } from '@/config';
+import { ACTIVE_MARKET_SYMBOLS, DEFAULT_MARKET_SYMBOL } from '@/config';
 import { useNetwork } from '@/features/network/NetworkContext';
+import { STAKE_PUBLIC } from '@/lib/market/stake';
 
 const LANDING_NAV = [
   { to: `/trade/${DEFAULT_MARKET_SYMBOL}`, label: 'Trade' },
   { to: '/portfolio', label: 'Portfolio' },
+  ...(STAKE_PUBLIC ? [{ to: '/stake', label: 'Stake' }] : []),
   { to: '/leaderboard', label: 'Leaderboard' },
   // Docs is a static Docusaurus build served from this same deployment at /docs.
   // Use a plain anchor (hardNav) so it does a real navigation to the static site
@@ -30,28 +33,28 @@ const SYSTEM_STATUS = [
 // is only known per-render. Building it at module scope would bake in the
 // deployment's own network and hydrate-mismatch for anyone on the other venue.
 const buildHeadlines = (networkLabel: string) => [
-  { title: `${ACTIVE_MARKET_SYMBOLS.length} Perpetual Markets Live on ${networkLabel}`, desc: `${ACTIVE_MARKET_SYMBOLS.map((s) => s.replace('-PERP', '')).join(' · ')} — USDC-settled perpetual futures with on-chain margin and settlement, traded self-custodial straight from your Freighter wallet.` },
-  { title: 'Kryon Brings Perpetuals to Stellar', desc: 'A decentralized exchange pairing an off-chain central-limit order book with a fully on-chain margin and settlement engine on Soroban.' },
+  { title: `${ACTIVE_MARKET_SYMBOLS.length} Perpetual Markets Live on ${networkLabel}`, desc: `${ACTIVE_MARKET_SYMBOLS.map((s) => s.replace('-PERP', '')).join(' · ')} — USDC-settled perpetual futures with on-chain margin and settlement, traded self-custodial from Phantom, Solflare or Backpack.` },
+  { title: 'FloyDex Brings Perpetuals to Solana', desc: 'A decentralized exchange pairing an off-chain central-limit order book with a fully on-chain margin and settlement engine on Solana.' },
   { title: 'Sub-Second Fills, On-Chain Truth', desc: 'Price-time matching off-chain for a familiar low-latency perp experience, with custody, margin, and settlement enforced on-chain.' },
 ];
 
 const SOLUTIONS = [
   { title: 'Perpetuals', desc: 'Trade perpetual futures on tokenized real-world assets and crypto, USDC-settled, with leverage and transparent funding.' },
-  { title: 'On-Chain Settlement', desc: 'Collateral, margin, and settlement live on Soroban. You keep your keys — every fill settles to a contract you control.' },
+  { title: 'On-Chain Settlement', desc: 'Collateral, margin, and settlement live on Solana. You keep your keys — every fill settles to a program you control.' },
   { title: 'CLOB Matching', desc: 'An off-chain central-limit order book matches orders price-time for low-latency fills, while on-chain state stays the source of truth.', accent: true },
   { title: 'Risk & Liquidation', desc: 'A transparent margin engine, funding mechanism, and insurance-backed liquidation keep markets solvent and fair.' },
 ];
 
 const INSIGHTS = [
-  { title: 'XLM-PERP Goes Live — USDC-Settled Perpetuals on Stellar', date: 'May 28, 2026', desc: 'Protocol Launch', featured: true },
-  { title: 'On-Chain Margin & Settlement, Off-Chain Speed', date: 'May 20, 2026', desc: 'How Kryon pairs a price-time CLOB matcher with a Soroban settlement engine.' },
-  { title: 'Self-Custodial Trading with Freighter', date: 'May 6, 2026', desc: 'Sign orders from your own wallet — your keys, your collateral, every fill.' },
-  { title: 'Understanding Funding & Mark Price on Kryon', date: 'April 24, 2026', desc: 'How the funding mechanism anchors perp prices to the oracle.' },
-  { title: 'Inside the Liquidation & Insurance Engine', date: 'April 11, 2026', desc: 'Transparent margin checks and an insurance fund that keeps markets solvent.' },
-  { title: 'The Road to Perpetuals', date: 'March 30, 2026', desc: 'Bringing tokenized real-world assets to perpetual futures on Stellar.' },
-  { title: 'Oracle Design: Pricing Perps on Soroban', date: 'March 18, 2026', desc: 'How the oracle adapter publishes the prices the engine settles against.' },
-  { title: 'Leaderboard & Portfolio Analytics', date: 'March 5, 2026', desc: 'Track PnL, open interest, and ranking across every market in real time.' },
-  { title: 'Kryon Stress-Test Report: Production Hardening', date: 'February 20, 2026', desc: 'Findings and fixes from load-testing the matcher, indexer, and settlement path.' },
+  { title: 'SOL-PERP Goes Live — USDC-Settled Perpetuals on Solana', date: 'September 28, 2026', desc: 'Protocol Launch', featured: true },
+  { title: 'On-Chain Margin & Settlement, Off-Chain Speed', date: 'September 25, 2026', desc: 'How FloyDex pairs a price-time CLOB matcher with a Solana settlement program.' },
+  { title: 'Self-Custodial Trading with Phantom', date: 'September 22, 2026', desc: 'Sign orders from your own wallet — your keys, your collateral, every fill.' },
+  { title: 'Understanding Funding & Mark Price on FloyDex', date: 'September 18, 2026', desc: 'How the funding mechanism anchors perp prices to the oracle.' },
+  { title: 'Inside the Liquidation & Insurance Engine', date: 'September 14, 2026', desc: 'Transparent margin checks and an insurance fund that keeps markets solvent.' },
+  { title: 'The Road to Perpetuals', date: 'September 10, 2026', desc: 'Bringing tokenized real-world assets to perpetual futures on Solana.' },
+  { title: 'Oracle Design: Pricing Perps on Pyth', date: 'September 6, 2026', desc: 'How the oracle adapter publishes the prices the engine settles against.' },
+  { title: 'Leaderboard & Portfolio Analytics', date: 'September 2, 2026', desc: 'Track PnL, open interest, and ranking across every market in real time.' },
+  { title: 'FloyDex Stress-Test Report: Production Hardening', date: 'August 28, 2026', desc: 'Findings and fixes from load-testing the matcher, indexer, and settlement path.' },
 ];
 
 function LoadingOverlay() {
@@ -221,7 +224,9 @@ function SolSvg({ idx }: { idx: number; active: boolean }) {
 
 export function LandingPage() {
   const router = useRouter();
-  const { connected, connecting, setConnecting, setAddress, setConnected, setWrongNetwork } = useWalletStore();
+  const { connected, connecting } = useWalletStore();
+  const { setVisible } = useWalletModal();
+  const { connected: walletConnected } = useWallet();
   // Server-seeded, so the network-named headline matches on hydration.
   const { config: networkConfig } = useNetwork();
   const headlines = buildHeadlines(networkConfig.label);
@@ -234,6 +239,8 @@ export function LandingPage() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [ftEmail, setFtEmail] = useState('');
   const [ftSubscribed, setFtSubscribed] = useState(false);
+  const [ftBusy, setFtBusy] = useState(false);
+  const [ftError, setFtError] = useState('');
   const dragStartX = useRef<number | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [scrollY, setScrollY] = useState(0);
@@ -314,36 +321,37 @@ export function LandingPage() {
     return () => window.removeEventListener('scroll', check);
   }, []);
 
-  function handleFtSubscribe() {
-    if (!ftEmail) return;
-    setFtSubscribed(true);
-    setFtEmail('');
-    setTimeout(() => setFtSubscribed(false), 2400);
+  async function handleFtSubscribe() {
+    if (!ftEmail || ftBusy) return;
+    setFtBusy(true);
+    setFtError('');
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: ftEmail }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setFtError(data.error || 'Could not subscribe');
+        return;
+      }
+      setFtSubscribed(true);
+      setFtEmail('');
+      setTimeout(() => setFtSubscribed(false), 2400);
+    } catch {
+      setFtError('Could not subscribe');
+    } finally {
+      setFtBusy(false);
+    }
   }
 
-  async function handleConnect() {
-    if (connected) { router.push(`/trade/${DEFAULT_MARKET_SYMBOL}`); return; }
-    const installed = await freighterIsInstalled();
-    if (!installed) {
-      toast.error('Freighter not found — install from freighter.app then refresh.');
+  function handleConnect() {
+    if (connected || walletConnected) {
+      router.push(`/trade/${DEFAULT_MARKET_SYMBOL}`);
       return;
     }
-    setConnecting(true);
-    try {
-      const { freighterConnect, isOnExpectedNetwork } = await import('@/lib/stellar/freighter');
-      const addr = await freighterConnect();
-      setAddress(addr);
-      setConnected(true);
-      const ok = await isOnExpectedNetwork();
-      setWrongNetwork(!ok);
-      if (!ok) toast.warning(`Switch Freighter to ${NETWORK_LABEL}.`);
-      else toast.success('Wallet connected');
-      router.push(`/trade/${DEFAULT_MARKET_SYMBOL}`);
-    } catch (e) {
-      toast.error(String(e));
-    } finally {
-      setConnecting(false);
-    }
+    setVisible(true);
   }
 
   const allCards = [
@@ -401,8 +409,8 @@ export function LandingPage() {
               transition: 'opacity 0.1s linear',
             }}
           >
-            <img src="/logo.png" alt="Kryon" className="s5-nav-logo-img" />
-            <span className="s5-nav-logo-text">KRYON</span>
+            <FloyDexLogo size={44} className="s5-nav-logo-img text-[#14F195]" />
+            <span className="s5-nav-logo-text">FLOYDEX</span>
           </Link>
           <button className="s5-menu-pill" onClick={() => setMenuOpen(m => !m)}>
             <svg viewBox="0 0 20 10" fill="none" width="20" height="10" aria-hidden="true">
@@ -444,13 +452,16 @@ export function LandingPage() {
             <div className="s5-hero-left">
               <div className="s5-hero-title-wrap">
                 <div className="s5-op-row">
-                  <div className="s5-op-slash-group">
-                    <div className="s5-hero-intel"><SplitChars text="Perps" delay={0.05} /></div>
-                    <img src="/images/dd.png" alt="" className="s5-hero-slash-img" />
+                    <div className="s5-op-slash-group s5-op-slash-group--stack">
+                    <div className="s5-hero-intel"><SplitChars text="Tokenized" delay={0.05} /></div>
+                    <div className="s5-op-perps-row">
+                      <div className="s5-hero-intel"><SplitChars text="Perps" delay={0.12} /></div>
+                      <img src="/images/dd.svg" alt="" className="s5-hero-slash-img" />
+                    </div>
                   </div>
                 </div>
                 <div className="s5-hero-intel s5-hero-intel--btm">
-                  <SplitChars text="Reimagined." delay={0.18} />
+                  <SplitChars text="Reimagined." delay={0.22} />
                 </div>
               </div>
             </div>
@@ -476,7 +487,7 @@ export function LandingPage() {
             <div className="s5-hero-right">
               <p className="s5-hero-right-desc s5-fade-up" style={{ animationDelay: '0.4s' }}>
                 Trade Perpetuals<br />
-                on Stellar with superfast<br />
+                on Solana with superfast<br />
                 Decentralized Execution.
               </p>
             </div>
@@ -581,7 +592,7 @@ export function LandingPage() {
           <div className="s5-insights-featured">
             <div className="s5-insights-featured-art">
               <div className="s5-insights-featured-art-img">
-                <svg viewBox="0 0 800 400" fill="none" stroke="rgba(181,153,229,0.75)" strokeWidth="1">
+                <svg viewBox="0 0 800 400" fill="none" stroke="#14F195" strokeWidth="1.4">
                   <rect x="100" y="180" width="600" height="120" rx="8"/>
                   <path d="M160 180 L220 100 L580 100 L640 180"/>
                   <ellipse cx="220" cy="310" rx="55" ry="55"/><ellipse cx="220" cy="310" rx="30" ry="30"/>
@@ -625,12 +636,15 @@ export function LandingPage() {
                 type="email"
                 placeholder={ftSubscribed ? "You're on the list." : 'Enter your email address'}
                 value={ftEmail}
-                onChange={e => setFtEmail(e.target.value)}
+                onChange={e => { setFtEmail(e.target.value); setFtError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleFtSubscribe()}
+                disabled={ftBusy || ftSubscribed}
+                aria-invalid={ftError ? true : undefined}
               />
+              {ftError ? <p className="s5-footer-signup-label mt-2">{ftError}</p> : null}
             </div>
-            <button className="s5-footer-subscribe-btn" onClick={handleFtSubscribe} disabled={ftSubscribed}>
-              {ftSubscribed ? 'Subscribed' : 'Subscribe'}
+            <button className="s5-footer-subscribe-btn" onClick={handleFtSubscribe} disabled={ftBusy || ftSubscribed}>
+              {ftSubscribed ? 'Subscribed' : ftBusy ? 'Saving' : 'Subscribe'}
             </button>
           </div>
 
@@ -638,16 +652,16 @@ export function LandingPage() {
             <div className="s5-footer-panel-grain" />
             <div className="s5-footer-panel-grid">
               <div>
-                <svg className="s5-footer-logo" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-                  <path d="M6 12 L26 32 L6 52 L18 52 L38 32 L18 12 Z" fill="currentColor"/>
-                  <path d="M30 12 L50 32 L30 52 L42 52 L62 32 L42 12 Z" fill="currentColor"/>
-                </svg>
+                <FloyDexLogo size={64} className="s5-footer-logo" />
               </div>
               <div>
                 <h3 className="s5-footer-col-h">Platform</h3>
                 <ul className="s5-footer-col-list">
                   <li><span className="s5-footer-col-arrow">↳</span><Link href={`/trade/${DEFAULT_MARKET_SYMBOL}`} className="text-inherit">Trade</Link></li>
                   <li><span className="s5-footer-col-arrow">↳</span><Link href="/portfolio" className="text-inherit">Portfolio</Link></li>
+                  {STAKE_PUBLIC ? (
+                    <li><span className="s5-footer-col-arrow">↳</span><Link href="/stake" className="text-inherit">Stake</Link></li>
+                  ) : null}
                   <li><span className="s5-footer-col-arrow">↳</span><Link href="/leaderboard" className="text-inherit">Leaderboard</Link></li>
                 </ul>
               </div>
@@ -670,8 +684,8 @@ export function LandingPage() {
                 </ul>
               </div>
             </div>
-            <svg className="s5-footer-wordmark" viewBox="0 0 1000 280" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-              <text x="500" y="279" textAnchor="middle" fontSize="290" fontFamily="Archivo, sans-serif" fontWeight="600" fill="#b599e5" letterSpacing="-15">KRYON</text>
+            <svg className="s5-footer-wordmark" viewBox="0 0 1000 220" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+              <text x="10" y="205" fontSize="190" fontFamily="Archivo, sans-serif" fontWeight="600" fill="#14F195" letterSpacing="-8" textLength="980" lengthAdjust="spacingAndGlyphs">FLOYDEX</text>
             </svg>
           </div>
         </footer>
