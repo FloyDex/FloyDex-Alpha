@@ -11,7 +11,7 @@ import hashlib
 import json
 import struct
 
-MAGIC = b"KRYONv1\x00"
+MAGIC = b"FLOYDEX\x00"
 U64_MAX = 2**64 - 1
 
 
@@ -35,8 +35,8 @@ def order(domain, owner, sub_id, market_id, flags, size, limit_price, nonce, exp
     )
 
 
-D = hashlib.sha256(b"kryon-conformance-domain").hexdigest()
-A = hashlib.sha256(b"kryon-conformance-owner-a").hexdigest()
+D = hashlib.sha256(b"floydex-conformance-domain").hexdigest()
+A = hashlib.sha256(b"floydex-conformance-owner-a").hexdigest()
 B = "ff" * 32
 
 cases = [
