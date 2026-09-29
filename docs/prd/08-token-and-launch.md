@@ -40,7 +40,9 @@ token with no volume behind it is just a meme:
 funded traders, and zero unresolved critical findings from audits or the
 bounty.
 
-### A2. Utility (once gates are met)
+### A2. Utility
+
+**Fee tiers are live on the desk.** Holding or locking $FLOYDEX lowers the 1% USDC taker fee (see `/stake`). Backstop staking, buyback, and listing votes still wait for the gates below.
 
 | Utility | Mechanism | Existing code it builds on |
 |---|---|---|

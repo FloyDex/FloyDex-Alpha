@@ -528,7 +528,7 @@ volume, ~1,500 daily active traders (see `01` §7).
 | **Trading fees** | 1% platform fee on fills → `FEE_COLLECTOR` USDC wallet |
 | **Maker rebates / tiers** | Fee config on exchange (program path); $FLOYDEX fee tiers later |
 | **Insurance / stake** | Stakers backstop; share of risk premium over time |
-| **$FLOYDEX** | Live mint (see Addresses). Buyback / fee discounts / listing governance switch on after utility gates (`08`) |
+| **$FLOYDEX** | Live mint. Hold or lock it on `/stake` to cut the 1% desk fee (down to 0.25%). Buyback and listing votes still wait on volume gates (`08`) |
 
 No revenue-share promises in marketing until counsel signs off. Primary cash
 flow today is the **1% desk fee** flushed to the revenue collector address

@@ -2,6 +2,9 @@
 export const FLOYDEX_TOKEN = {
   symbol: "FLOYDEX",
   name: "FloyDex",
+  /** Fixed pump.fun supply. Confirmed on the mint account. */
+  supply: 1_000_000_000,
+  decimals: 6,
   mint: "2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy",
   pair: "7mmwd8DHp9S6mnkBUSFruynA5A3pUqp17Ka5KqxKdtCC",
   clawpump: "https://clawpump.tech/tokens/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy",

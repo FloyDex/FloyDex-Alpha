@@ -83,9 +83,18 @@ async function waitForSig(
   return "unknown";
 }
 
-export async function sendTreasuryUsdc(
+export function sendTreasuryUsdc(
   owner: string,
   amount: number,
+): Promise<{ ok: true; signature: string } | { ok: false; error: string }> {
+  return sendTreasuryToken(owner, amount, USDC, 6);
+}
+
+export async function sendTreasuryToken(
+  owner: string,
+  amount: number,
+  mint: PublicKey = USDC,
+  decimals = 6,
 ): Promise<{ ok: true; signature: string } | { ok: false; error: string }> {
   const operator = operatorKey();
   if (!operator) {
@@ -115,9 +124,10 @@ export async function sendTreasuryUsdc(
     return { ok: true, signature: `local:self-withdraw:${Date.now()}` };
   }
 
-  const fromAta = getAssociatedTokenAddressSync(USDC, operator.publicKey);
-  const toAta = getAssociatedTokenAddressSync(USDC, dest);
-  const rawAmt = BigInt(Math.round(amount * 1e6));
+  const fromAta = getAssociatedTokenAddressSync(mint, operator.publicKey);
+  const toAta = getAssociatedTokenAddressSync(mint, dest);
+  const scale = 10 ** decimals;
+  const rawAmt = BigInt(Math.round(amount * scale));
   if (rawAmt <= 0n) return { ok: false, error: "Invalid withdraw amount" };
 
   const bal = await connection.getTokenAccountBalance(fromAta).catch(() => null);
@@ -125,7 +135,7 @@ export async function sendTreasuryUsdc(
   if (available < rawAmt) {
     return {
       ok: false,
-      error: `Treasury USDC balance too low (need ${(Number(rawAmt) / 1e6).toFixed(4)}, have ${(Number(available) / 1e6).toFixed(4)})`,
+      error: `Treasury token balance too low (need ${(Number(rawAmt) / scale).toFixed(4)}, have ${(Number(available) / scale).toFixed(4)})`,
     };
   }
 
@@ -143,14 +153,14 @@ export async function sendTreasuryUsdc(
     const tx = new Transaction().add(
       ComputeBudgetProgram.setComputeUnitLimit({ units: 120_000 }),
       ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 }),
-      createAssociatedTokenAccountIdempotentInstruction(operator.publicKey, toAta, dest, USDC),
+      createAssociatedTokenAccountIdempotentInstruction(operator.publicKey, toAta, dest, mint),
       createTransferCheckedInstruction(
         fromAta,
-        USDC,
+        mint,
         toAta,
         operator.publicKey,
         rawAmt,
-        6,
+        decimals,
         [],
         TOKEN_PROGRAM_ID,
       ),
@@ -202,7 +212,7 @@ export async function sendTreasuryUsdc(
   return {
     ok: false,
     error: lastErr.includes("insufficient")
-      ? "Treasury could not send USDC — fund the treasury with SOL for fees"
+      ? "Treasury could not send the token — fund the treasury with SOL for fees"
       : `Treasury send failed: ${lastErr.slice(0, 220)}`,
   };
 }

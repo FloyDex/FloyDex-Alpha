@@ -9,6 +9,7 @@ import { submitOrder } from "@/lib/market/matcher";
 import { useLocalOrders } from "@/stores/orders";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "@/lib/api";
 import { getBalance } from "@/lib/solana/vault";
 import { getAccountHealth } from "@/lib/solana/health";
 import { amountToHuman, formatAccountUsd, formatMarketPrice, formatMarketUsd, priceToHuman, toPriceInput } from "@/lib/format";
@@ -80,6 +81,19 @@ export function OrderEntry({
   const [tpGainUnit, setTpGainUnit] = useState<"percent" | "quote">("percent");
   const [slLossUnit, setSlLossUnit] = useState<"percent" | "quote">("percent");
   const [degenPromptOpen, setDegenPromptOpen] = useState(false);
+
+  const { data: feeQuote } = useQuery({
+    queryKey: ["fee-tier", address],
+    queryFn: async () => {
+      const q = address ? `?owner=${encodeURIComponent(address)}` : "";
+      const res = await apiFetch(`/api/stake${q}`, { cache: "no-store" });
+      if (!res.ok) return { feeBps: PLATFORM_FEE_BPS };
+      return (await res.json()) as { feeBps?: number };
+    },
+    staleTime: 15_000,
+    refetchInterval: 20_000,
+  });
+  const feeBps = feeQuote?.feeBps ?? PLATFORM_FEE_BPS;
 
   const sanitizeNumericInput = (val: string): string => {
     // Allow only digits and a single decimal point; strip leading zeros
@@ -159,7 +173,7 @@ export function OrderEntry({
     ? (baseSizeNum * execPrice).toFixed(2)
     : "0.00";
   const feeUsd = baseSizeNum > 0 && execPrice > 0
-    ? (baseSizeNum * execPrice * PLATFORM_FEE_BPS) / 10_000
+    ? (baseSizeNum * execPrice * feeBps) / 10_000
     : 0;
   const marginRequired = baseSizeNum > 0 && execPrice > 0
     ? (baseSizeNum * execPrice / effectiveLeverage).toFixed(2)
@@ -822,8 +836,9 @@ export function OrderEntry({
           <div className={rowCls}>
             <span>Fees</span>
             <span className="font-mono text-[#f5f5f5]">
-              {(PLATFORM_FEE_BPS / 100).toFixed(2)}%
+              {(feeBps / 100).toFixed(2)}%
               {feeUsd > 0 ? ` · $${feeUsd.toFixed(2)}` : ""}
+              {feeBps < PLATFORM_FEE_BPS ? " · $FLOYDEX" : ""}
             </span>
           </div>
         </div>

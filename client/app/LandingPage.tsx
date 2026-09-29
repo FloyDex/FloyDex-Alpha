@@ -56,6 +56,7 @@ const buildHeadlines = (networkLabel: string) => [
   { title: `${ACTIVE_MARKET_SYMBOLS.length} Perpetual Markets Live on ${networkLabel}`, desc: `${ACTIVE_MARKET_SYMBOLS.map((s) => s.replace('-PERP', '')).join(' · ')} — USDC-settled perpetual futures with on-chain margin and settlement, traded self-custodial from Phantom, Solflare or Backpack.` },
   { title: 'FloyDex Brings Perpetuals to Solana', desc: 'A decentralized exchange pairing an off-chain central-limit order book with a fully on-chain margin and settlement engine on Solana.' },
   { title: 'Sub-Second Fills, On-Chain Truth', desc: 'Price-time matching off-chain for a familiar low-latency perp experience, with custody, margin, and settlement enforced on-chain.' },
+  { title: '$FLOYDEX cuts the desk fee', desc: 'Hold 100K+ and the 1% fee drops. Lock 1M+ on the stake page and it is 0.25%. Supply is 1,000,000,000. The token is not required to trade.' },
 ];
 
 const SOLUTIONS = [
@@ -63,10 +64,12 @@ const SOLUTIONS = [
   { title: 'On-Chain Settlement', desc: 'Collateral, margin, and settlement live on Solana. You keep your keys — every fill settles to a program you control.' },
   { title: 'CLOB Matching', desc: 'An off-chain central-limit order book matches orders price-time for low-latency fills, while on-chain state stays the source of truth.', accent: true },
   { title: 'Risk & Liquidation', desc: 'A transparent margin engine, funding mechanism, and insurance-backed liquidation keep markets solvent and fair.' },
+  { title: '$FLOYDEX utility', desc: 'Hold or lock $FLOYDEX to lower the 1% USDC trading fee, down to 0.25%. Fixed 1B supply. Settlement stays USDC.' },
 ];
 
 const INSIGHTS = [
-  { title: 'SOL-PERP Goes Live — USDC-Settled Perpetuals on Solana', date: 'September 28, 2026', desc: 'Protocol Launch', featured: true },
+  { title: '$FLOYDEX fee utility is live', date: 'September 30, 2026', desc: 'Hold or stake the token and the desk fee drops. 1,000,000,000 supply, launched on pump.fun.', featured: true },
+  { title: 'SOL-PERP Goes Live — USDC-Settled Perpetuals on Solana', date: 'September 28, 2026', desc: 'Protocol Launch' },
   { title: 'On-Chain Margin & Settlement, Off-Chain Speed', date: 'September 25, 2026', desc: 'How FloyDex pairs a price-time CLOB matcher with a Solana settlement program.' },
   { title: 'Self-Custodial Trading with Phantom', date: 'September 22, 2026', desc: 'Sign orders from your own wallet — your keys, your collateral, every fill.' },
   { title: 'Understanding Funding & Mark Price on FloyDex', date: 'September 18, 2026', desc: 'How the funding mechanism anchors perp prices to the oracle.' },
@@ -738,6 +741,7 @@ export function LandingPage() {
                   <li><span className="s5-footer-col-arrow">↳</span><a href="#">On-Chain Settlement</a></li>
                   <li><span className="s5-footer-col-arrow">↳</span><a href="#">CLOB Matching</a></li>
                   <li><span className="s5-footer-col-arrow">↳</span><a href="#">Risk & Liquidation</a></li>
+                  <li><span className="s5-footer-col-arrow">↳</span><Link href="/stake" className="text-inherit">$FLOYDEX utility</Link></li>
                 </ul>
               </div>
               <div>

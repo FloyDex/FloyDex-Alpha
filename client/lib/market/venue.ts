@@ -12,7 +12,12 @@ import {
   type GiftClaims,
 } from "./gift";
 import { fetchMarkUsd } from "./marks";
-import { sendTreasuryUsdc } from "@/lib/solana/treasury";
+import { feeBpsForBalances, termByDays, type StakePosition } from "./stake";
+import { FLOYDEX_TOKEN } from "@/config/token";
+import { Connection, PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { solanaRpcUrl } from "@/lib/solana/rpc";
+import { sendTreasuryToken, sendTreasuryUsdc } from "@/lib/solana/treasury";
 
 export interface VenuePosition {
   marketId: number;
@@ -104,6 +109,9 @@ interface VenueState {
   feesSent?: number;
   /** Banned wallets — cannot deposit, withdraw, trade, gift, or stake. */
   bans?: Record<string, WalletBan>;
+  /** $FLOYDEX locks. Principal sits in the treasury until unlock. */
+  stakes?: StakePosition[];
+  seenStakeSigs?: string[];
 }
 
 const FILE = join(process.cwd(), ".data", "venue.json");
@@ -205,8 +213,82 @@ function accountEquity(acct: VenueAccount, upnl = 0): number {
   return acct.deposited + acct.realized + upnl - (acct.feesPaid ?? 0);
 }
 
-function platformFeeUsdc(size: number, price: number): number {
-  return (size * price * PLATFORM_FEE_BPS) / 10_000;
+function platformFeeUsdc(size: number, price: number, bps = PLATFORM_FEE_BPS): number {
+  return (size * price * bps) / 10_000;
+}
+
+const floydexBalCache = new Map<string, { at: number; amount: number }>();
+
+export async function floydexWalletBalance(owner: string): Promise<number> {
+  const hit = floydexBalCache.get(owner);
+  if (hit && Date.now() - hit.at < 20_000) return hit.amount;
+  let amount = 0;
+  try {
+    const connection = new Connection(solanaRpcUrl(), "confirmed");
+    const ata = getAssociatedTokenAddressSync(new PublicKey(FLOYDEX_TOKEN.mint), new PublicKey(owner));
+    const bal = await connection.getTokenAccountBalance(ata);
+    amount = bal.value.uiAmount ?? Number(bal.value.amount) / 10 ** (bal.value.decimals || 6);
+  } catch {
+    amount = 0;
+  }
+  floydexBalCache.set(owner, { at: Date.now(), amount });
+  return amount;
+}
+
+export function openStakedAmount(owner: string): number {
+  const rows = load().stakes ?? [];
+  return rows.reduce((sum, row) => {
+    if (row.owner !== owner || row.returned) return sum;
+    return sum + row.principal;
+  }, 0);
+}
+
+export async function traderFeeBps(owner: string): Promise<number> {
+  const wallet = owner ? await floydexWalletBalance(owner) : 0;
+  const staked = owner ? openStakedAmount(owner) : 0;
+  return feeBpsForBalances(wallet, staked);
+}
+
+export function listStakeRows(owner?: string): StakePosition[] {
+  const rows = load().stakes ?? [];
+  const mine = owner ? rows.filter((r) => r.owner === owner) : rows;
+  return [...mine].sort((a, b) => b.lockedAt - a.lockedAt);
+}
+
+export function totalStakedNow(): number {
+  return (load().stakes ?? []).reduce((sum, row) => (row.returned ? sum : sum + row.principal), 0);
+}
+
+export function lastStakeOwner(): string | null {
+  const rows = load().stakes ?? [];
+  return rows.at(-1)?.owner ?? null;
+}
+
+export function addStakeLock(row: StakePosition): { ok: true } | { ok: false; error: string } {
+  if (!termByDays(row.days)) return { ok: false, error: "Pick a listed term" };
+  if (!(row.principal >= 1)) return { ok: false, error: "Enter an amount of at least 1" };
+  const state = load();
+  const seen = new Set(state.seenStakeSigs ?? []);
+  if (seen.has(row.signature)) return { ok: false, error: "This transfer is already staked" };
+  state.stakes = [...(state.stakes ?? []), row];
+  state.seenStakeSigs = [...seen, row.signature];
+  persist(state);
+  floydexBalCache.delete(row.owner);
+  return { ok: true };
+}
+
+export function stakeRow(owner: string, id: string): StakePosition | undefined {
+  return (load().stakes ?? []).find((r) => r.id === id && r.owner === owner);
+}
+
+export function markStakeReturned(id: string, signature: string): void {
+  const state = load();
+  const row = (state.stakes ?? []).find((r) => r.id === id);
+  if (!row) return;
+  row.returned = true;
+  row.returnSignature = signature;
+  persist(state);
+  floydexBalCache.delete(row.owner);
 }
 
 /** Debit the trader and accrue protocol fees awaiting on-chain payout to FEE_COLLECTOR. */
@@ -373,6 +455,14 @@ function mergeVenueState(remote: VenueState, local: VenueState): void {
   if ((local.feesSent ?? 0) > (remote.feesSent ?? 0)) remote.feesSent = local.feesSent;
   if (local.claims && !remote.claims) remote.claims = local.claims;
   if (local.bans) remote.bans = { ...(remote.bans ?? {}), ...local.bans };
+  const stakeById = new Map((remote.stakes ?? []).map((s) => [s.id, s]));
+  for (const row of local.stakes ?? []) {
+    const prev = stakeById.get(row.id);
+    if (!prev || (row.returned && !prev.returned)) stakeById.set(row.id, row);
+  }
+  if (stakeById.size) remote.stakes = [...stakeById.values()];
+  const sigs = new Set([...(remote.seenStakeSigs ?? []), ...(local.seenStakeSigs ?? [])]);
+  if (sigs.size) remote.seenStakeSigs = [...sigs];
   if (local.payouts?.length) {
     const byId = new Map((remote.payouts ?? []).map((p) => [p.id, p]));
     for (const p of local.payouts) byId.set(p.id, p);
@@ -962,7 +1052,9 @@ export async function applyFill(args: {
   const lev = Math.min(leverage, maxLev);
   const notional = size * price;
   const needMargin = notional / lev;
-  const fee = platformFeeUsdc(size, price);
+  const bps = await traderFeeBps(owner);
+  const fee = platformFeeUsdc(size, price, bps);
+  const feeLabel = `${(bps / 100).toFixed(2)}%`;
 
   const existing = acct.positions.find((p) => p.marketId === marketId);
   if (!existing) {
@@ -971,7 +1063,7 @@ export async function applyFill(args: {
     if (snap.freeCollateral + 1e-9 < needMargin + fee) {
       return {
         ok: false,
-        error: `Need $${(needMargin + fee).toFixed(2)} free (incl. ${(PLATFORM_FEE_BPS / 100).toFixed(2)}% fee), have $${snap.freeCollateral.toFixed(2)}`,
+        error: `Need $${(needMargin + fee).toFixed(2)} free (incl. ${feeLabel} fee), have $${snap.freeCollateral.toFixed(2)}`,
       };
     }
     acct.positions.push({ marketId, isLong, size, entry: price, margin: needMargin });
@@ -1005,11 +1097,12 @@ export async function applyFill(args: {
   }
 
   const closed = Math.min(existing.size, size);
-  const closeFee = platformFeeUsdc(closed, price);
+  const closeBps = await traderFeeBps(owner);
+  const closeFee = platformFeeUsdc(closed, price, closeBps);
   const used = acct.positions.reduce((s, p) => s + p.margin, 0);
   const freeBefore = accountEquity(acct) - used;
   if (freeBefore + existing.margin * (closed / existing.size) + 1e-9 < closeFee) {
-    return { ok: false, error: `Insufficient balance for ${(PLATFORM_FEE_BPS / 100).toFixed(2)}% close fee` };
+    return { ok: false, error: `Insufficient balance for ${(closeBps / 100).toFixed(2)}% close fee` };
   }
   const dir = existing.isLong ? 1 : -1;
   const pnl = (price - existing.entry) * closed * dir;

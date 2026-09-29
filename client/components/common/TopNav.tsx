@@ -96,7 +96,7 @@ export function TopNav() {
                 <Link
                   key={t.label}
                   href={t.href}
-                  className={`desk-tab px-3 py-2 text-[13px] ${active ? "is-on" : ""}`}
+                  className={`desk-tab px-3 py-2 text-[13px] ${t.label === "Leaderboard" ? "hidden xl:inline" : ""} ${active ? "is-on" : ""}`}
                 >
                   {t.label}
                 </Link>
@@ -108,7 +108,7 @@ export function TopNav() {
                 href={t.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="desk-tab px-3 py-2 text-[13px]"
+                className="desk-tab hidden px-3 py-2 text-[13px] xl:inline"
               >
                 {t.label}
               </a>
