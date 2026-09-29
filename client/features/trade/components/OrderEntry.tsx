@@ -120,14 +120,14 @@ export function OrderEntry({
     queryKey: ["balance", address],
     queryFn: () => getBalance(address!, ASSETS.usdc),
     enabled: !!address && connected,
-    refetchInterval: fastPoll ? 2_000 : 10_000,
+    refetchInterval: fastPoll ? 3_000 : 15_000,
   });
 
   const { data: health } = useQuery({
     queryKey: ["health", address],
     queryFn: () => getAccountHealth(address!, ASSETS.usdc),
     enabled: !!address && connected,
-    refetchInterval: fastPoll ? 2_000 : 10_000,
+    refetchInterval: fastPoll ? 3_000 : 15_000,
   });
 
   // Available to trade = free collateral (balance minus locked margin).

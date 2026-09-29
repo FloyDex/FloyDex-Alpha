@@ -28,13 +28,13 @@ export function usePlaceMarketOrder(market: MarketConfig) {
     queryKey: ["balance", address],
     queryFn: () => getBalance(address!, ASSETS.usdc),
     enabled: !!address && connected,
-    refetchInterval: 10_000,
+    refetchInterval: 15_000,
   });
   const { data: health } = useQuery({
     queryKey: ["health", address],
     queryFn: () => getAccountHealth(address!, ASSETS.usdc),
     enabled: !!address && connected,
-    refetchInterval: 10_000,
+    refetchInterval: 15_000,
   });
 
   const availableToTrade = health?.freeCollateral ?? balance ?? 0n;

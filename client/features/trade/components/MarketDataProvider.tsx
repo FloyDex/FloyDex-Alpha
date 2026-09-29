@@ -248,6 +248,8 @@ export function MarketDataProvider({ market, children }: Props) {
     // ── Orderbook / trades REST polling (fallback when WS is down) ────────────
     async function pollOrderBook() {
       if (!visibleRef.current) return;
+      // Live book comes from the WS; REST is only a reconnect fallback.
+      if (wsActiveRef.current) return;
       await runOnce("book", async () => {
       const book = await fetchOrderBook(marketId);
       if (!cancelled && book) set().setOrderBook(marketId, book);
@@ -256,6 +258,7 @@ export function MarketDataProvider({ market, children }: Props) {
 
     async function pollTrades() {
       if (!visibleRef.current) return;
+      if (wsActiveRef.current) return;
       await runOnce("trades", async () => {
       const trades = await fetchRecentTrades(marketId);
       if (!cancelled && trades.length > 0) set().setTrades(marketId, trades);
@@ -311,9 +314,10 @@ export function MarketDataProvider({ market, children }: Props) {
     pollMarketStats();
 
     const timers = [
-      setInterval(pollOracle, 3_000),
-      setInterval(() => { pollOrderBook(); pollTrades(); }, 800),
-      setInterval(pollMarketStats, 15_000),
+      setInterval(pollOracle, 5_000),
+      // REST book/trades only when the WS is down (see pollOrderBook / pollTrades).
+      setInterval(() => { pollOrderBook(); pollTrades(); }, 5_000),
+      setInterval(pollMarketStats, 20_000),
       setInterval(poll24h, 30_000),
       // Switcher rows only need to be roughly live.
       setInterval(pollAllTickers, 60_000),

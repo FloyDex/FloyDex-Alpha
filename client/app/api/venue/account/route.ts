@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   await ensureVenueReady();
   const fired = await checkTriggers(owner);
   const snap = await snapshot(owner);
-  await flushVenue();
+  // Only wait on a pending durable write — never force a Blob round-trip on reads.
+  if (fired.length > 0) await flushVenue();
   return NextResponse.json(
     { ...snap, triggered: fired },
     { headers: { "Cache-Control": "no-store" } },

@@ -1071,8 +1071,13 @@ export function setTriggers(
 /** Close a position if mark has crossed its take-profit or stop-loss. SL wins if both hit. */
 export async function checkTriggers(owner: string): Promise<string[]> {
   const acct = getAccount(owner);
+  const armed = acct.positions.filter(
+    (p) => (p.tp != null && p.tp > 0) || (p.sl != null && p.sl > 0),
+  );
+  if (armed.length === 0) return [];
+
   const fired: string[] = [];
-  for (const p of [...acct.positions]) {
+  for (const p of [...armed]) {
     const mark = (await fetchMarkUsd(p.marketId)) ?? p.entry;
     const hitSl = Boolean(p.sl && p.sl > 0 && (p.isLong ? mark <= p.sl : mark >= p.sl));
     const hitTp = Boolean(p.tp && p.tp > 0 && (p.isLong ? mark >= p.tp : mark <= p.tp));

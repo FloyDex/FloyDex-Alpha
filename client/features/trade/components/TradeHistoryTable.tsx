@@ -39,7 +39,7 @@ export function TradeHistoryTable({ marketFilter }: { marketFilter: number | "al
       return (await res.json()) as Fill[];
     },
     enabled: !!address && connected,
-    refetchInterval: 10_000,
+    refetchInterval: 15_000,
   });
 
   if (!connected || !address) return <Empty text="Connect a wallet to view trade history" />;

@@ -33,7 +33,7 @@ export function PositionsTable({
     queryKey: ["positions", address],
     queryFn: () => getPositions(address!),
     enabled: !!address && connected,
-    refetchInterval: 10_000,
+    refetchInterval: 15_000,
   });
 
   const filtered = positions.filter(

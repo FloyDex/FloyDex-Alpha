@@ -17,8 +17,9 @@ export function Providers({ network, children }: { network: NetworkId; children:
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5_000,
-            refetchInterval: 10_000,
+            staleTime: 8_000,
+            // Opt-in per query — a global 10s interval was hammering every desk endpoint.
+            refetchInterval: false,
             // Don't poll/refetch in background tabs — saves RPC load & avoids
             // multi-tab thundering herd against the live infra.
             refetchIntervalInBackground: false,

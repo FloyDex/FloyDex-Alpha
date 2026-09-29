@@ -50,13 +50,16 @@ function localRateLimit(key: string, limit: number): boolean {
   return current.count <= limit;
 }
 
+let warnedMissingUpstash = false;
+
 export async function rateLimit(key: string, limit: number): Promise<boolean> {
   const distributed = await distributedRateLimit(key, limit).catch(() => false);
   if (distributed !== null) return distributed;
   // No Upstash configured. Prefer a per-instance bucket over fail-closed so the
-  // desk stays tradable; warn loudly so we still wire distributed limits ASAP.
-  if (process.env.NODE_ENV === "production") {
-    console.error(
+  // desk stays tradable; warn once so we still wire distributed limits ASAP.
+  if (process.env.NODE_ENV === "production" && !warnedMissingUpstash) {
+    warnedMissingUpstash = true;
+    console.warn(
       "rate-limit: UPSTASH_REDIS_REST_URL/TOKEN not configured — using in-memory fallback",
     );
   }

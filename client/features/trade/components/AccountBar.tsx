@@ -20,7 +20,7 @@ export function AccountBar() {
     queryKey: ["health", address],
     queryFn: () => getAccountHealth(address!, SETTLEMENT_ASSET.contract),
     enabled: !!address && connected,
-    refetchInterval: 10_000,
+    refetchInterval: 15_000,
   });
   const { data: giftSnap } = useQuery({
     queryKey: ["gift", address],
