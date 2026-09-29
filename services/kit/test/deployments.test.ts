@@ -8,7 +8,7 @@ import { BorshAccountsCoder } from "@coral-xyz/anchor";
 import { loadDeployment, DeploymentFileError, deriveExchangePda, compareExchangeState } from "../src/deployments.ts";
 
 function tmpFile(name: string, content: string): string {
-  const dir = mkdtempSync(join(tmpdir(), "kryon-deployments-"));
+  const dir = mkdtempSync(join(tmpdir(), "floydex-deployments-"));
   const path = join(dir, name);
   writeFileSync(path, content);
   return path;
@@ -95,7 +95,7 @@ test("compareExchangeState is clean when everything recorded agrees", () => {
 // fake objects it fabricates itself, so they can't catch a mismatch between
 // what the coder actually returns and what compareExchangeState expects —
 // only a round-trip through the real coder, against a real (trimmed) IDL,
-// can. The fixture is a frozen excerpt of target/idl/kryon_perps.json's
+// can. The fixture is a frozen excerpt of target/idl/floydex_perps.json's
 // Exchange account, not a live build artifact, so this runs without
 // `yarn build` having been run first.
 test("a real Anchor-decoded Exchange account has the field names compareExchangeState expects", async () => {

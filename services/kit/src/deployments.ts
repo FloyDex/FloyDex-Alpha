@@ -66,7 +66,7 @@ export function loadDeployment(path: string): DeploymentRecord {
   return rec;
 }
 
-/** Derives the `["exchange"]` PDA for a program, matching `programs/kryon-perps/src/state/exchange.rs`. */
+/** Derives the `["exchange"]` PDA for a program, matching `programs/floydex-perps/src/state/exchange.rs`. */
 export function deriveExchangePda(programId: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync([Buffer.from("exchange")], programId)[0];
 }

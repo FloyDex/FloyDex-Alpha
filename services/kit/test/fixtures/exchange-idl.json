@@ -1,10 +1,10 @@
 {
   "address": "2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB",
   "metadata": {
-    "name": "kryon_perps",
+    "name": "floydex_perps",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Kryon tokenized-stock perps: settlement, margin and risk on Solana."
+    "description": "FloyDex tokenized-stock perps: settlement, margin and risk on Solana."
   },
   "instructions": [],
   "accounts": [
