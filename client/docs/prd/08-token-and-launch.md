@@ -1,42 +1,47 @@
-# 08 — Token (KRY) and launches
+# 08 — Protocol token (ticker TBD) and launch markets
 
 > Not legal or tax advice. A token on top of a stock-derivatives venue carries
 > two layers of regulatory exposure. Get counsel **before** you publish
 > tokenomics, run a points program, or raise money. See `10`.
 
-"Token launches" means two different things in this plan:
-- **A. Kryon's own token (KRY):** the utility, supply and launch path.
-- **B. Launch markets as a product:** pre-listing perps for IPOs and new
-  tokens (phase 3), which also give KRY a pre-market.
+**Ticker and contract details are intentionally blank.** When the operator
+launches, they will publish the ticker, mint, and supply — then this doc and
+the desk copy get updated. Until then: points only; no named token ticker in
+product UI or marketing.
 
-## A. KRY token
+"Token launches" means two different things in this plan:
+- **A. FloyDex's own protocol token (name TBD):** utility, supply and launch path.
+- **B. Launch markets as a product:** pre-listing perps for IPOs and new
+  tokens (phase 3).
+
+## A. Protocol token (ticker TBD)
 
 ### A1. Principle: launch the token after the product, not before
 
-A perps DEX token with no volume behind it is a meme. Hyperliquid's playbook
-worked because the token followed real usage. Sequence:
+A perps DEX token with no volume behind it is a meme. Sequence:
 1. Mainnet with no token → **points** for real, non-wash activity.
 2. Reach the traction gates (below).
 3. TGE: airdrop to points holders, liquidity, then utility switches on.
+   Ticker / mint / metadata are filled in at that time only.
 
 **TGE gates (all three):** 90-day cumulative volume ≥ $250M, ≥ 5,000 unique
 funded traders, and zero unresolved critical findings from audits or the
 bounty.
 
-### A2. Utility: each item tied to something the protocol already has
+### A2. Utility (once a ticker exists)
 
 | Utility | Mechanism | Existing code it builds on |
 |---|---|---|
-| **Backstop staking** | Stake KRY into a second-loss backstop behind the USDC insurance fund. Earns a share of fees; slashed on bad debt beyond the USDC fund | `perp-insurance` share/cooldown model → Solana `Insurance` + `StakePosition` |
-| **Fee tiers** | Holding or staking KRY lowers taker fees and raises maker rebates | `fee_config` |
-| **Buyback** | X% of net protocol fees buy KRY on the open market to the treasury or burn | fee vault + keeper |
-| **Listing governance** | KRY holders vote on new equity markets and risk-parameter ranges; the Squads multisig executes after the time lock | Squads v4 (+ Realms voting if needed) |
+| **Backstop staking** | Stake the protocol token into a second-loss backstop behind the USDC insurance fund. Earns a share of fees; slashed on bad debt beyond the USDC fund | Solana `Insurance` + `StakePosition` |
+| **Fee tiers** | Holding or staking lowers taker fees and raises maker rebates | `fee_config` |
+| **Buyback** | X% of net protocol fees buy the token on the open market to the treasury or burn | fee vault + keeper |
+| **Listing governance** | Token holders vote on new equity markets and risk-parameter ranges; the Squads multisig executes after the time lock | Squads v4 (+ Realms voting if needed) |
 | **Pre-listing market seeding** | Stakers get early access and fee rebates on new pre-listing markets | `08-B` |
 
 Avoid promising revenue share or yield in marketing. Buyback plus fee
 discounts is the lower-risk shape, and counsel decides the final design.
 
-### A3. Supply sketch (to refine)
+### A3. Supply sketch (to refine — no ticker yet)
 
 | Bucket | % | Vesting |
 |---|---|---|
@@ -47,8 +52,9 @@ discounts is the lower-risk shape, and counsel decides the final design.
 | Investors | 12 | 12-month cliff, 24-month linear |
 | Initial liquidity | 5 | At TGE |
 
-Fixed supply of 1,000,000,000, SPL (Token-2022 metadata; no transfer hooks
-and no freeze authority after TGE).
+Fixed supply sketch of 1,000,000,000 SPL (Token-2022 metadata; no transfer
+hooks and no freeze authority after TGE). Final numbers and the ticker ship
+together at launch announcement.
 
 ### A4. Points program (starts at mainnet beta)
 
@@ -74,7 +80,7 @@ and no freeze authority after TGE).
 
 ### B1. Pre-listing perps
 For assets that don't trade yet: IPOs (e.g. the SPCX pattern that did $10B+ in
-24h at listing) and upcoming Solana token TGEs, including KRY itself.
+24h at listing) and upcoming Solana token TGEs.
 - **No oracle phase:** the mark is the book EMA with a hard band per day, OI
   caps of 5–10% of a normal market, max leverage 2–3x, and an isolated
   insurance sub-fund.
@@ -95,5 +101,6 @@ For assets that don't trade yet: IPOs (e.g. the SPCX pattern that did $10B+ in
 
 ## C. Timeline (see `09`)
 Points start at mainnet beta. The TGE comes no sooner than 90 days after
-mainnet, and only once the gates in A1 are met. Pre-listing markets launch
-after TGE, or for KRY itself as the first pre-listing market, before TGE.
+mainnet, and only once the gates in A1 are met. Pre-listing markets for
+external assets can ship on that cadence; a FloyDex-token pre-market waits
+until the ticker is announced.
