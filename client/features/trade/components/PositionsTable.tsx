@@ -3,13 +3,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWalletStore } from "@/stores/wallet";
 import { useMarketStore } from "@/stores/market";
-import { getPositions, getAccountHealth, RawPosition } from "@/lib/stellar/contracts";
-import { MARKETS } from "@/config";
-import { priceToHuman, amountToHuman, formatMarketUsd, formatMarketSize } from "@/lib/format";
+import type { RawPosition } from "@/lib/stellar/contracts";
+import { getPositions } from "@/lib/solana/account";
+import { MARKETS, PRICE_PRECISION } from "@/config";
+import { priceToHuman, amountToHuman, formatAccountUsd, formatMarketUsd, formatMarketSize } from "@/lib/format";
 import { buildOrderIntent } from "@/lib/market/order-intent";
 import { submitOrder } from "@/lib/market/matcher";
 import { useLocalOrders } from "@/stores/orders";
-import { calcUnrealizedPnl } from "@/lib/math";
+import { calcLiqPrice, calcUnrealizedPnl } from "@/lib/math";
 import { useTradeSettings } from "@/stores/settings";
 import { logoFor, UsdcLogo } from "@/components/common/AssetLogos";
 import { toast } from "sonner";
@@ -35,16 +36,6 @@ export function PositionsTable({
     refetchInterval: 10_000,
   });
 
-  // Account-level health drives leverage / liq-price / margin (the engine keeps
-  // margin at the vault, so position.margin is always 0 — never use it).
-  const { data: health } = useQuery({
-    queryKey: ["health", address],
-    queryFn: () => getAccountHealth(address!),
-    enabled: !!address && connected,
-    refetchInterval: 10_000,
-  });
-  const equityHuman = health ? amountToHuman(health.equity) : 0;
-
   const filtered = positions.filter(
     (p) =>
       (marketFilter === "all" || p.marketId === marketFilter) &&
@@ -55,7 +46,7 @@ export function PositionsTable({
     return <Empty text="Connect a wallet to view open positions" />;
   }
   if (filtered.length === 0) {
-    return <Empty text="No open positions" />;
+    return <Empty text="No positions. Deposit USDC, then Open Long or Open Short." />;
   }
 
   const cols = [
@@ -65,13 +56,15 @@ export function PositionsTable({
     "Mark Price",
     ...(hidePnl ? [] : ["PnL"]),
     ...(hideLiqPrice ? [] : ["Liq. Price"]),
+    "TP",
+    "SL",
     "Margin",
     "",
   ];
 
-  // Close is a market order in the opposite direction. Must use an aggressive
-  // limit price (not 0) — the gateway rejects limit_price <= 0. Closing a long =
-  // selling → use 0.5× mark; closing a short = buying → use 2× mark.
+  // Close is a market IOC in the opposite direction. Aggressive limit crosses the
+  // book; ioc prevents a resting leftover. Local open-orders must be marked
+  // filled/cancelled or Close leaves a ghost "Reduce SHORT @ 0.5× mark" row.
   const makeClose = (pos: RawPosition) => async () => {
     if (!address) return;
     const mark = markPrices[pos.marketId];
@@ -85,17 +78,22 @@ export function PositionsTable({
       limitPrice: aggPrice,
       reduceOnly: true,
       ttlSeconds: 60,
+      leverage: 10,
     });
     addOrder(intent);
-    const result = await submitOrder(intent);
+    const result = await submitOrder(intent, { ioc: true, orderType: "market" });
     if (result.ok) {
-      toast.success("Close order submitted");
+      const filledQty = result.fills?.reduce((s, f) => s + f.size, 0) ?? 0;
+      if (filledQty > 0) useLocalOrders.getState().markFilled(intent.nonce, address);
+      else useLocalOrders.getState().cancelOrder(intent.nonce, address);
+      toast.success(filledQty > 0 ? "Position closed" : "Close submitted — nothing left to fill");
       const keys = [["positions", address], ["fills", address], ["balance", address], ["health", address]];
       const invalidateAll = () => keys.forEach((key) => queryClient.invalidateQueries({ queryKey: key }));
       invalidateAll();
-      [3_000, 6_000, 10_000, 15_000, 22_000, 30_000].forEach((ms) => setTimeout(invalidateAll, ms));
+      [2_000, 5_000, 10_000].forEach((ms) => setTimeout(invalidateAll, ms));
     } else {
-      toast.warning(`Close order stored locally. ${result.error}`);
+      useLocalOrders.getState().cancelOrder(intent.nonce, address);
+      toast.error(result.error ?? "Close failed");
     }
   };
 
@@ -121,7 +119,6 @@ export function PositionsTable({
               key={String(pos.positionId)}
               position={pos}
               markPrice={markPrices[pos.marketId]}
-              equity={equityHuman}
               hidePnl={hidePnl}
               hideLiqPrice={hideLiqPrice}
               onClose={makeClose(pos)}
@@ -137,7 +134,6 @@ export function PositionsTable({
             key={String(pos.positionId)}
             position={pos}
             markPrice={markPrices[pos.marketId]}
-            equity={equityHuman}
             hidePnl={hidePnl}
             hideLiqPrice={hideLiqPrice}
             onClose={makeClose(pos)}
@@ -166,10 +162,12 @@ interface PositionView {
   sizeDisplay: string;
   entryDisplay: string;
   markDisplay: string;
+  tpDisplay: string;
+  slDisplay: string;
 }
 
 // Shared derivation used by both the desktop row and the mobile card.
-function getPositionView(position: RawPosition, markPrice: bigint | undefined, equity: number): PositionView {
+function getPositionView(position: RawPosition, markPrice: bigint | undefined): PositionView {
   // MARKETS, not ACTIVE_MARKETS: a position in a de-listed market must still
   // render legibly rather than collapsing to "#7".
   const market = Object.values(MARKETS).find((m) => m.marketId === position.marketId);
@@ -187,24 +185,25 @@ function getPositionView(position: RawPosition, markPrice: bigint | undefined, e
   const pnlColor = pnlHuman === null ? "text-[#a3a3a3]" : pnlHuman >= 0 ? "text-[#1fae5b]" : "text-[#e34c4c]";
 
   const notional = sizeHuman * refPrice;
+  // Prefer the margin actually posted on the venue position; fall back to IM×notional.
+  const postedMargin = amountToHuman(position.margin);
   const imRate = (market?.initialMarginBps ?? 0) / 10_000;
-  const positionMargin = notional * imRate;
+  const positionMargin =
+    postedMargin > 0 ? postedMargin : notional * (imRate > 0 ? imRate : 0.1);
   const pnlPct = pnlHuman !== null && positionMargin > 0 ? (pnlHuman / positionMargin) * 100 : null;
-  const lev = equity > 0 && notional > 0 ? Math.max(1, Math.round(notional / equity)) : 0;
+  // Position leverage = notional / margin (same as chart / ticket). Do NOT use
+  // account equity here — that made a 10× ticket show as 3× and a different liq.
+  const lev =
+    positionMargin > 0 && notional > 0
+      ? Math.max(1, Math.round(notional / positionMargin))
+      : 0;
 
   const liqPrice = (() => {
-    const mm = (market?.maintenanceMarginBps ?? 0) / 10_000;
-    if (!market || sizeHuman <= 0 || equity <= 0 || refPrice <= 0) return null;
-    let p: number;
-    if (position.isLong) {
-      const denom = sizeHuman * (1 - mm);
-      if (denom <= 0) return null;
-      p = (sizeHuman * refPrice - equity) / denom;
-    } else {
-      p = (equity + sizeHuman * refPrice) / (sizeHuman * (1 + mm));
-    }
-    if (!isFinite(p) || p <= 0) return null;
-    return market ? formatMarketUsd(market, p) : "$" + p.toFixed(4);
+    if (!market || sizeHuman <= 0 || entryHuman <= 0 || lev <= 0) return null;
+    const entryRaw = BigInt(Math.round(entryHuman * Number(PRICE_PRECISION)));
+    const liq = calcLiqPrice(position.isLong, entryRaw, lev, market.maintenanceMarginBps);
+    if (liq <= 0n) return null;
+    return formatMarketUsd(market, priceToHuman(liq));
   })();
 
   const sideBadge = position.isLong
@@ -222,6 +221,8 @@ function getPositionView(position: RawPosition, markPrice: bigint | undefined, e
     sizeDisplay: sz(sizeHuman),
     entryDisplay: px(entryHuman),
     markDisplay: markHuman !== null ? px(markHuman) : "—",
+    tpDisplay: position.tpPrice && position.tpPrice > 0 ? px(position.tpPrice) : "—",
+    slDisplay: position.slPrice && position.slPrice > 0 ? px(position.slPrice) : "—",
   };
 }
 
@@ -229,10 +230,12 @@ function PnlValue({ v }: { v: PositionView }) {
   if (v.pnlHuman === null) return <>—</>;
   return (
     <>
-      {v.pnlHuman >= 0 ? "+" : ""}${Math.abs(v.pnlHuman).toFixed(2)}
+      {v.pnlHuman > 0 ? "+" : ""}
+      {formatAccountUsd(v.pnlHuman)}
       {v.pnlPct !== null && (
         <span className="text-[11px] ml-1">
-          ({v.pnlPct >= 0 ? "+" : ""}{v.pnlPct.toFixed(2)}%)
+          ({v.pnlPct >= 0 ? "+" : ""}
+          {v.pnlPct.toFixed(2)}%)
         </span>
       )}
     </>
@@ -260,23 +263,21 @@ function MarketLabel({ v, badge = true }: { v: PositionView; badge?: boolean }) 
 function PositionRow({
   position,
   markPrice,
-  equity,
   onClose,
   hidePnl,
   hideLiqPrice,
 }: {
   position: RawPosition;
   markPrice: bigint | undefined;
-  equity: number;
   onClose: () => void;
   hidePnl: boolean;
   hideLiqPrice: boolean;
 }) {
   const [closing, setClosing] = useState(false);
-  const v = getPositionView(position, markPrice, equity);
+  const v = getPositionView(position, markPrice);
 
   return (
-    <tr className="border-t border-[#2A2A31] hover:bg-white/[0.02] transition-colors">
+    <tr className="border-t border-[#1A2A26] hover:bg-white/[0.02] transition-colors">
       <td className="pl-4 pr-2 py-[10px] text-left">
         <MarketLabel v={v} />
       </td>
@@ -296,6 +297,8 @@ function PositionRow({
         </td>
       )}
       {!hideLiqPrice && <td className="px-3 py-[10px] text-right text-amber-400">{v.liqPrice ?? "—"}</td>}
+      <td className="px-3 py-[10px] text-right font-medium text-[#1fae5b]">{v.tpDisplay}</td>
+      <td className="px-3 py-[10px] text-right font-medium text-[#e8716f]">{v.slDisplay}</td>
       <td className="px-3 py-[10px] text-right text-[#a3a3a3]">
         <span className="inline-flex items-center justify-end gap-1">
           {v.positionMargin.toFixed(2)} <UsdcLogo size={12} />
@@ -311,23 +314,21 @@ function PositionRow({
 function PositionCard({
   position,
   markPrice,
-  equity,
   onClose,
   hidePnl,
   hideLiqPrice,
 }: {
   position: RawPosition;
   markPrice: bigint | undefined;
-  equity: number;
   onClose: () => void;
   hidePnl: boolean;
   hideLiqPrice: boolean;
 }) {
   const [closing, setClosing] = useState(false);
-  const v = getPositionView(position, markPrice, equity);
+  const v = getPositionView(position, markPrice);
 
   return (
-    <div className="rounded-[10px] border border-[#2A2A31] bg-[#212128] p-3">
+    <div className="rounded-[10px] border border-[#1A2A26] bg-[#0E1614] p-3">
       <div className="flex items-center justify-between gap-2">
         <MarketLabel v={v} />
         <CloseButton closing={closing} setClosing={setClosing} onClose={onClose} />
@@ -353,6 +354,12 @@ function PositionCard({
             <span className="text-amber-400">{v.liqPrice ?? "—"}</span>
           </Field>
         )}
+        <Field label="TP">
+          <span className="text-[#1fae5b]">{v.tpDisplay}</span>
+        </Field>
+        <Field label="SL" align="right">
+          <span className="text-[#e8716f]">{v.slDisplay}</span>
+        </Field>
         <Field label="Margin" align={hideLiqPrice ? "left" : "right"}>
           <span className="inline-flex items-center gap-1 text-[#a3a3a3]">
             {v.positionMargin.toFixed(2)} <UsdcLogo size={12} />
@@ -391,7 +398,7 @@ function CloseButton({
 }) {
   return (
     <button
-      className="shrink-0 rounded-[6px] border border-[#334155] px-3 py-1.5 text-[12px] font-semibold text-[#f5f5f5] transition-colors hover:border-[#475569] hover:bg-[#212128] disabled:opacity-50"
+      className="shrink-0 rounded-[6px] border border-[#1C332C] px-3 py-1.5 text-[12px] font-semibold text-[#f5f5f5] transition-colors hover:border-[#2A4A40] hover:bg-[#0E1614] disabled:opacity-50"
       disabled={closing}
       onClick={async () => {
         setClosing(true);

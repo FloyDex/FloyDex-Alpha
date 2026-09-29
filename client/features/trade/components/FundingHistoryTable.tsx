@@ -56,7 +56,7 @@ export function FundingHistoryTable({ marketFilter }: { marketFilter: number | "
           const positive = p.amount >= 0;
           const onChain = p.txHash && !p.txHash.startsWith("0x000");
           return (
-            <tr key={`${p.marketId}-${p.createdAt}`} className="border-t border-[#2A2A31] hover:bg-white/[0.02] transition-colors">
+            <tr key={`${p.marketId}-${p.createdAt}`} className="border-t border-[#1A2A26] hover:bg-white/[0.02] transition-colors">
               <td className="pl-4 pr-2 py-[10px] text-left text-[#a3a3a3]">
                 {new Date(p.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </td>

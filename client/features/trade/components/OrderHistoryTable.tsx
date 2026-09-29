@@ -8,7 +8,7 @@ import { MarketCell } from "@/components/common/MarketCell";
 const STATUS_STYLE: Record<string, string> = {
   pending: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   filled: "bg-[rgba(31,174,91,0.12)] text-[#1fae5b] border-[#1fae5b]/20",
-  cancelled: "bg-[#2a2a30] text-[#a3a3a3] border-[#334155]",
+  cancelled: "bg-[#2a2a30] text-[#a3a3a3] border-[#1C332C]",
 };
 
 export function OrderHistoryTable({
@@ -52,7 +52,7 @@ export function OrderHistoryTable({
             ? "bg-[rgba(31,174,91,0.12)] text-[#1fae5b]"
             : "bg-[rgba(227,76,76,0.12)] text-[#e34c4c]";
           return (
-            <tr key={String(o.nonce)} className="border-t border-[#2A2A31] hover:bg-white/[0.02] transition-colors">
+            <tr key={String(o.nonce)} className="border-t border-[#1A2A26] hover:bg-white/[0.02] transition-colors">
               <td className="pl-4 pr-2 py-[10px] text-left text-[#a3a3a3]">
                 {new Date(Number(o.nonce)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </td>

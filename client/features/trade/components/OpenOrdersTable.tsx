@@ -2,14 +2,14 @@
 
 import { useWalletStore } from "@/stores/wallet";
 import { useLocalOrders } from "@/stores/orders";
-import { cancelOrder as cancelOnChain } from "@/lib/stellar/contracts";
+import { useMarketStore } from "@/stores/market";
 import { cancelOrderOnMatcher } from "@/lib/market/matcher";
 import { priceToHuman, amountToHuman, formatMarketUsd, formatMarketSize } from "@/lib/format";
 
 import { logoFor } from "@/components/common/AssetLogos";
 import { marketById } from "@/components/common/MarketCell";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function OpenOrdersTable({
   marketFilter,
@@ -20,6 +20,23 @@ export function OpenOrdersTable({
 }) {
   const { address, connected } = useWalletStore();
   const { orders, cancelOrder } = useLocalOrders();
+  const markPrices = useMarketStore((s) => s.markPrices);
+
+  // Older Close buttons left reduce-only "market" ghosts at 0.5×/2× mark in local
+  // Open Orders. Sweep them once so the desk matches the live book.
+  useEffect(() => {
+    if (!address) return;
+    for (const o of orders) {
+      if (o.status !== "pending" || o.owner !== address || !o.reduceOnly) continue;
+      const mark = markPrices[o.marketId];
+      if (!mark || mark <= 0n || o.limitPrice <= 0n) continue;
+      const ratio = Number(o.limitPrice) / Number(mark);
+      const ghost = ratio < 0.6 || ratio > 1.6;
+      if (!ghost) continue;
+      cancelOrder(o.nonce, address);
+      void cancelOrderOnMatcher(address, o.nonce).catch(() => {});
+    }
+  }, [address, orders, markPrices, cancelOrder]);
 
   const visible = orders.filter(
     (o) =>
@@ -40,12 +57,16 @@ export function OpenOrdersTable({
 
   const makeCancel = (order: (typeof visible)[number]) => async () => {
     try {
-      await cancelOnChain(address, order.nonce, order.expiryTs);
+      // Solana desk: cancel the off-chain book + local list. No Stellar gateway.
       await cancelOrderOnMatcher(address, order.nonce);
       cancelOrder(order.nonce, address);
       toast.success("Order cancelled");
     } catch (e) {
-      toast.error(`Cancel failed: ${e instanceof Error ? e.message : String(e)}`);
+      // Still drop the ghost row if the matcher is unreachable — these pending
+      // entries are localStorage leftovers more often than live book orders.
+      cancelOrder(order.nonce, address);
+      toast.success("Order removed");
+      console.warn("cancel matcher:", e);
     }
   };
 
@@ -111,7 +132,7 @@ function OrderCard({ order, onCancel }: { order: OrderType; onCancel: () => void
   const [cancelling, setCancelling] = useState(false);
   const v = orderView(order);
   return (
-    <div className="rounded-[10px] border border-[#2A2A31] bg-[#212128] p-3">
+    <div className="rounded-[10px] border border-[#1A2A26] bg-[#0E1614] p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {logoFor(v.baseSymbol, 16)}
@@ -124,7 +145,7 @@ function OrderCard({ order, onCancel }: { order: OrderType; onCancel: () => void
           </span>
         </div>
         <button
-          className="shrink-0 rounded-[6px] border border-[#334155] px-3 py-1.5 text-[12px] font-semibold text-[#a3a3a3] transition-colors hover:border-[#e34c4c]/40 hover:bg-[#e34c4c]/10 hover:text-[#e34c4c] disabled:opacity-50"
+          className="shrink-0 rounded-[6px] border border-[#1C332C] px-3 py-1.5 text-[12px] font-semibold text-[#a3a3a3] transition-colors hover:border-[#e34c4c]/40 hover:bg-[#e34c4c]/10 hover:text-[#e34c4c] disabled:opacity-50"
           disabled={cancelling}
           onClick={async () => {
             setCancelling(true);
@@ -146,7 +167,7 @@ function OrderCard({ order, onCancel }: { order: OrderType; onCancel: () => void
         <CardField label="Price" align="right"><span className="text-[#f5f5f5]">{v.priceDisplay}</span></CardField>
         {order.reduceOnly && (
           <CardField label="Reduce">
-            <span className="rounded border border-[#334155] px-1.5 py-0.5 text-[10px] text-[#a3a3a3]">Reduce Only</span>
+            <span className="rounded border border-[#1C332C] px-1.5 py-0.5 text-[10px] text-[#a3a3a3]">Reduce Only</span>
           </CardField>
         )}
       </div>
@@ -186,7 +207,7 @@ function OrderRow({
   const sideBadge = v.sideBadge;
 
   return (
-    <tr className="border-t border-[#2A2A31] hover:bg-white/[0.02] transition-colors">
+    <tr className="border-t border-[#1A2A26] hover:bg-white/[0.02] transition-colors">
       <td className="pl-4 pr-2 py-[10px] text-left">
         <div className="flex items-center gap-2">
           {logoFor(baseSymbol, 16)}
@@ -206,7 +227,7 @@ function OrderRow({
       <td className="px-3 py-[10px] text-right text-[#f5f5f5] font-medium">{priceDisplay}</td>
       <td className="px-3 py-[10px] text-right">
         {order.reduceOnly ? (
-          <span className="text-[10px] border border-[#334155] text-[#a3a3a3] px-1.5 py-0.5 rounded">Reduce</span>
+          <span className="text-[10px] border border-[#1C332C] text-[#a3a3a3] px-1.5 py-0.5 rounded">Reduce</span>
         ) : (
           <span className="text-[#737373]">—</span>
         )}
@@ -218,7 +239,7 @@ function OrderRow({
       </td>
       <td className="pr-4 pl-2 py-[10px] text-right">
         <button
-          className="px-3 py-1.5 text-[12px] font-semibold rounded-[6px] border border-[#334155] text-[#a3a3a3] hover:text-[#e34c4c] hover:border-[#e34c4c]/40 hover:bg-[#e34c4c]/10 disabled:opacity-50 transition-colors"
+          className="px-3 py-1.5 text-[12px] font-semibold rounded-[6px] border border-[#1C332C] text-[#a3a3a3] hover:text-[#e34c4c] hover:border-[#e34c4c]/40 hover:bg-[#e34c4c]/10 disabled:opacity-50 transition-colors"
           disabled={cancelling}
           onClick={async () => {
             setCancelling(true);

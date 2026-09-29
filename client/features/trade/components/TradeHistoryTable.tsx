@@ -11,11 +11,22 @@ interface Fill {
   id: string | number;
   marketId: number;
   isMaker: boolean;
+  isLong?: boolean;
   price: string | number;
   size: string | number;
+  pnl?: number;
+  reason?: string;
   txHash: string;
   createdAt: number;
 }
+
+const REASON_LABEL: Record<string, string> = {
+  open: "Open",
+  add: "Add",
+  close: "Close",
+  tp: "Take profit",
+  sl: "Stop loss",
+};
 
 export function TradeHistoryTable({ marketFilter }: { marketFilter: number | "all" }) {
   const { address, connected } = useWalletStore();
@@ -36,7 +47,10 @@ export function TradeHistoryTable({ marketFilter }: { marketFilter: number | "al
   const rows = fills.filter((f) => marketFilter === "all" || f.marketId === marketFilter);
   if (rows.length === 0) return <Empty text="No trades yet" />;
 
-  const cols = ["Time", "Market", "Role", "Size", "Price", "Tx"];
+  const venueMode = rows.some((f) => String(f.txHash).startsWith("venue:"));
+  const cols = venueMode
+    ? ["Time", "Market", "Side", "Type", "Size", "Price", "PnL"]
+    : ["Time", "Market", "Role", "Size", "Price", "Tx"];
 
   return (
     <div className="overflow-x-auto no-scrollbar">
@@ -52,9 +66,42 @@ export function TradeHistoryTable({ marketFilter }: { marketFilter: number | "al
       </thead>
       <tbody>
         {rows.map((f) => {
-          const onChain = f.txHash && !f.txHash.startsWith("dbfill");
+          if (venueMode) {
+            const sideLong = f.isLong !== false;
+            const pnl = f.pnl ?? 0;
+            const reason = REASON_LABEL[f.reason ?? ""] ?? (f.isMaker ? "Maker" : "Taker");
+            return (
+              <tr key={String(f.id)} className="border-t border-[#1A2A26] hover:bg-white/[0.02] transition-colors">
+                <td className="pl-4 pr-2 py-[10px] text-left text-[#a3a3a3]">
+                  {new Date(f.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </td>
+                <td className="px-3 py-[10px] text-left">
+                  <MarketCell marketId={f.marketId} size={15} className="font-semibold text-[#f5f5f5]" />
+                </td>
+                <td className="px-3 py-[10px] text-right">
+                  <span className={`rounded-[5px] px-1.5 py-0.5 text-[10px] font-bold tracking-wide ${
+                    sideLong
+                      ? "bg-[rgba(31,174,91,0.12)] text-[#1fae5b]"
+                      : "bg-[rgba(227,76,76,0.12)] text-[#e34c4c]"
+                  }`}>
+                    {sideLong ? "LONG" : "SHORT"}
+                  </span>
+                </td>
+                <td className="px-3 py-[10px] text-right text-[#a3a3a3]">{reason}</td>
+                <td className="px-3 py-[10px] text-right text-[#f5f5f5] font-medium">{sizeFor(f.marketId, Number(f.size))}</td>
+                <td className="px-3 py-[10px] text-right text-[#f5f5f5] font-medium">{priceFor(f.marketId, Number(f.price))}</td>
+                <td className={`pr-4 pl-2 py-[10px] text-right font-medium ${
+                  pnl > 0 ? "text-[#1fae5b]" : pnl < 0 ? "text-[#e34c4c]" : "text-[#737373]"
+                }`}>
+                  {pnl === 0 ? "—" : `${pnl > 0 ? "+" : ""}$${pnl.toFixed(4)}`}
+                </td>
+              </tr>
+            );
+          }
+
+          const onChain = f.txHash && !f.txHash.startsWith("dbfill") && !f.txHash.startsWith("venue:");
           return (
-            <tr key={String(f.id)} className="border-t border-[#2A2A31] hover:bg-white/[0.02] transition-colors">
+            <tr key={String(f.id)} className="border-t border-[#1A2A26] hover:bg-white/[0.02] transition-colors">
               <td className="pl-4 pr-2 py-[10px] text-left text-[#a3a3a3]">
                 {new Date(f.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </td>

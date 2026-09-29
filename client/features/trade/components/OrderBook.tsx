@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMarketStore } from "@/stores/market";
 import type { OrderBookLevel } from "@/lib/market/matcher";
 import { UsdcLogo, logoFor } from "@/components/common/AssetLogos";
@@ -97,12 +97,28 @@ export function OrderBook({ market }: { market: MarketConfig }) {
   const spreadPct =
     spreadAbs && midPrice ? ((parseFloat(spreadAbs) / midPrice) * 100).toFixed(3) + "%" : "0.000%";
 
+  const lastTrades = trades;
+  const lastPx = lastTrades[0] ? parseFloat(lastTrades[0].price) : midPrice;
+  const lastSide = lastTrades[0]?.side;
+  const bidNotional = bids.reduce((n, r) => n + r.metric, 0);
+  const askNotional = asks.reduce((n, r) => n + r.metric, 0);
+  const bookTotal = bidNotional + askNotional;
+  const bidPct = bookTotal > 0 ? (bidNotional / bookTotal) * 100 : 50;
+  const prevLast = useRef<number | null>(null);
+  const [lastFlash, setLastFlash] = useState<"up" | "down" | null>(null);
+  useEffect(() => {
+    if (lastPx == null) return;
+    if (prevLast.current != null && lastPx !== prevLast.current) {
+      setLastFlash(lastPx >= prevLast.current ? "up" : "down");
+      const t = setTimeout(() => setLastFlash(null), 380);
+      prevLast.current = lastPx;
+      return () => clearTimeout(t);
+    }
+    prevLast.current = lastPx;
+  }, [lastPx]);
+
   const tabCls = (active: boolean) =>
-    `flex-1 h-full text-center text-[13px] font-semibold relative transition-colors ${
-      active
-        ? "text-[#f5f5f5] after:content-[''] after:absolute after:left-0 after:right-0 after:bottom-[-1px] after:h-[2px] after:bg-[#ff9440]"
-        : "text-[#a3a3a3] hover:text-[#f5f5f5]"
-    }`;
+    `desk-tab h-full flex-1 text-center text-[12.5px] ${active ? "is-on" : ""}`;
 
   const onPriceClick = (price: number) => setSelectedPrice(marketId, price);
 
@@ -116,7 +132,7 @@ export function OrderBook({ market }: { market: MarketConfig }) {
           const hl = hover?.side === "ask" && originalIdx <= asks.length - 1 - (hover?.idx ?? 0);
           return (
             <BookRow
-              key={displayIdx}
+              key={`ask-${a.price}`}
               level={a}
               side="ask"
               maxCum={maxDepth}
@@ -141,7 +157,7 @@ export function OrderBook({ market }: { market: MarketConfig }) {
           const hl = hover?.side === "bid" && i <= (hover?.idx ?? -1);
           return (
             <BookRow
-              key={i}
+              key={`bid-${b.price}`}
               level={b}
               side="bid"
               maxCum={maxDepth}
@@ -160,7 +176,7 @@ export function OrderBook({ market }: { market: MarketConfig }) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Tabs */}
-      <div className="mx-[8px] flex h-[46px] border-b border-[#3a3a42] shrink-0">
+      <div className="mx-2 flex h-9 shrink-0 border-b border-[#15221E]">
         {(["Order Book", "Trades"] as const).map((t) => (
           <button key={t} className={tabCls(activeTab === t)} onClick={() => setActiveTab(t)}>
             {t}
@@ -183,13 +199,13 @@ export function OrderBook({ market }: { market: MarketConfig }) {
                 {tickOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setTickOpen(false)} />
-                    <div className="absolute left-0 top-full mt-1 z-50 rounded-[8px] border border-[#334155] bg-[#212128] p-1 shadow-[0_10px_30px_rgba(0,0,0,.5)]">
+                    <div className="absolute left-0 top-full mt-1 z-50 rounded-[8px] border border-[#1C332C] bg-[#0E1614] p-1 shadow-[0_10px_30px_rgba(0,0,0,.5)]">
                       {TICKS.map((t, i) => (
                         <button
                           key={t}
                           onClick={() => { setTickIdx(i); setTickOpen(false); }}
                           className={`block w-full text-left px-3 py-[5px] rounded-[5px] transition-colors ${
-                            i === safeTickIdx ? "text-[#f5f5f5] bg-[#212128]" : "text-[#a3a3a3] hover:text-[#f5f5f5] hover:bg-[#212128]"
+                            i === safeTickIdx ? "text-[#f5f5f5] bg-[#0E1614]" : "text-[#a3a3a3] hover:text-[#f5f5f5] hover:bg-[#0E1614]"
                           }`}
                         >
                           {formatTick(t)}
@@ -225,37 +241,50 @@ export function OrderBook({ market }: { market: MarketConfig }) {
           </div>
 
           {/* Column headers */}
-          <div
-            className="grid grid-cols-3 px-[8px] pb-[6px] font-mono text-[11px] text-[#9fb0c9] shrink-0"
-            style={{ letterSpacing: ".02em" }}
-          >
-            <span>Price</span>
-            <span className="text-right">Size</span>
-            <span className="text-right">Total</span>
+          <div className={`${BOOK_COLS} px-2 pb-[6px] font-mono text-[10.5px] text-[#7d8f88] shrink-0`}>
+            <span className="min-w-0">Price</span>
+            <span className="min-w-0 text-right">Size</span>
+            <span className="min-w-0 text-right">Total</span>
           </div>
 
           {viewMode !== "bids" && Asks}
 
-          {/* Spread row */}
           <div
-            className="grid grid-cols-3 px-[8px] py-[7px] bg-[#212128] font-mono text-[11.5px] font-semibold shrink-0"
+            className={`flex shrink-0 items-center justify-between px-2 py-1.5 ${
+              lastFlash === "up" ? "floy-flash-up" : lastFlash === "down" ? "floy-flash-down" : "bg-[#0B1210]"
+            }`}
           >
-            <span className="font-medium text-[#f5f5f5]">{spreadAbs ?? "—"}</span>
-            <span className="text-center text-[#f5f5f5]">Spread</span>
-            <span className="text-right text-[#f5f5f5]">{spreadPct}</span>
+            <button
+              type="button"
+              className={`font-mono text-[15px] font-semibold tabular ${
+                lastSide === "sell" ? "text-[#FF5C6A]" : "text-[#14F195]"
+              }`}
+              onClick={() => lastPx != null && onPriceClick(lastPx)}
+            >
+              {(lastPx ?? midPrice)?.toFixed(priceDecimals) ?? "—"}
+            </button>
+            <div className="text-right font-mono text-[10px] leading-tight text-[#7d8f88]">
+              <div>Spread {spreadAbs ?? "—"}</div>
+              <div>{spreadPct}</div>
+            </div>
           </div>
 
           {viewMode !== "asks" && Bids}
+          <div className="flex shrink-0 items-center gap-2 px-2 py-1.5">
+            <span className="font-mono text-[10px] text-[#14F195]">{bidPct.toFixed(1)}%</span>
+            <div className="flex h-[3px] flex-1 overflow-hidden rounded-full bg-[#15221E]">
+              <div className="h-full bg-[#14F195]" style={{ width: `${bidPct}%` }} />
+              <div className="h-full bg-[#FF5C6A]" style={{ width: `${100 - bidPct}%` }} />
+            </div>
+            <span className="font-mono text-[10px] text-[#FF5C6A]">{(100 - bidPct).toFixed(1)}%</span>
+          </div>
         </>
       ) : (
         /* Trades tab */
         <div className="flex flex-col flex-1 overflow-hidden">
-          <div
-            className="grid grid-cols-3 px-[8px] py-[6px] font-mono text-[11px] text-[#9fb0c9] border-b border-[#2A2A31] shrink-0"
-            style={{ letterSpacing: ".02em" }}
-          >
-            <span>Price</span>
-            <span className="text-right">Size</span>
+          <div className={`${TAPE_COLS} border-b border-[#1A2A26] px-[8px] py-[6px] font-mono text-[11px] text-[#9fb0c9] shrink-0`}>
+            <span className="min-w-0">Price</span>
+            <span className="min-w-0 text-right">Size</span>
             <span className="text-right">Time</span>
           </div>
           <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
@@ -266,31 +295,26 @@ export function OrderBook({ market }: { market: MarketConfig }) {
             ) : (
               trades.map((t, i) => (
                 <div
-                  key={i}
-                  className="grid grid-cols-3 font-mono text-[11.5px] hover:bg-white/[0.02] cursor-pointer"
-                  style={{ padding: "4px 8px" }}
+                  key={`${t.timestamp}-${i}`}
+                  className={`${TAPE_COLS} cursor-pointer px-2 py-1 font-mono text-[11px] hover:bg-white/[0.02] ${i === 0 ? "floy-tape-in" : ""}`}
                   onClick={() => setSelectedPrice(marketId, parseFloat(t.price))}
                 >
                   <span
-                    className={
+                    className={`min-w-0 truncate tabular-nums ${
                       t.side === "buy"
-                        ? "text-[#54bd7c]"
+                        ? "text-[#14F195]"
                         : t.side === "sell"
-                          ? "text-[#e06a6a]"
+                          ? "text-[#FF5C6A]"
                           : "text-[#a3a3a3]"
-                    }
+                    }`}
                   >
                     {parseFloat(t.price).toFixed(market.priceDecimals)}
                   </span>
-                  <span className="text-right text-[#f5f5f5]">
-                    {fmt(tradeMetric(t.price, t.size))}
+                  <span className="min-w-0 truncate text-right tabular-nums text-[#f5f5f5]">
+                    {fmtBook(tradeMetric(t.price, t.size))}
                   </span>
-                  <span className="text-right text-[#a3a3a3]">
-                    {new Date(t.timestamp).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                    })}
+                  <span className="shrink-0 text-right tabular-nums text-[#a3a3a3]">
+                    {fmtTapeTime(t.timestamp)}
                   </span>
                 </div>
               ))
@@ -304,13 +328,33 @@ export function OrderBook({ market }: { market: MarketConfig }) {
 
 type HoverState = { side: "ask" | "bid"; idx: number } | null;
 
+const BOOK_COLS =
+  "grid [grid-template-columns:minmax(0,1.15fr)_minmax(0,0.95fr)_minmax(0,1fr)] gap-x-1.5";
+const TAPE_COLS =
+  "grid [grid-template-columns:minmax(0,1.1fr)_minmax(0,0.9fr)_58px] gap-x-1.5";
+
+function fmtTapeTime(ts: number): string {
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const ss = String(d.getSeconds()).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
 // toFixed, not String(): String(0.00001) is "1e-5".
 function formatTick(t: number): string {
   return t.toFixed(Math.max(0, Math.ceil(-Math.log10(t))));
 }
 
-function fmt(n: number): string {
-  return n >= 1000 ? n.toLocaleString("en-US", { maximumFractionDigits: 0 }) : n.toFixed(2);
+/** Compact so size/total never collide in the 270px book rail. */
+function fmtBook(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return "0.00";
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (abs >= 1e4) return `${(n / 1e3).toFixed(1)}K`;
+  if (abs >= 1e3) return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
+  return n.toFixed(2);
 }
 
 function BookRow({
@@ -333,27 +377,46 @@ function BookRow({
   onLeave: () => void;
 }) {
   const barPct = (level.cum / maxCum) * 100;
+  const prev = useRef(level.metric);
+  const [flash, setFlash] = useState<"up" | "down" | null>(null);
+  useEffect(() => {
+    if (prev.current === level.metric) return;
+    setFlash(level.metric >= prev.current ? "up" : "down");
+    prev.current = level.metric;
+    const t = setTimeout(() => setFlash(null), 320);
+    return () => clearTimeout(t);
+  }, [level.metric]);
 
   return (
     <div
-      className="relative grid grid-cols-3 overflow-hidden rounded-[4px] font-mono text-[12px] cursor-pointer hover:bg-white/[0.03]"
-      style={{ padding: "3px 5px", margin: "1px 8px", lineHeight: 1.4 }}
+      className={`${BOOK_COLS} relative cursor-pointer overflow-hidden rounded-[4px] px-[5px] py-[3px] font-mono text-[11px] hover:bg-white/[0.03] ${
+        flash === "up" ? "floy-flash-up" : flash === "down" ? "floy-flash-down" : ""
+      }`}
+      style={{ margin: "1px 8px", lineHeight: 1.4 }}
       onClick={onClick}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
       <div
-        className={`absolute top-0 bottom-0 left-0 rounded-[4px] ${
-          side === "ask" ? "bg-[rgba(199,67,67,0.34)]" : "bg-[rgba(54,156,91,0.32)]"
+        className={`absolute inset-y-0 right-0 rounded-[4px] ${
+          side === "ask" ? "bg-[rgba(255,92,106,0.22)]" : "bg-[rgba(20,241,149,0.16)]"
         }`}
-        style={{ width: `${barPct}%` }}
+        style={{ width: `${barPct}%`, transition: "width 180ms ease-out" }}
       />
-      {highlight && <div className="absolute inset-0 bg-white/[0.08] z-[1]" />}
-      <span className={`relative z-10 ${side === "ask" ? "text-[#ff5d5d]" : "text-[#42e783]"}`}>
+      {highlight && <div className="absolute inset-0 z-[1] bg-white/[0.08]" />}
+      <span
+        className={`relative z-10 min-w-0 truncate tabular-nums ${
+          side === "ask" ? "text-[#FF5C6A]" : "text-[#14F195]"
+        }`}
+      >
         {level.price.toFixed(priceDecimals)}
       </span>
-      <span className="relative z-10 text-right text-[#f5f5f5]">{fmt(level.metric)}</span>
-      <span className="relative z-10 text-right text-[#f5f5f5]">{fmt(level.cum)}</span>
+      <span className="relative z-10 min-w-0 truncate text-right tabular-nums text-[#f5f5f5]">
+        {fmtBook(level.metric)}
+      </span>
+      <span className="relative z-10 min-w-0 truncate text-right tabular-nums text-[#8A9B94]">
+        {fmtBook(level.cum)}
+      </span>
     </div>
   );
 }
@@ -365,15 +428,15 @@ function EmptyRows({ count, side }: { count: number; side: "ask" | "bid" }) {
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="grid grid-cols-3 font-mono text-[11.5px]"
+          className={`${BOOK_COLS} font-mono text-[11px]`}
           style={{ padding: "3px 8px", lineHeight: 1.4 }}
         >
           <div
             className={`h-[5px] rounded-full opacity-[0.06] ${side === "ask" ? "bg-[#e06a6a]" : "bg-[#54bd7c]"}`}
             style={{ width: widths[i % widths.length] }}
           />
-          <div className="h-[5px] rounded-full bg-[#334155] opacity-[0.06] ml-auto" style={{ width: 36 }} />
-          <div className="h-[5px] rounded-full bg-[#334155] opacity-[0.06] ml-auto" style={{ width: 44 }} />
+          <div className="h-[5px] rounded-full bg-[#1C332C] opacity-[0.06] ml-auto" style={{ width: 36 }} />
+          <div className="h-[5px] rounded-full bg-[#1C332C] opacity-[0.06] ml-auto" style={{ width: 44 }} />
         </div>
       ))}
     </>
