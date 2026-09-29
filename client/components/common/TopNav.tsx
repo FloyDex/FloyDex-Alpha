@@ -16,6 +16,7 @@ import { useTradeSettings } from "@/stores/settings";
 
 const GITHUB_REPO = "https://github.com/FloyDex/FloyDex-Alpha";
 const TELEGRAM = "https://t.me/floydex_com";
+const X_HANDLE = "https://x.com/floydex_com";
 
 const TABS = [
   { label: "Markets", href: "/markets", match: "/markets" },
@@ -27,6 +28,7 @@ const TABS = [
 const EXTERNAL_LINKS = [
   { label: "Docs", href: GITHUB_REPO },
   { label: "Telegram", href: TELEGRAM },
+  { label: "X", href: X_HANDLE },
 ];
 
 export function TopNav() {

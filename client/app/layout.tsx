@@ -40,6 +40,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
+    site: "@floydex_com",
+    creator: "@floydex_com",
     title: "FloyDex | Tokenized PerpDex",
     description: "Decentralised perpetual futures on Solana",
     images: ["/icon-512.png"],

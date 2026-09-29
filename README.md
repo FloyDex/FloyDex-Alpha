@@ -7,9 +7,11 @@
 [![Solana](https://img.shields.io/badge/Solana-mainnet%20%2F%20devnet-14F195?logo=solana&logoColor=white)](https://solana.com)
 [![Live](https://img.shields.io/badge/live-floydex.com-14F195)](https://floydex.com)
 [![Telegram](https://img.shields.io/badge/telegram-floydex__com-26A5E4?logo=telegram)](https://t.me/floydex_com)
+[![X](https://img.shields.io/badge/X-floydex__com-000000?logo=x)](https://x.com/floydex_com)
 
 **Website:** [floydex.com](https://floydex.com)  
 **Telegram:** [t.me/floydex_com](https://t.me/floydex_com)  
+**X:** [@floydex_com](https://x.com/floydex_com)  
 **Repo:** [github.com/FloyDex/FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha)
 
 FloyDex is a Solana-native **hybrid CLOB** for tokenized-stock and crypto
@@ -547,6 +549,7 @@ cross-chain deploy.
 | **Org** | [FloyDex](https://github.com/FloyDex) |
 | **Website** | [floydex.com](https://floydex.com) |
 | **Telegram** | [t.me/floydex_com](https://t.me/floydex_com) |
+| **X** | [@floydex_com](https://x.com/floydex_com) |
 | **Repo** | [FloyDex/FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha) |
 
 ### Co-founders
