@@ -542,11 +542,41 @@ cross-chain deploy.
 |---|---|
 | **Org** | [FloyDex](https://github.com/FloyDex) |
 | **Repo** | [FloyDex/FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha) |
-| **Product owner (docs)** | FloyDex core team (`docs/prd/01`) |
 
-Contributor details and public bios can be added here as the team publishes
-them. For security reports, prefer a private channel to the org maintainers —
-do not open issues that include exploit PoCs against live funds.
+### Co-founders
+
+**[Amaan Sayyad](https://x.com/amaanbiz)** — Co-founder · blockchain developer · entrepreneur  
+45× hackathon wins · 10+ shipped Web3 products · 3× founder · 8× companies · 12× speaker · 3× grantee · research papers, copyrights & patents  
+
+| | |
+|---|---|
+| X | [@amaanbiz](https://x.com/amaanbiz) |
+| GitHub | [AmaanSayyad](https://github.com/AmaanSayyad) |
+| LinkedIn | [amaan-sayyad-](https://www.linkedin.com/in/amaan-sayyad-/) |
+| Portfolio | [amaan-sayyad-portfolio.vercel.app](https://amaan-sayyad-portfolio.vercel.app/) |
+| Proof of work | [Achievements / POW](https://docs.google.com/document/d/1WQXjpoRdcEHiq3BiVaAT3jXeBmI9eFvKelK9EWdWOQA/edit?usp=sharing) |
+
+**[Samya Biswas](https://x.com/CancelSamya)** — Co-founder · blockchain developer  
+9× hackathon wins  
+
+| | |
+|---|---|
+| X | [@CancelSamya](https://x.com/CancelSamya) |
+| GitHub | [SamyaDeb](https://github.com/SamyaDeb) |
+| LinkedIn | [samyadeb](https://www.linkedin.com/in/samyadeb/) |
+| Portfolio | [samyadeb.vercel.app](https://samyadeb.vercel.app/) |
+
+### Contract helpers
+
+| Name | Role |
+|---|---|
+| Abdulmajid Hassan | Community |
+| Konan | Design |
+| VR | Graphics |
+| Draheem | Motion |
+
+For security reports, contact the co-founders privately — do not open issues that include exploit PoCs against live funds.
+
 
 ---
 
