@@ -1,11 +1,13 @@
 {
-  "name": "@kryon/sdk",
+  "name": "@floydex/sdk",
   "version": "0.1.0",
   "private": true,
-  "description": "Kryon-sol TypeScript SDK: order encoding and signing.",
+  "description": "FloyDex TypeScript SDK: order encoding and signing.",
   "type": "module",
   "license": "MIT OR Apache-2.0",
-  "engines": { "node": ">=22.18" },
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
@@ -13,5 +15,10 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.7.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FloyDex/FloyDex-Alpha.git"
+  },
+  "homepage": "https://github.com/FloyDex/FloyDex-Alpha"
 }
