@@ -205,6 +205,8 @@ export interface RawPosition {
   margin: bigint;
   isLong: boolean;
   lastFundingIndex: bigint;
+  tpPrice?: number | null;
+  slPrice?: number | null;
 }
 
 export interface RawAccountHealth {

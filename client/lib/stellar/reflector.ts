@@ -1,6 +1,6 @@
 // Reflector "External CEX & DEX" oracle — SEP-40 read-only client.
 //
-// Reflector is NOT Kryon's mark price and must never become one: its feeds
+// Reflector is NOT FloyDex's mark price and must never become one: its feeds
 // refresh on a 300s `resolution`, while the on-chain OracleGuard enforces
 // max_oracle_age_secs = 120. A 5-minute mark would spend most of its life
 // outside that window, and widening the guard to accommodate it would mean
@@ -22,7 +22,7 @@ import { nativeToScVal, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { simulateRead } from "./simulate";
 import { NETWORK, PRICE_PRECISION } from "@/config";
 
-// Reflector quotes at 1e14; Kryon's internal precision is 1e18.
+// Reflector quotes at 1e14; FloyDex's internal precision is 1e18.
 const REFLECTOR_DECIMALS = 14n;
 const REFLECTOR_SCALE = PRICE_PRECISION / 10n ** REFLECTOR_DECIMALS; // 1e4
 
