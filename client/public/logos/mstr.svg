@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Strategy / MicroStrategy mark: Bitcoin orange field + upright ₿ -->
+  <rect width="32" height="32" rx="6" fill="#F7931A"/>
+  <g fill="#0A0A0A">
+    <!-- Vertical stems through the B -->
+    <rect x="14.15" y="5.2" width="2.1" height="3.4" rx="0.4"/>
+    <rect x="17.75" y="5.2" width="2.1" height="3.4" rx="0.4"/>
+    <rect x="14.15" y="23.4" width="2.1" height="3.4" rx="0.4"/>
+    <rect x="17.75" y="23.4" width="2.1" height="3.4" rx="0.4"/>
+    <!-- Bitcoin B body -->
+    <path d="M12.2 8.4h7.1c3.15 0 5.35 1.7 5.35 4.35 0 1.85-.95 3.15-2.45 3.85 1.95.75 3.15 2.25 3.15 4.45 0 3.05-2.4 4.95-5.85 4.95H12.2V8.4zm4.1 6.55h3.05c1.55 0 2.45-.8 2.45-2.05s-.9-2-2.45-2H16.3v4.05zm0 7.85h3.45c1.8 0 2.85-.95 2.85-2.35s-1.05-2.3-2.85-2.3H16.3v4.65z"/>
+  </g>
+</svg>

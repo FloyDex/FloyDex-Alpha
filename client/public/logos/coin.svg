@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Coinbase logomark: brand blue disc + bold white C -->
+  <circle cx="16" cy="16" r="16" fill="#0052FF"/>
+  <path
+    fill="#FFFFFF"
+    d="M16 5.2C10.04 5.2 5.2 10.04 5.2 16S10.04 26.8 16 26.8c3.82 0 7.2-1.78 9.36-4.54h-4.9c-1.2 1.32-2.94 2.14-4.86 2.14-3.7 0-6.7-3-6.7-6.7s3-6.7 6.7-6.7c1.92 0 3.66.82 4.86 2.14h4.9C23.2 6.98 19.82 5.2 16 5.2z"
+  />
+</svg>
