@@ -183,6 +183,43 @@
 }
 .s5-menu-pill:hover { background: rgba(22,22,22,1) }
 
+.s5-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+.s5-nav-social {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50px;
+  color: #14F195;
+  background: rgba(22,22,22,.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: background .2s, color .2s;
+}
+.s5-nav-social:hover {
+  background: rgba(22,22,22,1);
+  color: #3DFFB0;
+}
+
+.s5-footer-socials {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+.s5-footer-socials a {
+  display: grid;
+  place-items: center;
+  color: #14F195;
+  opacity: .95;
+  transition: opacity .15s ease;
+}
+.s5-footer-socials a:hover { opacity: .7; }
+
 .s5-menu-overlay {
   position: fixed;
   inset: 0;

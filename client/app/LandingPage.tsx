@@ -23,9 +23,23 @@ const LANDING_NAV = [
   ...(STAKE_PUBLIC ? [{ to: '/stake', label: 'Stake' }] : []),
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: GITHUB_REPO, label: 'Docs', hardNav: true },
-  { to: TELEGRAM, label: 'Telegram', hardNav: true },
-  { to: X_HANDLE, label: 'X', hardNav: true },
 ];
+
+function TelegramIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.458.02.889-.16 1.844-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+    </svg>
+  );
+}
+
+function XLogoIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.227-8.451L1.254 2.25H8.08l4.253 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
+    </svg>
+  );
+}
 
 const SYSTEM_STATUS = [
   '01. Oracle Feed', '02. CLOB Matcher', '03. Margin Engine', '04. Vault', '05. Order Gateway',
@@ -416,13 +430,35 @@ export function LandingPage() {
             <FloyDexLogo size={44} className="s5-nav-logo-img text-[#14F195]" />
             <span className="s5-nav-logo-text">FLOYDEX</span>
           </Link>
-          <button className="s5-menu-pill" onClick={() => setMenuOpen(m => !m)}>
-            <svg viewBox="0 0 20 10" fill="none" width="20" height="10" aria-hidden="true">
-              <line x1="0" y1="1.5" x2="20" y2="1.5" stroke="currentColor" strokeWidth="1.5" />
-              <line x1="0" y1="8.5" x2="20" y2="8.5" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-            <span>MENU</span>
-          </button>
+          <div className="s5-nav-actions">
+            <a
+              href={TELEGRAM}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Telegram"
+              title="Telegram"
+              className="s5-nav-social"
+            >
+              <TelegramIcon />
+            </a>
+            <a
+              href={X_HANDLE}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="X"
+              title="X"
+              className="s5-nav-social"
+            >
+              <XLogoIcon />
+            </a>
+            <button className="s5-menu-pill" onClick={() => setMenuOpen(m => !m)}>
+              <svg viewBox="0 0 20 10" fill="none" width="20" height="10" aria-hidden="true">
+                <line x1="0" y1="1.5" x2="20" y2="1.5" stroke="currentColor" strokeWidth="1.5" />
+                <line x1="0" y1="8.5" x2="20" y2="8.5" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+              <span>MENU</span>
+            </button>
+          </div>
 
           {menuOpen && (
             <div className="s5-menu-overlay" onClick={() => setMenuOpen(false)}>
@@ -698,14 +734,12 @@ export function LandingPage() {
                   <li><span className="s5-footer-col-arrow">↳</span><a href="#">Company</a></li>
                   <li><span className="s5-footer-col-arrow">↳</span><a href="#">Careers</a></li>
                   <li style={{ marginTop: '8px' }}><a href="#">Insights</a></li>
-                  <li>
-                    <a href={TELEGRAM} target="_blank" rel="noopener noreferrer">
-                      Telegram
+                  <li className="s5-footer-socials">
+                    <a href={TELEGRAM} target="_blank" rel="noopener noreferrer" aria-label="Telegram" title="Telegram">
+                      <TelegramIcon size={22} />
                     </a>
-                  </li>
-                  <li>
-                    <a href={X_HANDLE} target="_blank" rel="noopener noreferrer">
-                      X
+                    <a href={X_HANDLE} target="_blank" rel="noopener noreferrer" aria-label="X" title="X">
+                      <XLogoIcon size={20} />
                     </a>
                   </li>
                 </ul>
