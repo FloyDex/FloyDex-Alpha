@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useWalletStore } from "@/stores/wallet";
 import { useLocalOrders } from "@/stores/orders";
@@ -19,6 +19,7 @@ export function BottomPanel() {
   const [activeTab, setActiveTab] = useState<TabKey>("Positions");
   const { address, connected } = useWalletStore();
   const allOrders = useLocalOrders((s) => s.orders);
+  const prevFilled = useRef(0);
 
   // Shared positions query (same key as PositionsTable — cache hit, no double-fetch)
   const { data: allPositions = [] } = useQuery({
@@ -31,6 +32,14 @@ export function BottomPanel() {
   const positionCount = allPositions.length;
   const orderCount = allOrders.filter((o) => o.status === "pending").length;
   const orderHistoryCount = allOrders.length;
+  const filledCount = allOrders.filter((o) => o.status === "filled").length;
+
+  // After a fill lands in local order history, jump to Positions so the open
+  // risk is obvious (Order History alone looks like "filled but no position").
+  useEffect(() => {
+    if (filledCount > prevFilled.current) setActiveTab("Positions");
+    prevFilled.current = filledCount;
+  }, [filledCount]);
 
   const TABS: { key: TabKey; count: number | null }[] = [
     { key: "Positions", count: positionCount },

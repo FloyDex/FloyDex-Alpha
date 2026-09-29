@@ -2,7 +2,8 @@
 
 import { useLocalOrders } from "@/stores/orders";
 import { useWalletStore } from "@/stores/wallet";
-import { priceFor, sizeFor } from "@/lib/format";
+import { formatMarketUsd, priceFor, sizeFor } from "@/lib/format";
+import { MARKETS } from "@/config";
 import { MarketCell } from "@/components/common/MarketCell";
 
 const STATUS_STYLE: Record<string, string> = {
@@ -47,10 +48,20 @@ export function OrderHistoryTable({
       </thead>
       <tbody>
         {rows.map((o) => {
-          const isMarket = o.limitPrice === 0n;
+          const isMarket = o.ticketType === "market" || o.limitPrice === 0n;
           const sideBadge = o.isLong
             ? "bg-[rgba(31,174,91,0.12)] text-[#1fae5b]"
             : "bg-[rgba(227,76,76,0.12)] text-[#e34c4c]";
+          const market = Object.values(MARKETS).find((m) => m.marketId === o.marketId);
+          const priceLabel = (() => {
+            if (o.avgFillPrice != null && o.avgFillPrice > 0) {
+              return market
+                ? formatMarketUsd(market, o.avgFillPrice)
+                : `$${o.avgFillPrice.toFixed(2)}`;
+            }
+            if (isMarket) return "Market";
+            return priceFor(o.marketId, o.limitPrice);
+          })();
           return (
             <tr key={String(o.nonce)} className="border-t border-[#1A2A26] hover:bg-white/[0.02] transition-colors">
               <td className="pl-4 pr-2 py-[10px] text-left text-[#a3a3a3]">
@@ -67,7 +78,7 @@ export function OrderHistoryTable({
               </td>
               <td className="px-3 py-[10px] text-right text-[#f5f5f5] font-medium">{sizeFor(o.marketId, o.size)}</td>
               <td className="px-3 py-[10px] text-right text-[#f5f5f5] font-medium">
-                {isMarket ? "Market" : priceFor(o.marketId, o.limitPrice)}
+                {priceLabel}
               </td>
               <td className="px-3 py-[10px] text-right">
                 <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium border capitalize ${STATUS_STYLE[o.status] ?? STATUS_STYLE.cancelled}`}>

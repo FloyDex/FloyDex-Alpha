@@ -27,13 +27,22 @@ const bigIntStorage = createJSONStorage(() => localStorage, {
 type TrackedOrder = OrderIntent & {
   status: "pending" | "filled" | "cancelled";
   addedAt: number;
+  /** UI ticket type — market orders use an aggressive limit under the hood. */
+  ticketType?: "market" | "limit";
+  /** VWAP of venue fills when the order completed (human USD). */
+  avgFillPrice?: number;
+  filledSize?: number;
 };
 
 interface OrdersState {
   orders: TrackedOrder[];
-  addOrder: (intent: OrderIntent) => void;
+  addOrder: (intent: OrderIntent, meta?: { ticketType?: "market" | "limit" }) => void;
   cancelOrder: (nonce: bigint, owner?: string) => void;
-  markFilled: (nonce: bigint, owner?: string) => void;
+  markFilled: (
+    nonce: bigint,
+    owner?: string,
+    fill?: { avgFillPrice?: number; filledSize?: number },
+  ) => void;
   clearCancelled: () => void;
   clearAll: () => void;
 }
@@ -42,10 +51,15 @@ export const useLocalOrders = create<OrdersState>()(
   persist(
     (set) => ({
       orders: [],
-      addOrder: (intent) =>
+      addOrder: (intent, meta) =>
         set((s) => ({
           orders: [
-            { ...intent, status: "pending" as const, addedAt: Date.now() },
+            {
+              ...intent,
+              status: "pending" as const,
+              addedAt: Date.now(),
+              ticketType: meta?.ticketType,
+            },
             ...s.orders.filter((o) => !(o.owner === intent.owner && o.nonce === intent.nonce)).slice(0, 99),
           ],
         })),
@@ -55,10 +69,17 @@ export const useLocalOrders = create<OrdersState>()(
             o.nonce === nonce && (!owner || o.owner === owner) ? { ...o, status: "cancelled" as const } : o
           ),
         })),
-      markFilled: (nonce, owner) =>
+      markFilled: (nonce, owner, fill) =>
         set((s) => ({
           orders: s.orders.map((o) =>
-            o.nonce === nonce && (!owner || o.owner === owner) ? { ...o, status: "filled" as const } : o
+            o.nonce === nonce && (!owner || o.owner === owner)
+              ? {
+                  ...o,
+                  status: "filled" as const,
+                  avgFillPrice: fill?.avgFillPrice ?? o.avgFillPrice,
+                  filledSize: fill?.filledSize ?? o.filledSize,
+                }
+              : o
           ),
         })),
       clearCancelled: () =>

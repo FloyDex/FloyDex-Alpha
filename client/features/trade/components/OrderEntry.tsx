@@ -390,12 +390,18 @@ export function OrderEntry({
         ...(orderType === "market" ? { ioc: true, orderType: "market" as const } : {}),
       });
       if (result.ok) {
-        addOrder(intent);
+        addOrder(intent, { ticketType: orderType === "market" ? "market" : "limit" });
         const filledQty = result.fills?.reduce((s, f) => s + f.size, 0) ?? 0;
+        const fillNotional = result.fills?.reduce((s, f) => s + f.price * f.size, 0) ?? 0;
+        const avgFillPrice = filledQty > 0 ? fillNotional / filledQty : undefined;
         if (filledQty > 0 || orderType === "market") {
           // Market/IOC never rests — mark filled or cancel so Open Orders stays clean.
-          if (filledQty > 0) useLocalOrders.getState().markFilled(intent.nonce, address);
-          else useLocalOrders.getState().cancelOrder(intent.nonce, address);
+          if (filledQty > 0) {
+            useLocalOrders.getState().markFilled(intent.nonce, address, {
+              avgFillPrice,
+              filledSize: filledQty,
+            });
+          } else useLocalOrders.getState().cancelOrder(intent.nonce, address);
         }
         if (result.book) useMarketStore.getState().setOrderBook(market.marketId, result.book);
         const extras = tpsl && (tpPrice || slPrice)
@@ -408,10 +414,10 @@ export function OrderEntry({
           extras
         );
         // Immediately refetch all user-facing data and poll fast for 30s to catch on-chain settlement
-        queryClient.invalidateQueries({ queryKey: ["balance", address] });
-        queryClient.invalidateQueries({ queryKey: ["health", address] });
-        queryClient.invalidateQueries({ queryKey: ["fills", address] });
-        queryClient.invalidateQueries({ queryKey: ["positions", address] });
+        const keys = [["balance", address], ["health", address], ["fills", address], ["positions", address]];
+        const invalidateAll = () => keys.forEach((key) => queryClient.invalidateQueries({ queryKey: key }));
+        invalidateAll();
+        [1_500, 4_000, 10_000].forEach((ms) => setTimeout(invalidateAll, ms));
         setFastPoll(true);
         setTimeout(() => setFastPoll(false), 30_000);
       } else {
