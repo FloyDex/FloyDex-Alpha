@@ -9,6 +9,7 @@ import {
   recordGiftClaim,
   toGiftStatus,
   topUpGiftCredit,
+  withdrawableNow,
   type GiftClaims,
 } from "./gift";
 
@@ -27,6 +28,16 @@ test("withdraw error names the remaining profit", () => {
   assert.ok(msg && msg.includes("$12.50") && msg.includes("$500.00") && msg.includes("$5"));
   assert.equal(giftWithdrawError(5, 500), null);
   assert.equal(giftWithdrawError(0, 0), null);
+  // Funded principal can leave while the gift is locked.
+  assert.equal(giftWithdrawError(5, 0, 1.09, 1.0951), null);
+  assert.ok(giftWithdrawError(5, 0, 2, 1.0951));
+});
+
+test("withdrawableNow caps to principal while gift is locked", () => {
+  assert.equal(withdrawableNow(5, 0, 6.01, 1.0951), 1.0951);
+  assert.equal(withdrawableNow(5, 500, 6.01, 1.0951), 6.01);
+  assert.equal(withdrawableNow(0, 0, 3, 1), 3);
+  assert.equal(withdrawableNow(5, 0, 0.5, 1.0951), 0.5);
 });
 
 test("status is omitted when no gift was claimed", () => {

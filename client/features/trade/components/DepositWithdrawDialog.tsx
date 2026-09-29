@@ -131,7 +131,9 @@ export function DepositWithdrawDialog({
   const giftLocked = Boolean(giftSnap?.gift && !giftSnap.gift.unlocked);
 
   const maxDeposit = walletBalanceHuman ?? 0;
-  const maxWithdraw = Math.max(0, freeHuman);
+  // While signup credit is locked, only funded principal may leave — not the gift.
+  const instantHuman = Math.max(0, Math.min(freeHuman, principalHuman));
+  const maxWithdraw = giftLocked ? instantHuman : Math.max(0, freeHuman);
   const maxForTab = tab === "deposit" ? maxDeposit : maxWithdraw;
 
   function switchTab(next: "deposit" | "withdraw") {
@@ -243,14 +245,20 @@ export function DepositWithdrawDialog({
   const overFree = tab === "withdraw" && amt > maxWithdraw + eps;
   const overMax = overWallet || overFree;
   const needsManual =
-    tab === "withdraw" && amt > 0 && amt > principalHuman + eps && !overFree;
+    tab === "withdraw" &&
+    amt > 0 &&
+    amt > principalHuman + eps &&
+    !overFree &&
+    !giftLocked;
+  const overGiftLock =
+    tab === "withdraw" && giftLocked && amt > principalHuman + eps && !overFree;
   const canSubmit =
     !!asset &&
     amt > 0 &&
     !overMax &&
     !overCap &&
     !loading &&
-    !(tab === "withdraw" && giftLocked) &&
+    !overGiftLock &&
     !(tab === "deposit" && missingTrustline);
 
   const usedPct =
@@ -263,8 +271,12 @@ export function DepositWithdrawDialog({
     if (tab === "deposit" && missingTrustline) return `Add ${code} trustline`;
     if (overWallet) return `Not enough ${code} in wallet`;
     if (overCap) return "Over the deposit cap";
-    if (giftLocked) return "Credit locked — keep trading";
-    if (overFree) return "Exceeds available to withdraw";
+    if (overGiftLock) return "Above funded deposits — credit locked";
+    if (overFree) {
+      return giftLocked
+        ? `Only ${formatAccountUsd(maxWithdraw)} withdrawable (credit locked)`
+        : "Exceeds available to withdraw";
+    }
     if (!(amt > 0)) return tab === "deposit" ? `Enter amount to deposit` : `Enter amount to withdraw`;
     if (needsManual) return `Request payout ${floorAmt(amt)} ${code}`;
     return tab === "deposit" ? `Deposit ${floorAmt(amt)} ${code}` : `Withdraw ${floorAmt(amt)} ${code}`;
@@ -515,9 +527,11 @@ export function DepositWithdrawDialog({
 
                 {giftLocked && tab === "withdraw" && giftSnap?.gift && (
                   <p className="mt-3 rounded-[8px] border border-[#1A2A26] bg-[#0E1614] px-3 py-2 text-[11.5px] leading-snug text-[#8A9B94]">
-                    Signup credit is locked until ${giftSnap.gift.unlockAt.toFixed(0)} realized
-                    profit ({Math.max(0, giftSnap.gift.realized).toFixed(2)} / $
-                    {giftSnap.gift.unlockAt.toFixed(0)}).
+                    ${giftSnap.gift.amount.toFixed(0)} signup credit stays locked until $
+                    {giftSnap.gift.unlockAt.toFixed(0)} realized profit (
+                    {Math.max(0, giftSnap.gift.realized).toFixed(2)} / $
+                    {giftSnap.gift.unlockAt.toFixed(0)}). You can still withdraw funded deposits
+                    up to {formatAccountUsd(instantHuman)}.
                   </p>
                 )}
 

@@ -18,9 +18,38 @@ export function giftUnlocked(giftUsd: number, giftRealized: number): boolean {
   return !(giftUsd > 0) || giftRealized >= GIFT_UNLOCK_PROFIT;
 }
 
-export function giftWithdrawError(giftUsd: number, giftRealized: number): string | null {
+/**
+ * How much free collateral may leave the vault right now.
+ * While the signup credit is locked, only funded principal is withdrawable —
+ * the gift itself stays until unlock, but deposits are never trapped.
+ */
+export function withdrawableNow(
+  giftUsd: number,
+  giftRealized: number,
+  freeCollateral: number,
+  principalLeftAmt: number,
+): number {
+  const free = Math.max(0, freeCollateral);
+  if (giftUnlocked(giftUsd, giftRealized)) return free;
+  return Math.max(0, Math.min(free, Math.max(0, principalLeftAmt)));
+}
+
+export function giftWithdrawError(
+  giftUsd: number,
+  giftRealized: number,
+  amount?: number,
+  principalLeftAmt?: number,
+): string | null {
   if (giftUnlocked(giftUsd, giftRealized)) return null;
-  return `Make $${GIFT_UNLOCK_PROFIT.toFixed(0)} profit before withdrawing the $${GIFT_USD.toFixed(0)} credit ($${giftRealized.toFixed(2)} / $${GIFT_UNLOCK_PROFIT.toFixed(2)})`;
+  // Principal repayments are always allowed while the credit is locked.
+  if (
+    amount != null &&
+    principalLeftAmt != null &&
+    amount <= principalLeftAmt + 1e-9
+  ) {
+    return null;
+  }
+  return `Make $${GIFT_UNLOCK_PROFIT.toFixed(0)} profit before withdrawing the $${GIFT_USD.toFixed(0)} credit ($${Math.max(0, giftRealized).toFixed(2)} / $${GIFT_UNLOCK_PROFIT.toFixed(2)})`;
 }
 
 export function isDeviceId(value: string): boolean {

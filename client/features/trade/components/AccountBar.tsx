@@ -108,7 +108,8 @@ function CreditNotice({ connected, gift }: { connected: boolean; gift: GiftStatu
           <div className="h-full bg-[#14F195]" style={{ width: `${Math.max(3, pct)}%` }} />
         </div>
         <p className="mt-1.5 text-[10px] leading-snug text-[#6b7c74]">
-          One credit per IP and device. Withdraw after ${GIFT_UNLOCK_PROFIT} realized profit.
+          ${GIFT_USD} credit unlocks after ${GIFT_UNLOCK_PROFIT} realized profit. Your funded
+          deposits stay withdrawable.
         </p>
       </div>
     );

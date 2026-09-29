@@ -785,7 +785,9 @@ export function creditDeposit(owner: string, amountUsdc: number, signature: stri
 export function debitWithdraw(owner: string, amountUsdc: number): { ok: true } | { ok: false; error: string } {
   const state = load();
   const acct = getAccount(owner);
-  const giftErr = giftWithdrawError(acct.giftUsd ?? 0, acct.giftRealized ?? 0);
+  ensureFundingFields(acct);
+  const left = principalLeft(acct);
+  const giftErr = giftWithdrawError(acct.giftUsd ?? 0, acct.giftRealized ?? 0, amountUsdc, left);
   if (giftErr) return { ok: false, error: giftErr };
   const used = acct.positions.reduce((s, p) => s + p.margin, 0);
   const free = accountEquity(acct) - used;
@@ -809,6 +811,7 @@ export function recordFundedOut(owner: string, amountUsdc: number, signature?: s
  * Auto USDC only returns remaining funded deposits (fundedIn − fundedOut).
  * Anything above that — profit and/or unlocked gift — is a manual payout
  * for admin approval. Never auto-send when withdrawal > funded principal.
+ * While signup credit is locked, amounts above principal are rejected (not queued).
  */
 export function requestWithdraw(owner: string, amountUsdc: number):
   | { ok: true; mode: "auto"; principalLeft: number }
@@ -816,9 +819,12 @@ export function requestWithdraw(owner: string, amountUsdc: number):
   | { ok: false; error: string } {
   const state = load();
   const acct = getAccount(owner);
-  const giftErr = giftWithdrawError(acct.giftUsd ?? 0, acct.giftRealized ?? 0);
-  if (giftErr) return { ok: false, error: giftErr };
   if (!(amountUsdc > 0)) return { ok: false, error: "Invalid amount" };
+
+  ensureFundingFields(acct);
+  const left = principalLeft(acct);
+  const giftErr = giftWithdrawError(acct.giftUsd ?? 0, acct.giftRealized ?? 0, amountUsdc, left);
+  if (giftErr) return { ok: false, error: giftErr };
 
   const used = acct.positions.reduce((s, p) => s + p.margin, 0);
   const free = accountEquity(acct) - used;
@@ -826,8 +832,7 @@ export function requestWithdraw(owner: string, amountUsdc: number):
     return { ok: false, error: "Insufficient free collateral" };
   }
 
-  const left = principalLeft(acct);
-  // Withdrawal above funded deposits → admin must approve.
+  // Withdrawal above funded deposits → admin must approve (gift must be unlocked).
   if (amountUsdc > left + 1e-9) {
     const debit = debitWithdraw(owner, amountUsdc);
     if (!debit.ok) return debit;
@@ -1009,7 +1014,10 @@ export async function applyFill(args: {
   const dir = existing.isLong ? 1 : -1;
   const pnl = (price - existing.entry) * closed * dir;
   acct.realized += pnl;
-  if ((acct.giftUsd ?? 0) > 0) acct.giftRealized = (acct.giftRealized ?? 0) + pnl;
+  // Unlock progress only counts profit — losses must not erase earned unlock headway.
+  if ((acct.giftUsd ?? 0) > 0 && pnl > 0) {
+    acct.giftRealized = (acct.giftRealized ?? 0) + pnl;
+  }
   chargePlatformFee(state, acct, closeFee);
   pushFill(acct, {
     marketId,
