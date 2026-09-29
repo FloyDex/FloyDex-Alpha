@@ -5,7 +5,7 @@
 //! `(shard, feed_id)`, so a caller cannot pick among several recent prices by
 //! posting their own update account.
 
-use crate::error::KryonError;
+use crate::error::FloyDexError;
 use anchor_lang::prelude::*;
 use protocol_core::{OracleGuard, OracleSnapshot, OracleSource, PRECISION};
 use pyth_solana_receiver_sdk::price_update::{PriceUpdateV2, VerificationLevel};
@@ -21,14 +21,14 @@ pub fn push_feed_address(shard_id: u16, feed_id: &[u8; 32]) -> Pubkey {
 pub fn pyth_to_precision(value: i128, exponent: i32) -> Result<i128> {
     let shift = 18i32
         .checked_add(exponent)
-        .ok_or(KryonError::InvalidPrice)?;
-    require!((-38..=38).contains(&shift), KryonError::InvalidPrice);
+        .ok_or(FloyDexError::InvalidPrice)?;
+    require!((-38..=38).contains(&shift), FloyDexError::InvalidPrice);
     let out = if shift >= 0 {
         value.checked_mul(10i128.pow(shift as u32))
     } else {
         value.checked_div(10i128.pow((-shift) as u32))
     };
-    out.ok_or_else(|| error!(KryonError::MathOverflow))
+    out.ok_or_else(|| error!(FloyDexError::MathOverflow))
 }
 
 /// Read `ai` as the Pyth feed `feed_id` on `shard_id`. Checks the account
@@ -39,24 +39,24 @@ pub fn read_pyth(ai: &AccountInfo, feed_id: &[u8; 32], shard_id: u16) -> Result<
     require_keys_eq!(
         ai.key(),
         push_feed_address(shard_id, feed_id),
-        KryonError::InvalidOracleAccount
+        FloyDexError::InvalidOracleAccount
     );
     require_keys_eq!(
         *ai.owner,
         pyth_solana_receiver_sdk::ID,
-        KryonError::InvalidOracleAccount
+        FloyDexError::InvalidOracleAccount
     );
     let data = ai.try_borrow_data()?;
     // try_deserialize checks the account discriminator.
     let update = PriceUpdateV2::try_deserialize(&mut &data[..])
-        .map_err(|_| error!(KryonError::InvalidOracleAccount))?;
+        .map_err(|_| error!(FloyDexError::InvalidOracleAccount))?;
     require!(
         update.verification_level == VerificationLevel::Full,
-        KryonError::OracleNotFullyVerified
+        FloyDexError::OracleNotFullyVerified
     );
     let msg = &update.price_message;
-    require!(msg.feed_id == *feed_id, KryonError::InvalidOracleAccount);
-    require!(msg.publish_time >= 0, KryonError::InvalidPrice);
+    require!(msg.feed_id == *feed_id, FloyDexError::InvalidOracleAccount);
+    require!(msg.publish_time >= 0, FloyDexError::InvalidPrice);
     let publish_time = msg.publish_time as u64;
     Ok(OracleSnapshot {
         asset: [0; 16],
@@ -80,7 +80,7 @@ pub fn read_pyth_checked(
 ) -> Result<OracleSnapshot> {
     let snap = read_pyth(ai, feed_id, shard_id)?;
     snap.validate(now, guard)
-        .map_err(|e| error!(KryonError::from(e)))?;
+        .map_err(|e| error!(FloyDexError::from(e)))?;
     Ok(snap)
 }
 

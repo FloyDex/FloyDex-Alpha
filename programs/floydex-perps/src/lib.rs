@@ -27,7 +27,7 @@ pub use state::FeeConfig;
 pub mod bench;
 
 #[program]
-pub mod kryon_perps {
+pub mod floydex_perps {
     use super::*;
 
     // --- admin & bootstrap ---
@@ -64,6 +64,15 @@ pub mod kryon_perps {
 
     pub fn set_fee_config(ctx: Context<AdminOnly>, fee_config: FeeConfig) -> Result<()> {
         instructions::admin::handle_set_fee_config(ctx, fee_config)
+    }
+
+    pub fn set_fee_collector(ctx: Context<AdminOnly>, collector: Pubkey) -> Result<()> {
+        instructions::admin::handle_set_fee_collector(ctx, collector)
+    }
+
+    /// Permissionless: drain accrued settlement fees to `Exchange.fee_collector`.
+    pub fn collect_fees(ctx: Context<CollectFees>) -> Result<()> {
+        instructions::collateral::handle_collect_fees(ctx)
     }
 
     pub fn set_max_total_oi_policy_bps(ctx: Context<AdminOnly>, max_total: u32) -> Result<()> {
@@ -189,6 +198,24 @@ pub mod kryon_perps {
 
     pub fn revoke_delegate(ctx: Context<OwnerOnly>) -> Result<()> {
         instructions::delegate::handle_revoke_delegate(ctx)
+    }
+
+    pub fn init_market_book(ctx: Context<InitMarketBook>, market_id: u16) -> Result<()> {
+        instructions::book::handle_init_market_book(ctx, market_id)
+    }
+
+    /// Post a limit onto the on-chain book. Crossing size matches immediately;
+    /// the remainder rests. Position settlement is still `settle_fills`.
+    pub fn place_order(ctx: Context<PlaceOrder>, args: PlaceOrderArgs) -> Result<()> {
+        instructions::book::handle_place_order(ctx, args)
+    }
+
+    pub fn cancel_book_order(
+        ctx: Context<CancelBookOrder>,
+        market_id: u16,
+        nonce: u64,
+    ) -> Result<()> {
+        instructions::book::handle_cancel_book_order(ctx, market_id, nonce)
     }
 
     pub fn cancel_order(

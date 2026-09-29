@@ -1,14 +1,15 @@
-//! Collateral listing.
+//! Collateral listing and fee collection.
 
 use crate::constants::*;
-use crate::error::KryonError;
-use crate::events::CollateralAdded;
+use crate::error::{CoreResultExt, FloyDexError};
+use crate::events::{CollateralAdded, FeesCollected};
 use crate::state::*;
 use crate::token_ext::check_mint_extensions;
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 use anchor_spl::token_2022;
-use anchor_spl::token_interface::{Mint, TokenInterface};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use protocol_core::{checked_mul, checked_sub};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct CollateralParams {
@@ -30,7 +31,7 @@ pub struct CollateralParams {
 
 #[derive(Accounts)]
 pub struct AddCollateral<'info> {
-    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ KryonError::Unauthorized)]
+    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ FloyDexError::Unauthorized)]
     pub exchange: Account<'info, Exchange>,
     #[account(mut)]
     pub admin: Signer<'info>,
@@ -58,7 +59,7 @@ pub struct AddCollateral<'info> {
 /// sized by the token program itself (it knows every extension it runs).
 fn create_vault(ctx: &Context<AddCollateral>) -> Result<()> {
     let vault = ctx.accounts.vault.to_account_info();
-    require!(vault.lamports() == 0, KryonError::InvalidConfig);
+    require!(vault.lamports() == 0, FloyDexError::InvalidConfig);
     let token_program = ctx.accounts.token_program.to_account_info();
     let space = token_2022::get_account_data_size(
         CpiContext::new(
@@ -99,19 +100,19 @@ pub fn handle_add_collateral(ctx: Context<AddCollateral>, p: CollateralParams) -
     create_vault(&ctx)?;
     let ex = &mut ctx.accounts.exchange;
     let decimals = ctx.accounts.mint.decimals;
-    require!(decimals <= MAX_DECIMALS, KryonError::InvalidConfig);
-    require!(p.haircut_bps <= 10_000, KryonError::InvalidConfig);
+    require!(decimals <= MAX_DECIMALS, FloyDexError::InvalidConfig);
+    require!(p.haircut_bps <= 10_000, FloyDexError::InvalidConfig);
     if p.is_settlement {
         require!(
             ex.settlement_mint == Pubkey::default(),
-            KryonError::SettlementCollateralExists
+            FloyDexError::SettlementCollateralExists
         );
         require!(
             p.pyth_feed_id == [0; 32]
                 && p.haircut_bps == 0
                 && p.closed_haircut_bps == 0
                 && p.max_closed_age_secs == 0,
-            KryonError::InvalidConfig
+            FloyDexError::InvalidConfig
         );
         ex.settlement_mint = ctx.accounts.mint.key();
         ex.settlement_collateral_index = ex.collateral_count;
@@ -123,11 +124,11 @@ pub fn handle_add_collateral(ctx: Context<AddCollateral>, p: CollateralParams) -
                 && p.haircut_bps.saturating_add(p.closed_haircut_bps) <= 10_000
                 && (p.max_closed_age_secs == 0 || p.max_closed_age_secs > p.max_oracle_age_secs)
                 && p.max_closed_age_secs <= MAX_CLOSED_PRICE_AGE_SECS,
-            KryonError::InvalidConfig
+            FloyDexError::InvalidConfig
         );
     }
     let index = ex.collateral_count;
-    ex.collateral_count = index.checked_add(1).ok_or(KryonError::InvalidConfig)?;
+    ex.collateral_count = index.checked_add(1).ok_or(FloyDexError::InvalidConfig)?;
 
     let c = &mut ctx.accounts.collateral;
     c.mint = ctx.accounts.mint.key();
@@ -153,6 +154,83 @@ pub fn handle_add_collateral(ctx: Context<AddCollateral>, p: CollateralParams) -
         mint: c.mint,
         index,
         is_settlement: p.is_settlement
+    });
+    Ok(())
+}
+
+/// Permissionless drain of accrued trading fees to `Exchange.fee_collector`.
+/// Fees stay in the vault (and in `fees_accrued`) until this is called, so
+/// solvency is `vault = balances + fees + insurance + …` both before and after.
+#[event_cpi]
+#[derive(Accounts)]
+pub struct CollectFees<'info> {
+    #[account(seeds = [EXCHANGE_SEED], bump = exchange.bump)]
+    pub exchange: Box<Account<'info, Exchange>>,
+    /// Anyone may trigger a collect; they only pay the transaction fee.
+    pub payer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [COLLATERAL_SEED, mint.key().as_ref()],
+        bump = collateral.bump,
+        has_one = mint,
+        has_one = vault,
+        has_one = token_program,
+        constraint = collateral.is_settlement @ FloyDexError::InvalidConfig,
+    )]
+    pub collateral: Box<Account<'info, Collateral>>,
+    pub mint: Box<InterfaceAccount<'info, Mint>>,
+    #[account(mut)]
+    pub vault: Box<InterfaceAccount<'info, TokenAccount>>,
+    #[account(
+        mut,
+        token::mint = mint,
+        token::authority = exchange.fee_collector,
+        token::token_program = token_program,
+    )]
+    pub collector_token: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
+pub fn handle_collect_fees(ctx: Context<CollectFees>) -> Result<()> {
+    require!(
+        ctx.accounts.exchange.fee_collector != Pubkey::default(),
+        FloyDexError::InvalidConfig
+    );
+    let scale = ctx.accounts.collateral.scale();
+    require!(scale > 0, FloyDexError::InvalidConfig);
+    let tokens_i = ctx.accounts.collateral.fees_accrued / scale;
+    if tokens_i <= 0 {
+        return Ok(());
+    }
+    let amount = u64::try_from(tokens_i).map_err(|_| error!(FloyDexError::MathOverflow))?;
+    let debit = checked_mul(i128::from(amount), scale).core()?;
+    ctx.accounts.collateral.fees_accrued =
+        checked_sub(ctx.accounts.collateral.fees_accrued, debit).core()?;
+
+    let mint_key = ctx.accounts.mint.key();
+    let seeds: &[&[u8]] = &[
+        COLLATERAL_SEED,
+        mint_key.as_ref(),
+        &[ctx.accounts.collateral.bump],
+    ];
+    token_interface::transfer_checked(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.vault.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+                to: ctx.accounts.collector_token.to_account_info(),
+                authority: ctx.accounts.collateral.to_account_info(),
+            },
+            &[seeds],
+        ),
+        amount,
+        ctx.accounts.mint.decimals,
+    )?;
+    emit_cpi!(FeesCollected {
+        mint: mint_key,
+        collector: ctx.accounts.exchange.fee_collector,
+        amount
     });
     Ok(())
 }

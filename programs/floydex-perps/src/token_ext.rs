@@ -6,7 +6,7 @@
 //! walks the TLV entries itself: every type must be on the allow-list, and
 //! the scaled-UI multiplier is decoded without floats.
 
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::spl_token_2022;
 use protocol_core::{f64_bits_to_precision, PRECISION};
@@ -63,7 +63,7 @@ fn tlv_entries(data: &[u8]) -> Result<Vec<(u16, &[u8])>> {
     }
     require!(
         data[BASE_LEN] == MINT_ACCOUNT_TYPE,
-        KryonError::UnsupportedMintExtension
+        FloyDexError::UnsupportedMintExtension
     );
     let mut i = BASE_LEN + 1;
     while i + 2 <= data.len() {
@@ -71,10 +71,10 @@ fn tlv_entries(data: &[u8]) -> Result<Vec<(u16, &[u8])>> {
         if ty == ext::UNINITIALIZED {
             break;
         }
-        require!(i + 4 <= data.len(), KryonError::UnsupportedMintExtension);
+        require!(i + 4 <= data.len(), FloyDexError::UnsupportedMintExtension);
         let len = usize::from(u16::from_le_bytes([data[i + 2], data[i + 3]]));
         let end = i + 4 + len;
-        require!(end <= data.len(), KryonError::UnsupportedMintExtension);
+        require!(end <= data.len(), FloyDexError::UnsupportedMintExtension);
         out.push((ty, &data[i + 4..end]));
         i = end;
     }
@@ -90,7 +90,7 @@ pub fn check_mint_extensions(mint: &AccountInfo) -> Result<()> {
     for (ty, _) in tlv_entries(&data)? {
         require!(
             ALLOWED_MINT_EXTENSIONS.contains(&ty),
-            KryonError::UnsupportedMintExtension
+            FloyDexError::UnsupportedMintExtension
         );
     }
     Ok(())
@@ -112,7 +112,7 @@ pub fn ui_multiplier(mint: &AccountInfo, now: i64) -> Result<i128> {
     else {
         return Ok(PRECISION);
     };
-    require!(v.len() >= 56, KryonError::UnsupportedMintExtension);
+    require!(v.len() >= 56, FloyDexError::UnsupportedMintExtension);
     let word = |at: usize| u64::from_le_bytes(v[at..at + 8].try_into().unwrap());
     let effective_at = word(40) as i64;
     let bits = if now >= effective_at {

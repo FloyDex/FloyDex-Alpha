@@ -1,6 +1,6 @@
 [package]
-name = "kryon-perps"
-description = "Kryon tokenized-stock perps: settlement, margin and risk on Solana."
+name = "floydex-perps"
+description = "FloyDex tokenized-stock perps: settlement, margin and risk on Solana."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -9,7 +9,7 @@ rust-version.workspace = true
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "kryon_perps"
+name = "floydex_perps"
 
 [features]
 default = []

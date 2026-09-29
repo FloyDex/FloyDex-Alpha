@@ -1,5 +1,6 @@
 pub mod adl;
 pub mod admin;
+pub mod book;
 pub mod collateral;
 pub mod delegate;
 pub mod funding;
@@ -12,6 +13,7 @@ pub mod user;
 
 pub use adl::*;
 pub use admin::*;
+pub use book::*;
 pub use collateral::*;
 pub use delegate::*;
 pub use funding::*;

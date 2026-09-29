@@ -9,6 +9,14 @@ pub struct FeeConfig {
     pub taker_fee_bps: u32,
 }
 
+impl FeeConfig {
+    /// Production schedule: 1% on every buy and every sell.
+    pub const PLATFORM: Self = Self {
+        maker_fee_bps: crate::constants::PLATFORM_FEE_BPS,
+        taker_fee_bps: crate::constants::PLATFORM_FEE_BPS,
+    };
+}
+
 /// Global configuration. PDA `["exchange"]`.
 #[account]
 #[derive(InitSpace, Debug)]
@@ -46,7 +54,9 @@ pub struct Exchange {
     pub max_reward_bps: u32,
     /// Share of a position one liquidation step may close (`plan_liquidation`).
     pub partial_liquidation_bps: u32,
-    pub _reserved: [u8; 56],
+    /// Owner of the USDC token account that receives collected trading fees.
+    pub fee_collector: Pubkey,
+    pub _reserved: [u8; 24],
 }
 
 impl Exchange {

@@ -2,7 +2,7 @@
 //! nothing else, until an expiry. Withdrawals always need the owner.
 
 use crate::constants::*;
-use crate::error::KryonError;
+use crate::error::FloyDexError;
 use crate::events::DelegateSet;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -15,17 +15,17 @@ pub struct OwnerOnly<'info> {
         mut,
         seeds = [USER_SEED, owner.key().as_ref(), &[user_account.load()?.sub_id]],
         bump = user_account.load()?.bump,
-        constraint = user_account.load()?.owner == owner.key() @ KryonError::Unauthorized,
+        constraint = user_account.load()?.owner == owner.key() @ FloyDexError::Unauthorized,
     )]
     pub user_account: AccountLoader<'info, UserAccount>,
 }
 
 pub fn handle_set_delegate(ctx: Context<OwnerOnly>, delegate: Pubkey, expiry: i64) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
-    require!(expiry > now, KryonError::InvalidDelegateExpiry);
+    require!(expiry > now, FloyDexError::InvalidDelegateExpiry);
     require!(
         delegate != Pubkey::default() && delegate != ctx.accounts.owner.key(),
-        KryonError::InvalidConfig
+        FloyDexError::InvalidConfig
     );
     let sub_id = {
         let mut u = ctx.accounts.user_account.load_mut()?;

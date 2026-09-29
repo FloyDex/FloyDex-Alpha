@@ -24,7 +24,7 @@
 //! in the `crate::health` layout, skipping this market.
 
 use crate::constants::*;
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use crate::events::{BadDebt, Liquidated, PositionChanged, SharesRetired};
 use crate::health::{health, load_risk_inputs, market_view, plan_liquidation, CollateralPrice};
 use crate::instructions::insurance::cover_deficit;
@@ -51,7 +51,7 @@ pub struct Liquidate<'info> {
         mut,
         seeds = [USER_SEED, liquidator.key().as_ref(), &[liquidator_account.load()?.sub_id]],
         bump = liquidator_account.load()?.bump,
-        constraint = liquidator_account.load()?.owner == liquidator.key() @ KryonError::Unauthorized,
+        constraint = liquidator_account.load()?.owner == liquidator.key() @ FloyDexError::Unauthorized,
     )]
     pub liquidator_account: AccountLoader<'info, UserAccount>,
     /// The account being liquidated.
@@ -68,20 +68,20 @@ pub fn handle_liquidate<'info>(
     position_id: u64,
 ) -> Result<()> {
     let ex = &ctx.accounts.exchange;
-    require!(!ex.paused, KryonError::Paused);
+    require!(!ex.paused, FloyDexError::Paused);
     require!(
         ex.insurance == ctx.accounts.insurance.key() && ex.max_reward_bps > 0,
-        KryonError::InsuranceNotInitialized
+        FloyDexError::InsuranceNotInitialized
     );
     require_keys_neq!(
         ctx.accounts.user_account.key(),
         ctx.accounts.liquidator_account.key(),
-        KryonError::SelfLiquidation
+        FloyDexError::SelfLiquidation
     );
     require_keys_neq!(
         ctx.accounts.user_account.load()?.owner,
         ctx.accounts.liquidator.key(),
-        KryonError::SelfLiquidation
+        FloyDexError::SelfLiquidation
     );
     let now = Clock::get()?.unix_timestamp as u64;
     let si = ex.settlement_collateral_index;
@@ -96,7 +96,7 @@ pub fn handle_liquidate<'info>(
     }
     require!(
         view.session != MarketSession::Halted,
-        KryonError::MarketHalted
+        FloyDexError::MarketHalted
     );
     let mark = view.mark;
     let mid = view.market_id;
@@ -111,7 +111,7 @@ pub fn handle_liquidate<'info>(
         let u = ctx.accounts.liquidator_account.load()?;
         load_risk_inputs(&u, &mut accs, si, &[mid], now, false)?
     };
-    require!(accs.is_empty(), KryonError::InvalidRemainingAccounts);
+    require!(accs.is_empty(), FloyDexError::InvalidRemainingAccounts);
     // The liquidator may receive the user's collateral: it needs its prices.
     for p in user_inputs.prices.iter() {
         if liq_inputs.price_of(p.index).is_none() {
@@ -129,7 +129,7 @@ pub fn handle_liquidate<'info>(
         &user_inputs,
         &user_markets,
     )?;
-    require!(before.liquidatable, KryonError::NotLiquidatable);
+    require!(before.liquidatable, FloyDexError::NotLiquidatable);
     let liq_before = health(
         &*ctx.accounts.liquidator_account.load()?,
         &liq_inputs,
@@ -142,8 +142,8 @@ pub fn handle_liquidate<'info>(
             .positions
             .iter()
             .find(|p| p.in_use != 0 && p.position_id == position_id)
-            .ok_or(KryonError::PositionNotFound)?;
-        require!(slot.market_id == mid, KryonError::PositionNotFound);
+            .ok_or(FloyDexError::PositionNotFound)?;
+        require!(slot.market_id == mid, FloyDexError::PositionNotFound);
         let plan = plan_liquidation(
             &u,
             &user_inputs,
@@ -161,7 +161,7 @@ pub fn handle_liquidate<'info>(
             .map_or(0, |p| p.size.get())
     };
     let size = to_whole_units(plan.close_size, position_size);
-    require!(size > 0, KryonError::InvalidAmount);
+    require!(size > 0, FloyDexError::InvalidAmount);
     // The penalty on the slice actually closed (same rule as the plan's).
     let penalty = apply_bps(
         notional(size, mark).core()?,
@@ -205,7 +205,7 @@ pub fn handle_liquidate<'info>(
         .core()?;
         require!(
             long >= 0 && short >= 0 && long == short,
-            KryonError::MathOverflow
+            FloyDexError::MathOverflow
         );
         m.oi_long.set(long);
         m.oi_short.set(short);
@@ -223,7 +223,7 @@ pub fn handle_liquidate<'info>(
         |h: &risk_engine::AccountHealth| h.maintenance_margin_required.saturating_sub(h.equity);
     require!(
         shortfall(&after) < shortfall(&before),
-        KryonError::LiquidationWouldNotImproveHealth
+        FloyDexError::LiquidationWouldNotImproveHealth
     );
 
     // --- deficit: the user's own collateral, then insurance, then bad debt ---
@@ -272,7 +272,7 @@ pub fn handle_liquidate<'info>(
     let reduce_ok = !liq_out.increased && liq_after.free_collateral >= liq_before.free_collateral;
     require!(
         meets_initial || reduce_ok,
-        KryonError::InsufficientCollateral
+        FloyDexError::InsufficientCollateral
     );
 
     // --- events ---

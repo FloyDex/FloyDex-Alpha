@@ -102,7 +102,7 @@ impl UserAccount {
                     .balances
                     .iter()
                     .position(|b| b.in_use == 0)
-                    .ok_or(crate::error::KryonError::TooManyBalances)?;
+                    .ok_or(crate::error::FloyDexError::TooManyBalances)?;
                 self.balances[i] = BalanceSlot {
                     amount: PodI128::ZERO,
                     collateral_index,
@@ -117,7 +117,7 @@ impl UserAccount {
             .amount
             .get()
             .checked_add(delta)
-            .ok_or(crate::error::KryonError::MathOverflow)?;
+            .ok_or(crate::error::FloyDexError::MathOverflow)?;
         b.amount.set(next);
         if next == 0 {
             *b = BalanceSlot::default();

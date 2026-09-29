@@ -12,7 +12,7 @@
 //!   shares with no claim on anything.
 
 use crate::constants::*;
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use crate::events::{SharesRetired, Staked, UnstakeRequested, Unstaked};
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -35,14 +35,14 @@ fn validate_liquidation_config(c: &LiquidationConfig) -> Result<()> {
             && c.max_reward_bps <= MAX_REWARD_BPS_CEILING
             && c.partial_liquidation_bps > 0
             && c.partial_liquidation_bps <= 10_000,
-        KryonError::InvalidConfig
+        FloyDexError::InvalidConfig
     );
     Ok(())
 }
 
 #[derive(Accounts)]
 pub struct InitInsurance<'info> {
-    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ KryonError::Unauthorized)]
+    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ FloyDexError::Unauthorized)]
     pub exchange: Box<Account<'info, Exchange>>,
     #[account(mut)]
     pub admin: Signer<'info>,
@@ -69,7 +69,7 @@ pub fn handle_init_insurance(
 ) -> Result<()> {
     require!(
         unstake_cooldown_secs <= MAX_UNSTAKE_COOLDOWN_SECS,
-        KryonError::InvalidConfig
+        FloyDexError::InvalidConfig
     );
     validate_liquidation_config(&config)?;
     let ins = &mut ctx.accounts.insurance;
@@ -95,7 +95,7 @@ pub fn handle_set_liquidation_config(
     let ex = &mut ctx.accounts.exchange;
     require!(
         ex.insurance != Pubkey::default(),
-        KryonError::InsuranceNotInitialized
+        FloyDexError::InsuranceNotInitialized
     );
     ex.max_reward_bps = config.max_reward_bps;
     ex.partial_liquidation_bps = config.partial_liquidation_bps;
@@ -154,11 +154,11 @@ fn refresh(pos: &mut StakePosition, owner: Pubkey, bump: u8, epoch: u32) {
 }
 
 pub fn handle_stake(ctx: Context<MoveStake>, amount: u64) -> Result<()> {
-    require!(!ctx.accounts.exchange.paused, KryonError::Paused);
-    require!(amount > 0, KryonError::InvalidAmount);
+    require!(!ctx.accounts.exchange.paused, FloyDexError::Paused);
+    require!(amount > 0, FloyDexError::InvalidAmount);
     let value = i128::from(amount)
         .checked_mul(ctx.accounts.settlement_collateral.scale())
-        .ok_or(KryonError::MathOverflow)?;
+        .ok_or(FloyDexError::MathOverflow)?;
 
     let before = ctx.accounts.vault.amount;
     token_interface::transfer_checked(
@@ -180,8 +180,8 @@ pub fn handle_stake(ctx: Context<MoveStake>, amount: u64) -> Result<()> {
         .vault
         .amount
         .checked_sub(before)
-        .ok_or(KryonError::MathOverflow)?;
-    require!(received == amount, KryonError::TransferAmountMismatch);
+        .ok_or(FloyDexError::MathOverflow)?;
+    require!(received == amount, FloyDexError::TransferAmountMismatch);
 
     let ins = &mut ctx.accounts.insurance;
     // Price against NAV before the deposit; the first staker (or the first
@@ -191,7 +191,7 @@ pub fn handle_stake(ctx: Context<MoveStake>, amount: u64) -> Result<()> {
     } else {
         mul_div_floor(value, ins.total_shares, ins.fund).core()?
     };
-    require!(minted > 0, KryonError::InvalidAmount);
+    require!(minted > 0, FloyDexError::InvalidAmount);
     ins.fund = checked_add(ins.fund, value).core()?;
     ins.total_shares = checked_add(ins.total_shares, minted).core()?;
     let epoch = ins.epoch;
@@ -222,7 +222,7 @@ pub struct RequestUnstake<'info> {
         mut,
         seeds = [STAKE_SEED, staker.key().as_ref()],
         bump = stake_position.bump,
-        constraint = stake_position.owner == staker.key() @ KryonError::Unauthorized,
+        constraint = stake_position.owner == staker.key() @ FloyDexError::Unauthorized,
     )]
     pub stake_position: Box<Account<'info, StakePosition>>,
 }
@@ -235,9 +235,12 @@ pub fn handle_request_unstake(ctx: Context<RequestUnstake>, shares: i128) -> Res
     let pos = &mut ctx.accounts.stake_position;
     let (owner, bump) = (pos.owner, pos.bump);
     refresh(pos, owner, bump, epoch);
-    require!(shares > 0, KryonError::InvalidAmount);
-    require!(pos.pending_unstake_shares == 0, KryonError::UnstakePending);
-    require!(shares <= pos.shares, KryonError::InsufficientShares);
+    require!(shares > 0, FloyDexError::InvalidAmount);
+    require!(
+        pos.pending_unstake_shares == 0,
+        FloyDexError::UnstakePending
+    );
+    require!(shares <= pos.shares, FloyDexError::InsufficientShares);
     pos.pending_unstake_shares = shares;
     pos.unlock_ts = now.saturating_add(cooldown);
     emit_cpi!(UnstakeRequested {
@@ -255,7 +258,7 @@ pub fn handle_withdraw_unstaked(ctx: Context<MoveStake>) -> Result<()> {
     let staker = ctx.accounts.staker.key();
     let ins = &mut ctx.accounts.insurance;
     let pos = &mut ctx.accounts.stake_position;
-    require!(pos.owner == staker, KryonError::NoPendingUnstake);
+    require!(pos.owner == staker, FloyDexError::NoPendingUnstake);
     if pos.epoch != ins.epoch {
         let bump = pos.bump;
         refresh(pos, staker, bump, ins.epoch);
@@ -268,15 +271,15 @@ pub fn handle_withdraw_unstaked(ctx: Context<MoveStake>) -> Result<()> {
         return Ok(());
     }
     let shares = pos.pending_unstake_shares;
-    require!(shares > 0, KryonError::NoPendingUnstake);
-    require!(now >= pos.unlock_ts, KryonError::UnstakeLocked);
+    require!(shares > 0, FloyDexError::NoPendingUnstake);
+    require!(now >= pos.unlock_ts, FloyDexError::UnstakeLocked);
 
     let scale = ctx.accounts.settlement_collateral.scale();
     let value = mul_div_floor(shares, ins.fund, ins.total_shares)
         .core()?
         .min(ins.fund);
     // Whole token units only; the sub-unit remainder stays in the fund.
-    let amount = u64::try_from(value / scale).map_err(|_| error!(KryonError::MathOverflow))?;
+    let amount = u64::try_from(value / scale).map_err(|_| error!(FloyDexError::MathOverflow))?;
     let paid = i128::from(amount) * scale;
     ins.fund = checked_sub(ins.fund, paid).core()?;
     ins.total_shares = checked_sub(ins.total_shares, shares).core()?;

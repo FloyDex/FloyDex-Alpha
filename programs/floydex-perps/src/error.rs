@@ -6,7 +6,7 @@ use protocol_core::CoreError;
 /// crates; program-only errors follow.
 #[error_code]
 #[derive(PartialEq, Eq)]
-pub enum KryonError {
+pub enum FloyDexError {
     MathOverflow,
     DivisionByZero,
     InvalidAmount,
@@ -109,9 +109,13 @@ pub enum KryonError {
     UnstakeLocked,
     #[msg("An owner cannot liquidate their own account")]
     SelfLiquidation,
+    #[msg("The market book has no free slot for this price")]
+    BookFull,
+    #[msg("That order is not resting on the book")]
+    BookOrderNotFound,
 }
 
-impl From<CoreError> for KryonError {
+impl From<CoreError> for FloyDexError {
     fn from(e: CoreError) -> Self {
         match e {
             CoreError::MathOverflow => Self::MathOverflow,
@@ -158,6 +162,6 @@ pub trait CoreResultExt<T> {
 impl<T> CoreResultExt<T> for core::result::Result<T, CoreError> {
     #[inline]
     fn core(self) -> Result<T> {
-        self.map_err(|e| error!(KryonError::from(e)))
+        self.map_err(|e| error!(FloyDexError::from(e)))
     }
 }

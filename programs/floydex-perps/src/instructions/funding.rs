@@ -12,7 +12,7 @@
 //! counts the pending amount through the market's indexes.
 
 use crate::constants::*;
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use crate::events::FundingUpdated;
 use crate::health::{market_view, secs_closed, MarketView};
 use crate::mark::observe;
@@ -32,7 +32,7 @@ pub struct UpdateFunding<'info> {
 }
 
 pub fn handle_update_funding(ctx: Context<UpdateFunding>) -> Result<()> {
-    require!(!ctx.accounts.exchange.paused, KryonError::Paused);
+    require!(!ctx.accounts.exchange.paused, FloyDexError::Paused);
     let now = Clock::get()?.unix_timestamp as u64;
     let view = {
         let m = ctx.accounts.market.load()?;
@@ -71,7 +71,7 @@ pub fn funding_premium(m: &Market, view: &MarketView, now: u64) -> Result<i128> 
     }
     Ok(match view.session {
         MarketSession::Regular | MarketSession::Extended => {
-            let index = view.oracle.ok_or(KryonError::StaleOracle)?.price;
+            let index = view.oracle.ok_or(FloyDexError::StaleOracle)?.price;
             premium_from_mark(ema, index).core()?
         }
         MarketSession::Closed => {

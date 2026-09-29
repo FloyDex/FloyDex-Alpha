@@ -1,7 +1,7 @@
 //! Admin (Squads + time lock), guardian and bootstrap instructions.
 
 use crate::constants::*;
-use crate::error::KryonError;
+use crate::error::FloyDexError;
 use crate::events::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -30,9 +30,9 @@ pub struct InitializeExchange<'info> {
     pub exchange: Account<'info, Exchange>,
     #[account(mut)]
     pub authority: Signer<'info>,
-    #[account(constraint = program.programdata_address()? == Some(program_data.key()) @ KryonError::NotUpgradeAuthority)]
-    pub program: Program<'info, crate::program::KryonPerps>,
-    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ KryonError::NotUpgradeAuthority)]
+    #[account(constraint = program.programdata_address()? == Some(program_data.key()) @ FloyDexError::NotUpgradeAuthority)]
+    pub program: Program<'info, crate::program::FloydexPerps>,
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ FloyDexError::NotUpgradeAuthority)]
     pub program_data: Account<'info, ProgramData>,
     pub system_program: Program<'info, System>,
 }
@@ -44,7 +44,7 @@ pub fn handle_initialize_exchange(
     validate_fees(&args.fee_config)?;
     require!(
         args.max_total_oi_policy_bps <= 1_000_000,
-        KryonError::InvalidConfig
+        FloyDexError::InvalidConfig
     );
     let ex = &mut ctx.accounts.exchange;
     ex.admin = ctx.accounts.authority.key();
@@ -54,6 +54,7 @@ pub fn handle_initialize_exchange(
     ex.calendar_authority = args.calendar_authority;
     ex.paused = false;
     ex.fee_config = args.fee_config;
+    ex.fee_collector = FEE_COLLECTOR;
     ex.insurance = Pubkey::default();
     ex.domain = args.domain;
     ex.max_total_oi_policy_bps = args.max_total_oi_policy_bps;
@@ -70,7 +71,7 @@ pub fn handle_initialize_exchange(
 
 #[derive(Accounts)]
 pub struct AdminOnly<'info> {
-    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ KryonError::Unauthorized)]
+    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ FloyDexError::Unauthorized)]
     pub exchange: Account<'info, Exchange>,
     pub admin: Signer<'info>,
 }
@@ -97,7 +98,7 @@ pub fn handle_accept_admin(ctx: Context<AcceptAdmin>) -> Result<()> {
     let signer = ctx.accounts.pending_admin.key();
     require!(
         ex.pending_admin != Pubkey::default() && ex.pending_admin == signer,
-        KryonError::NotPendingAdmin
+        FloyDexError::NotPendingAdmin
     );
     ex.admin = signer;
     ex.pending_admin = Pubkey::default();
@@ -137,11 +138,11 @@ pub fn handle_set_calendar_authority(ctx: Context<AdminOnly>, authority: Pubkey)
     Ok(())
 }
 
-/// Trading fees are capped at 1% a side as a fat-finger guard.
+/// Trading fees are capped at 1% a side: that is also the production rate.
 fn validate_fees(fee: &FeeConfig) -> Result<()> {
     require!(
-        fee.maker_fee_bps <= 100 && fee.taker_fee_bps <= 100,
-        KryonError::InvalidConfig
+        fee.maker_fee_bps <= PLATFORM_FEE_BPS && fee.taker_fee_bps <= PLATFORM_FEE_BPS,
+        FloyDexError::InvalidConfig
     );
     Ok(())
 }
@@ -152,14 +153,21 @@ pub fn handle_set_fee_config(ctx: Context<AdminOnly>, fee_config: FeeConfig) -> 
     Ok(())
 }
 
+pub fn handle_set_fee_collector(ctx: Context<AdminOnly>, collector: Pubkey) -> Result<()> {
+    require!(collector != Pubkey::default(), FloyDexError::InvalidConfig);
+    ctx.accounts.exchange.fee_collector = collector;
+    emit!(FeeCollectorUpdated { collector });
+    Ok(())
+}
+
 /// KRY-Q11: the ceiling on the sum of every market's `oi_policy_bps`. It may
 /// not drop below the sum already committed.
 pub fn handle_set_max_total_oi_policy_bps(ctx: Context<AdminOnly>, max_total: u32) -> Result<()> {
     let ex = &mut ctx.accounts.exchange;
-    require!(max_total <= 1_000_000, KryonError::InvalidConfig);
+    require!(max_total <= 1_000_000, FloyDexError::InvalidConfig);
     require!(
         max_total >= ex.total_oi_policy_bps,
-        KryonError::AggregateOiPolicyExceeded
+        FloyDexError::AggregateOiPolicyExceeded
     );
     ex.max_total_oi_policy_bps = max_total;
     Ok(())
@@ -178,7 +186,7 @@ pub fn handle_unpause(ctx: Context<AdminOnly>) -> Result<()> {
 /// The guardian can pause; only the admin can unpause.
 #[derive(Accounts)]
 pub struct Pause<'info> {
-    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = guardian @ KryonError::Unauthorized)]
+    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = guardian @ FloyDexError::Unauthorized)]
     pub exchange: Account<'info, Exchange>,
     pub guardian: Signer<'info>,
 }
@@ -249,12 +257,12 @@ pub fn validate_market_params(market_id: u16, p: &MarketParams) -> Result<()> {
         && p.pyth_feed_id != [0; 32]
         && p.funding_imbalance_coeff >= 0
         && p.funding_max_rate_per_hour > 0;
-    require!(ok, KryonError::InvalidConfig);
+    require!(ok, FloyDexError::InvalidConfig);
     // KRY-Q8: a declared leverage cap may be tighter than the margin implies,
     // never looser.
     let implied = protocol_core::implied_max_leverage_bps(p.initial_margin_bps)
-        .map_err(|e| error!(KryonError::from(e)))?;
-    require!(p.max_leverage_bps <= implied, KryonError::InvalidConfig);
+        .map_err(|e| error!(FloyDexError::from(e)))?;
+    require!(p.max_leverage_bps <= implied, FloyDexError::InvalidConfig);
     let s = &p.session_policy;
     let session_ok = s.extended_margin_mult_bps >= 10_000
         && s.closed_margin_mult_bps >= 10_000
@@ -263,14 +271,14 @@ pub fn validate_market_params(market_id: u16, p: &MarketParams) -> Result<()> {
         && s.closed_oi_cap_bps <= 10_000
         && s.close_ramp_secs <= MAX_CLOSE_RAMP_SECS
         && s.close_grace_secs <= MAX_CLOSE_GRACE_SECS;
-    require!(session_ok, KryonError::InvalidConfig);
+    require!(session_ok, FloyDexError::InvalidConfig);
     Ok(())
 }
 
 #[derive(Accounts)]
 #[instruction(market_id: u16)]
 pub struct CreateMarket<'info> {
-    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ KryonError::Unauthorized)]
+    #[account(mut, seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ FloyDexError::Unauthorized)]
     pub exchange: Account<'info, Exchange>,
     #[account(mut)]
     pub admin: Signer<'info>,
@@ -295,10 +303,10 @@ pub fn handle_create_market(
     let total = ex
         .total_oi_policy_bps
         .checked_add(p.oi_policy_bps)
-        .ok_or(KryonError::MathOverflow)?;
+        .ok_or(FloyDexError::MathOverflow)?;
     require!(
         total <= ex.max_total_oi_policy_bps,
-        KryonError::AggregateOiPolicyExceeded
+        FloyDexError::AggregateOiPolicyExceeded
     );
     ex.total_oi_policy_bps = total;
 

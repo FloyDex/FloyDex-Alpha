@@ -13,7 +13,7 @@
 //! 3. the public key bytes are the expected signer's, and the message bytes
 //!    are exactly the order we re-encoded: full length, full content.
 
-use crate::error::KryonError;
+use crate::error::FloyDexError;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::ed25519_program;
 use anchor_lang::solana_program::sysvar::instructions::load_instruction_at_checked;
@@ -63,9 +63,11 @@ impl SignatureOffsets {
 
 fn slice(data: &[u8], offset: u16, len: usize) -> Result<&[u8]> {
     let start = usize::from(offset);
-    let end = start.checked_add(len).ok_or(KryonError::Ed25519Malformed)?;
+    let end = start
+        .checked_add(len)
+        .ok_or(FloyDexError::Ed25519Malformed)?;
     data.get(start..end)
-        .ok_or_else(|| error!(KryonError::Ed25519Malformed))
+        .ok_or_else(|| error!(FloyDexError::Ed25519Malformed))
 }
 
 /// Check signature `r` against `expected_message` and return the public key
@@ -76,31 +78,31 @@ pub fn verified_signer(
     expected_message: &[u8],
 ) -> Result<Pubkey> {
     let ix = load_instruction_at_checked(usize::from(r.ix_index), instructions_sysvar)
-        .map_err(|_| error!(KryonError::Ed25519Malformed))?;
+        .map_err(|_| error!(FloyDexError::Ed25519Malformed))?;
     // Rule 1: the precompile, and nothing else.
     require_keys_eq!(
         ix.program_id,
         ed25519_program::ID,
-        KryonError::Ed25519WrongProgram
+        FloyDexError::Ed25519WrongProgram
     );
     let data = &ix.data;
-    require!(data.len() >= OFFSETS_START, KryonError::Ed25519Malformed);
+    require!(data.len() >= OFFSETS_START, FloyDexError::Ed25519Malformed);
     let count = usize::from(data[0]);
     require!(
         usize::from(r.sig_index) < count,
-        KryonError::Ed25519Malformed
+        FloyDexError::Ed25519Malformed
     );
     let at = OFFSETS_START + usize::from(r.sig_index) * OFFSETS_LEN;
     let o = SignatureOffsets::parse(
         data.get(at..at + OFFSETS_LEN)
-            .ok_or_else(|| error!(KryonError::Ed25519Malformed))?,
+            .ok_or_else(|| error!(FloyDexError::Ed25519Malformed))?,
     );
     // Rule 2: every offset points into this same instruction.
     require!(
         o.signature_instruction_index == THIS_INSTRUCTION
             && o.public_key_instruction_index == THIS_INSTRUCTION
             && o.message_instruction_index == THIS_INSTRUCTION,
-        KryonError::Ed25519OffsetIndex
+        FloyDexError::Ed25519OffsetIndex
     );
     slice(data, o.signature_offset, SIGNATURE_LEN)?;
     let pubkey = slice(data, o.public_key_offset, PUBKEY_LEN)?;
@@ -112,7 +114,7 @@ pub fn verified_signer(
     // Rule 3: the full message, byte for byte (a prefix or a longer message fails).
     require!(
         message == expected_message,
-        KryonError::Ed25519MessageMismatch
+        FloyDexError::Ed25519MessageMismatch
     );
-    Pubkey::try_from(pubkey).map_err(|_| error!(KryonError::Ed25519Malformed))
+    Pubkey::try_from(pubkey).map_err(|_| error!(FloyDexError::Ed25519Malformed))
 }

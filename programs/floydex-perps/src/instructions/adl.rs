@@ -15,7 +15,7 @@
 //! costs it nothing against the mark.
 
 use crate::constants::*;
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use crate::events::{Adl, PositionChanged};
 use crate::health::market_view;
 use crate::mark::observe;
@@ -52,17 +52,17 @@ pub fn handle_adl(
     counterparty_position_id: u64,
 ) -> Result<()> {
     let ex = &ctx.accounts.exchange;
-    require!(!ex.paused, KryonError::Paused);
+    require!(!ex.paused, FloyDexError::Paused);
     require!(
         ex.insurance == ctx.accounts.insurance.key(),
-        KryonError::InsuranceNotInitialized
+        FloyDexError::InsuranceNotInitialized
     );
     let bad_debt = ctx.accounts.insurance.bad_debt;
-    require!(bad_debt > 0, KryonError::NoBadDebtToOffset);
+    require!(bad_debt > 0, FloyDexError::NoBadDebtToOffset);
     require_keys_neq!(
         ctx.accounts.winner_account.key(),
         ctx.accounts.counterparty_account.key(),
-        KryonError::SelfTrade
+        FloyDexError::SelfTrade
     );
     let now = Clock::get()?.unix_timestamp as u64;
     let si = ex.settlement_collateral_index;
@@ -76,7 +76,7 @@ pub fn handle_adl(
     }
     require!(
         view.session != MarketSession::Halted,
-        KryonError::MarketHalted
+        FloyDexError::MarketHalted
     );
     let (mark, mid) = (view.mark, view.market_id);
 
@@ -85,8 +85,8 @@ pub fn handle_adl(
             .positions
             .iter()
             .find(|p| p.in_use != 0 && p.position_id == id)
-            .ok_or(KryonError::PositionNotFound)?;
-        require!(slot.market_id == mid, KryonError::PositionNotFound);
+            .ok_or(FloyDexError::PositionNotFound)?;
+        require!(slot.market_id == mid, FloyDexError::PositionNotFound);
         Ok(slot)
     };
     let w = find(&*ctx.accounts.winner_account.load()?, winner_position_id)?;
@@ -95,7 +95,7 @@ pub fn handle_adl(
         counterparty_position_id,
     )?;
     let w_long = w.is_long != 0;
-    require!(w_long != (c.is_long != 0), KryonError::DirectionMismatch);
+    require!(w_long != (c.is_long != 0), FloyDexError::DirectionMismatch);
 
     // In profit at the mark, per unit.
     let entry = w.entry_price.get();
@@ -105,11 +105,11 @@ pub fn handle_adl(
         checked_sub(entry, mark)
     }
     .core()?;
-    require!(per_unit > 0, KryonError::PositionNotInProfit);
+    require!(per_unit > 0, FloyDexError::PositionNotInProfit);
     // Never close more than the debt needs.
     let needed = mul_div_ceil(bad_debt, PRECISION, per_unit).core()?;
     let size = to_whole_units(needed, w.size.get().min(c.size.get()));
-    require!(size > 0, KryonError::NoBadDebtToOffset);
+    require!(size > 0, FloyDexError::NoBadDebtToOffset);
 
     let (fl, fs) = {
         let m = ctx.accounts.market.load()?;
@@ -143,7 +143,7 @@ pub fn handle_adl(
         .core()?;
         require!(
             long >= 0 && short >= 0 && long == short,
-            KryonError::MathOverflow
+            FloyDexError::MathOverflow
         );
         m.oi_long.set(long);
         m.oi_short.set(short);

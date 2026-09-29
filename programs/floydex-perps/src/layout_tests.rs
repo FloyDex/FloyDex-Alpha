@@ -14,6 +14,8 @@ fn zero_copy_sizes_are_pinned() {
     assert_eq!(size_of::<SessionWindowPod>(), 24);
     assert_eq!(size_of::<UserAccount>(), 1_376);
     assert_eq!(size_of::<Market>(), 824);
+    assert_eq!(size_of::<BookOrder>(), 72);
+    assert_eq!(size_of::<MarketBook>(), 2_320);
     // 05 §1 targets: UserAccount ~2.2 KB, Market ~1.5 KB.
     const _: () = assert!(8 + size_of::<UserAccount>() <= 2_300);
     const _: () = assert!(8 + size_of::<Market>() <= 1_536);

@@ -10,7 +10,7 @@
 //! funding round toward −∞, fees round up, and a VWAP entry rounds up for a
 //! long and down for a short.
 
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use protocol_core::{
@@ -114,7 +114,7 @@ pub fn apply_side(
             let residual = checked_sub(size, close).core()?;
             if residual > 0 {
                 // Stellar: a reduce-only order may not flip the position.
-                require!(!reduce_only, KryonError::InvalidAmount);
+                require!(!reduce_only, FloyDexError::InvalidAmount);
                 open(
                     u,
                     market_id,
@@ -127,7 +127,7 @@ pub fn apply_side(
             }
         }
         Some(i) => {
-            require!(!reduce_only, KryonError::PositionNotFound);
+            require!(!reduce_only, FloyDexError::PositionNotFound);
             let slot = u.positions[i];
             let funding = funding_pnl(&slot, index_for(is_long))?;
             let old_size = slot.size.get();
@@ -155,7 +155,7 @@ pub fn apply_side(
             out.entry_after = new_entry;
         }
         None => {
-            require!(!reduce_only, KryonError::PositionNotFound);
+            require!(!reduce_only, FloyDexError::PositionNotFound);
             open(
                 u,
                 market_id,
@@ -183,9 +183,9 @@ fn open(
         .positions
         .iter()
         .position(|p| p.in_use == 0)
-        .ok_or(KryonError::TooManyPositions)?;
+        .ok_or(FloyDexError::TooManyPositions)?;
     let id = u.next_position_id;
-    u.next_position_id = id.checked_add(1).ok_or(KryonError::MathOverflow)?;
+    u.next_position_id = id.checked_add(1).ok_or(FloyDexError::MathOverflow)?;
     u.positions[i] = PositionSlot {
         position_id: id,
         size: size.into(),
@@ -311,16 +311,16 @@ mod tests {
         let mut u = user();
         assert_eq!(
             apply_side(&mut u, 1, true, true, P, 100 * P, 0, 0).unwrap_err(),
-            error!(KryonError::PositionNotFound)
+            error!(FloyDexError::PositionNotFound)
         );
         apply_side(&mut u, 1, true, false, P, 100 * P, 0, 0).unwrap();
         assert_eq!(
             apply_side(&mut u, 1, true, true, P, 100 * P, 0, 0).unwrap_err(),
-            error!(KryonError::PositionNotFound)
+            error!(FloyDexError::PositionNotFound)
         );
         assert_eq!(
             apply_side(&mut u, 1, false, true, 2 * P, 100 * P, 0, 0).unwrap_err(),
-            error!(KryonError::InvalidAmount)
+            error!(FloyDexError::InvalidAmount)
         );
     }
 
@@ -357,6 +357,11 @@ mod tests {
     fn fees_round_up() {
         assert_eq!(trade_fee(P, 100 * P, 5).unwrap(), P / 20);
         assert_eq!(
+            trade_fee(P, 100 * P, 100).unwrap(),
+            P,
+            "1% of 100 notional is 1"
+        );
+        assert_eq!(
             trade_fee(1, 1, 1).unwrap(),
             1,
             "any non-zero fee is at least 1 wei"
@@ -372,7 +377,7 @@ mod tests {
         }
         assert_eq!(
             apply_side(&mut u, 17, true, false, P, P, 0, 0).unwrap_err(),
-            error!(KryonError::TooManyPositions)
+            error!(FloyDexError::TooManyPositions)
         );
     }
 }

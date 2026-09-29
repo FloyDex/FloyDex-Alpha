@@ -2,7 +2,7 @@
 //! oracle source (admin).
 
 use crate::constants::*;
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use crate::events::MarkPosted;
 use crate::health::{market_view, secs_closed};
 use crate::mark::{fold_mark, observe};
@@ -21,7 +21,7 @@ pub struct SessionWindowArgs {
 
 #[derive(Accounts)]
 pub struct PostSessionCalendar<'info> {
-    #[account(seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = calendar_authority @ KryonError::Unauthorized)]
+    #[account(seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = calendar_authority @ FloyDexError::Unauthorized)]
     pub exchange: Account<'info, Exchange>,
     pub calendar_authority: Signer<'info>,
     #[account(mut, seeds = [MARKET_SEED, &market.load()?.market_id.to_le_bytes()], bump = market.load()?.bump)]
@@ -55,14 +55,14 @@ pub fn handle_post_session_calendar(
                 && w.start > now
                 && w.start >= prev_end
                 && session_from_u8(w.session).is_some(),
-            KryonError::InvalidSessionWindow
+            FloyDexError::InvalidSessionWindow
         );
         prev_end = w.end;
     }
     let keep = usize::from(current.is_some());
     require!(
         keep + windows.len() <= CALENDAR_LEN,
-        KryonError::InvalidSessionWindow
+        FloyDexError::InvalidSessionWindow
     );
 
     let mut next = [SessionWindowPod::default(); CALENDAR_LEN];
@@ -87,7 +87,7 @@ pub fn handle_post_session_calendar(
 #[derive(Accounts)]
 #[instruction(market_id: u16)]
 pub struct SetMarketOracle<'info> {
-    #[account(seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ KryonError::Unauthorized)]
+    #[account(seeds = [EXCHANGE_SEED], bump = exchange.bump, has_one = admin @ FloyDexError::Unauthorized)]
     pub exchange: Account<'info, Exchange>,
     pub admin: Signer<'info>,
     #[account(mut, seeds = [MARKET_SEED, &market_id.to_le_bytes()], bump = market.load()?.bump)]
@@ -106,7 +106,7 @@ pub fn handle_set_market_oracle(
 ) -> Result<()> {
     require!(
         max_oracle_age_secs > 0 && max_oracle_confidence_bps <= 10_000,
-        KryonError::InvalidConfig
+        FloyDexError::InvalidConfig
     );
     let mut m = ctx.accounts.market.load_mut()?;
     m.pyth_shard_id = pyth_shard_id;
@@ -137,12 +137,12 @@ pub fn handle_post_mark(ctx: Context<PostMark>, mid: u64) -> Result<()> {
     let ex = &ctx.accounts.exchange;
     require!(
         ex.is_operator(&ctx.accounts.operator.key()),
-        KryonError::NotOperator
+        FloyDexError::NotOperator
     );
-    require!(!ex.paused, KryonError::Paused);
+    require!(!ex.paused, FloyDexError::Paused);
     let now = Clock::get()?.unix_timestamp as u64;
     let mid = wire_to_precision(mid).core()?;
-    require!(mid > 0, KryonError::InvalidPrice);
+    require!(mid > 0, FloyDexError::InvalidPrice);
     let view = {
         let m = ctx.accounts.market.load()?;
         market_view(&m, &ctx.accounts.price_update, now)?
@@ -152,7 +152,7 @@ pub fn handle_post_mark(ctx: Context<PostMark>, mid: u64) -> Result<()> {
     require!(
         m.last_mark_post == 0
             || now >= m.last_mark_post.saturating_add(POST_MARK_MIN_INTERVAL_SECS),
-        KryonError::PostMarkTooSoon
+        FloyDexError::PostMarkTooSoon
     );
     let clamped = match view.session {
         MarketSession::Closed => {
@@ -165,7 +165,7 @@ pub fn handle_post_mark(ctx: Context<PostMark>, mid: u64) -> Result<()> {
             let hi = checked_add(view.mark, band).core()?;
             mid.clamp(lo, hi)
         }
-        MarketSession::Halted => return err!(KryonError::MarketHalted),
+        MarketSession::Halted => return err!(FloyDexError::MarketHalted),
     };
     fold_mark(&mut m, clamped, now)?;
     m.last_mark_post = now;

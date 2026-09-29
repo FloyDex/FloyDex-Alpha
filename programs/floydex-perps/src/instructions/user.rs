@@ -2,7 +2,7 @@
 //! Withdrawals always need the owner; a session key can never move funds.
 
 use crate::constants::*;
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use crate::events::{Deposit as DepositEvent, Withdraw as WithdrawEvent};
 use crate::health::{has_risk, load_risk_inputs, validate_withdrawal};
 use crate::state::*;
@@ -46,7 +46,7 @@ pub struct MoveCollateral<'info> {
         mut,
         seeds = [USER_SEED, owner.key().as_ref(), &[user_account.load()?.sub_id]],
         bump = user_account.load()?.bump,
-        constraint = user_account.load()?.owner == owner.key() @ KryonError::Unauthorized,
+        constraint = user_account.load()?.owner == owner.key() @ FloyDexError::Unauthorized,
     )]
     pub user_account: AccountLoader<'info, UserAccount>,
     #[account(
@@ -71,19 +71,22 @@ pub struct MoveCollateral<'info> {
 fn to_precision(c: &Collateral, amount: u64) -> Result<i128> {
     i128::from(amount)
         .checked_mul(c.scale())
-        .ok_or_else(|| error!(KryonError::MathOverflow))
+        .ok_or_else(|| error!(FloyDexError::MathOverflow))
 }
 
 pub fn handle_deposit(ctx: Context<MoveCollateral>, amount: u64) -> Result<()> {
-    require!(!ctx.accounts.exchange.paused, KryonError::Paused);
-    require!(amount > 0, KryonError::InvalidAmount);
+    require!(!ctx.accounts.exchange.paused, FloyDexError::Paused);
+    require!(amount > 0, FloyDexError::InvalidAmount);
     let c = &ctx.accounts.collateral;
-    require!(c.active, KryonError::AssetDisabled);
+    require!(c.active, FloyDexError::AssetDisabled);
     let next_total = c
         .total_deposited
         .checked_add(amount)
-        .ok_or(KryonError::MathOverflow)?;
-    require!(next_total <= c.deposit_cap, KryonError::DepositCapExceeded);
+        .ok_or(FloyDexError::MathOverflow)?;
+    require!(
+        next_total <= c.deposit_cap,
+        FloyDexError::DepositCapExceeded
+    );
     let credit = to_precision(c, amount)?;
 
     let before = ctx.accounts.vault.amount;
@@ -108,8 +111,8 @@ pub fn handle_deposit(ctx: Context<MoveCollateral>, amount: u64) -> Result<()> {
         .vault
         .amount
         .checked_sub(before)
-        .ok_or(KryonError::MathOverflow)?;
-    require!(received == amount, KryonError::TransferAmountMismatch);
+        .ok_or(FloyDexError::MathOverflow)?;
+    require!(received == amount, FloyDexError::TransferAmountMismatch);
 
     ctx.accounts.collateral.total_deposited = next_total;
     let index = ctx.accounts.collateral.index;
@@ -131,9 +134,9 @@ pub fn handle_withdraw<'info>(
     ctx: Context<'_, '_, 'info, 'info, MoveCollateral<'info>>,
     amount: u64,
 ) -> Result<()> {
-    require!(amount > 0, KryonError::InvalidAmount);
+    require!(amount > 0, FloyDexError::InvalidAmount);
     let c = &ctx.accounts.collateral;
-    require!(c.active, KryonError::AssetDisabled);
+    require!(c.active, FloyDexError::AssetDisabled);
     let debit = to_precision(c, amount)?;
     let index = c.index;
     let now = Clock::get()?.unix_timestamp as u64;
@@ -143,11 +146,11 @@ pub fn handle_withdraw<'info>(
         let u = ctx.accounts.user_account.load()?;
         require!(
             u.balance(index) >= debit,
-            KryonError::InsufficientCollateral
+            FloyDexError::InsufficientCollateral
         );
         if has_risk(&u) {
             // Paused: only idle collateral may leave (05 §7.6, decided 2026-09-26).
-            require!(!ex.paused, KryonError::Paused);
+            require!(!ex.paused, FloyDexError::Paused);
             let mut accs: &'info [AccountInfo<'info>] = ctx.remaining_accounts;
             let risk = load_risk_inputs(
                 &u,
@@ -157,10 +160,10 @@ pub fn handle_withdraw<'info>(
                 now,
                 false,
             )?;
-            require!(accs.is_empty(), KryonError::InvalidRemainingAccounts);
+            require!(accs.is_empty(), FloyDexError::InvalidRemainingAccounts);
             let price = risk
                 .price_of(index)
-                .ok_or(KryonError::InvalidRemainingAccounts)?;
+                .ok_or(FloyDexError::InvalidRemainingAccounts)?;
             // Round the withdrawn value up: rounding must never free margin.
             let value = mul_div_ceil(debit, price, PRECISION).core()?;
             validate_withdrawal(&u, &risk, &risk.markets, value)?;

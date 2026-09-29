@@ -14,7 +14,7 @@
 
 use crate::constants::*;
 use crate::ed25519::{verified_signer, SigRef};
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use crate::events::{FillSettled, PositionChanged};
 use crate::health::{health, load_risk_inputs, market_view, MarketView};
 use crate::mark::{fold_mark, observe};
@@ -100,10 +100,10 @@ pub fn handle_settle_fills<'info>(
     let ex = &ctx.accounts.exchange;
     require!(
         ex.is_operator(&ctx.accounts.operator.key()),
-        KryonError::NotOperator
+        FloyDexError::NotOperator
     );
-    require!(!ex.paused, KryonError::Paused);
-    require!(!fills.is_empty(), KryonError::InvalidAmount);
+    require!(!ex.paused, FloyDexError::Paused);
+    require!(!fills.is_empty(), FloyDexError::InvalidAmount);
     let now = Clock::get()?.unix_timestamp as u64;
 
     // The market view (session, mark, oracle) once per instruction.
@@ -126,7 +126,7 @@ pub fn handle_settle_fills<'info>(
         emit_cpi!(maker_change);
         emit_cpi!(taker_change);
     }
-    require!(accs.is_empty(), KryonError::InvalidRemainingAccounts);
+    require!(accs.is_empty(), FloyDexError::InvalidRemainingAccounts);
     let c = &mut ctx.accounts.settlement_collateral;
     c.fees_accrued = checked_add(c.fees_accrued, fees).core()?;
     Ok(())
@@ -135,7 +135,7 @@ pub fn handle_settle_fills<'info>(
 fn next<'info>(accs: &mut &'info [AccountInfo<'info>]) -> Result<&'info AccountInfo<'info>> {
     let (head, tail) = accs
         .split_first()
-        .ok_or(KryonError::InvalidRemainingAccounts)?;
+        .ok_or(FloyDexError::InvalidRemainingAccounts)?;
     *accs = tail;
     Ok(head)
 }
@@ -178,7 +178,7 @@ fn read_record(
     require_keys_eq!(
         record.key(),
         order_record_address(owner, sub_id, nonce).0,
-        KryonError::InvalidRemainingAccounts
+        FloyDexError::InvalidRemainingAccounts
     );
     if record.owner == &system_program::ID {
         return Ok((0, false));
@@ -186,7 +186,7 @@ fn read_record(
     require_keys_eq!(
         *record.owner,
         crate::ID,
-        KryonError::InvalidRemainingAccounts
+        FloyDexError::InvalidRemainingAccounts
     );
     let r = OrderRecord::try_deserialize(&mut &record.try_borrow_data()?[..])?;
     Ok((r.filled, r.is_cancelled()))
@@ -205,13 +205,13 @@ fn settle_one<'info>(
     let maker_record = next(accs)?;
     let taker_record = next(accs)?;
     let maker_loader: AccountLoader<'info, UserAccount> = AccountLoader::try_from(maker_ai)
-        .map_err(|_| error!(KryonError::InvalidRemainingAccounts))?;
+        .map_err(|_| error!(FloyDexError::InvalidRemainingAccounts))?;
     let taker_loader: AccountLoader<'info, UserAccount> = AccountLoader::try_from(taker_ai)
-        .map_err(|_| error!(KryonError::InvalidRemainingAccounts))?;
-    require_keys_neq!(maker_ai.key(), taker_ai.key(), KryonError::SelfTrade);
+        .map_err(|_| error!(FloyDexError::InvalidRemainingAccounts))?;
+    require_keys_neq!(maker_ai.key(), taker_ai.key(), FloyDexError::SelfTrade);
     require!(
         maker_ai.is_writable && taker_ai.is_writable,
-        KryonError::InvalidRemainingAccounts
+        FloyDexError::InvalidRemainingAccounts
     );
 
     // --- 2. signatures: the signer must be the owner or a live delegate ---
@@ -225,7 +225,7 @@ fn settle_one<'info>(
         let u = s.user.load()?;
         require!(
             u.can_sign_orders(&signer, now as i64),
-            KryonError::Ed25519PubkeyMismatch
+            FloyDexError::Ed25519PubkeyMismatch
         );
     }
 
@@ -233,17 +233,17 @@ fn settle_one<'info>(
     let (maker, taker) = (&sides[0].order, &sides[1].order);
     let fill_size = wire_to_precision(fill.fill_size).core()?;
     let fill_price = wire_to_precision(fill.fill_price).core()?;
-    require!(fill_size > 0 && fill_price > 0, KryonError::InvalidAmount);
-    require_keys_neq!(sides[0].owner, sides[1].owner, KryonError::SelfTrade);
+    require!(fill_size > 0 && fill_price > 0, FloyDexError::InvalidAmount);
+    require_keys_neq!(sides[0].owner, sides[1].owner, FloyDexError::SelfTrade);
     require!(
         maker.market_id != 0
             && maker.market_id == taker.market_id
             && maker.market_id == view.market_id,
-        KryonError::InvalidConfig
+        FloyDexError::InvalidConfig
     );
     let maker_long = maker.flags & FLAG_IS_LONG != 0;
     let taker_long = taker.flags & FLAG_IS_LONG != 0;
-    require!(maker_long != taker_long, KryonError::DirectionMismatch);
+    require!(maker_long != taker_long, FloyDexError::DirectionMismatch);
     for s in sides.iter_mut() {
         validate_order(s, fill_size, fill_price, now)?;
     }
@@ -257,7 +257,7 @@ fn settle_one<'info>(
     let upper = checked_add(view.mark, max_delta).core()?;
     require!(
         fill_price >= lower && fill_price <= upper,
-        KryonError::PriceOutsideBand
+        FloyDexError::PriceOutsideBand
     );
 
     // --- risk inputs for each side's *other* markets, before any mutation ---
@@ -339,7 +339,7 @@ fn settle_one<'info>(
         }
         require!(
             long >= 0 && short >= 0 && long == short,
-            KryonError::MathOverflow
+            FloyDexError::MathOverflow
         );
         m.oi_long.set(long);
         m.oi_short.set(short);
@@ -354,9 +354,9 @@ fn settle_one<'info>(
             .core()?;
             if !allowed {
                 return Err(if view.session == MarketSession::Halted {
-                    error!(KryonError::SessionExposureBlocked)
+                    error!(FloyDexError::SessionExposureBlocked)
                 } else {
-                    error!(KryonError::OpenInterestExceeded)
+                    error!(FloyDexError::OpenInterestExceeded)
                 });
             }
             // Stellar `require_insurance_headroom` (KRY-Q4/Q11): new exposure
@@ -367,7 +367,7 @@ fn settle_one<'info>(
                     .accounts
                     .insurance
                     .as_ref()
-                    .ok_or(KryonError::InsuranceNotInitialized)?;
+                    .ok_or(FloyDexError::InsuranceNotInitialized)?;
                 let backing = checked_sub(ins.fund, ins.bad_debt).core()?.max(0);
                 let cap = mul_div(backing, i128::from(m.oi_policy_bps), BPS_DENOMINATOR).core()?;
                 let oi_notional = if long > 0 {
@@ -375,7 +375,7 @@ fn settle_one<'info>(
                 } else {
                     0
                 };
-                require!(oi_notional <= cap, KryonError::InsuranceFundInsufficient);
+                require!(oi_notional <= cap, FloyDexError::InsuranceFundInsufficient);
             }
         }
     }
@@ -403,7 +403,7 @@ fn settle_one<'info>(
         let reduce_ok = !outcomes[k].increased && h.free_collateral >= before[k].free_collateral;
         require!(
             meets_initial || reduce_ok,
-            KryonError::InsufficientCollateral
+            FloyDexError::InsufficientCollateral
         );
         if !meets_initial && before[k].liquidatable {
             // The side sold if it is short the fill, bought if long.
@@ -413,7 +413,7 @@ fn settle_one<'info>(
             } else {
                 fill_price <= view.mark
             };
-            require!(at_or_better, KryonError::LiquidatableReduceOffMark);
+            require!(at_or_better, FloyDexError::LiquidatableReduceOffMark);
         }
     }
 
@@ -455,7 +455,7 @@ fn side<'a, 'info>(
 ) -> Result<Side<'a, 'info>> {
     require!(
         order.flags & !FLAGS_KNOWN == 0,
-        KryonError::InvalidOrderFlags
+        FloyDexError::InvalidOrderFlags
     );
     let (owner, sub_id) = {
         let u = user.load()?;
@@ -476,24 +476,24 @@ fn validate_order(s: &mut Side, fill_size: i128, fill_price: i128, now: u64) -> 
     let o = &s.order;
     let size = wire_to_precision(o.size).core()?;
     let limit = wire_to_precision(o.limit_price).core()?;
-    require!(size > 0 && limit > 0, KryonError::InvalidAmount);
+    require!(size > 0 && limit > 0, FloyDexError::InvalidAmount);
     // now <= expiry_ts <= now + 7d
-    require!(now <= o.expiry_ts, KryonError::OrderExpired);
+    require!(now <= o.expiry_ts, FloyDexError::OrderExpired);
     require!(
         o.expiry_ts <= now.saturating_add(MAX_ORDER_TTL_SECS),
-        KryonError::OrderExpired
+        FloyDexError::OrderExpired
     );
     // Not tombstoned, and not under the cancel-all watermark.
     let (filled, cancelled) = read_record(s.record, &s.owner, s.sub_id, o.nonce)?;
-    require!(!cancelled, KryonError::OrderCancelled);
+    require!(!cancelled, FloyDexError::OrderCancelled);
     require!(
         o.nonce >= s.user.load()?.cancel_all_below_nonce,
-        KryonError::OrderCancelled
+        FloyDexError::OrderCancelled
     );
     // filled + fill_size <= size
     require!(
         checked_add(filled, fill_size).core()? <= size,
-        KryonError::OrderOverfilled
+        FloyDexError::OrderOverfilled
     );
     // Limit price: a long never pays more, a short never receives less.
     let long = o.flags & FLAG_IS_LONG != 0;
@@ -503,7 +503,7 @@ fn validate_order(s: &mut Side, fill_size: i128, fill_price: i128, now: u64) -> 
         } else {
             fill_price >= limit
         },
-        KryonError::PriceOutsideBand
+        FloyDexError::PriceOutsideBand
     );
     s.filled_before = filled;
     Ok(())
@@ -517,7 +517,7 @@ fn upsert_record<'info>(
     filled: i128,
 ) -> Result<()> {
     let record = s.record;
-    require!(record.is_writable, KryonError::InvalidRemainingAccounts);
+    require!(record.is_writable, FloyDexError::InvalidRemainingAccounts);
     if record.owner == &system_program::ID {
         let (_, bump) = order_record_address(&s.owner, s.sub_id, s.order.nonce);
         let space = 8 + OrderRecord::INIT_SPACE;

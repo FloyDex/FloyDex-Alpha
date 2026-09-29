@@ -12,7 +12,7 @@
 //!    Token-2022 scaled-UI multiplier (splits and dividends, `06` §7): a
 //!    raw token is worth `multiplier × price`.
 
-use crate::error::{CoreResultExt, KryonError};
+use crate::error::{CoreResultExt, FloyDexError};
 use crate::oracle::read_pyth;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -68,7 +68,7 @@ impl MarketView {
 /// - Halted: mark = last valid oracle price; reduce-only is enforced by the
 ///   caller through `may_increase_exposure`.
 pub fn market_view(m: &Market, price_ai: &AccountInfo, now: u64) -> Result<MarketView> {
-    require!(m.active != 0, KryonError::AssetDisabled);
+    require!(m.active != 0, FloyDexError::AssetDisabled);
     let raw = read_pyth(price_ai, &m.pyth_feed_id, m.pyth_shard_id)?;
     let mut windows = [SessionWindow {
         start: 0,
@@ -90,7 +90,7 @@ pub fn market_view(m: &Market, price_ai: &AccountInfo, now: u64) -> Result<Marke
         }
         MarketSession::Closed => {
             let last = m.last_oracle_price.get();
-            require!(last > 0, KryonError::StaleOracle);
+            require!(last > 0, FloyDexError::StaleOracle);
             let ema = m.mark_ema.get();
             let book = if ema > 0 { ema } else { last };
             (
@@ -100,7 +100,7 @@ pub fn market_view(m: &Market, price_ai: &AccountInfo, now: u64) -> Result<Marke
         }
         MarketSession::Halted => {
             let last = m.last_oracle_price.get();
-            require!(last > 0, KryonError::StaleOracle);
+            require!(last > 0, FloyDexError::StaleOracle);
             (last, None)
         }
     };
@@ -165,7 +165,7 @@ fn take<'info>(
     accs: &mut &'info [AccountInfo<'info>],
     n: usize,
 ) -> Result<&'info [AccountInfo<'info>]> {
-    require!(accs.len() >= n, KryonError::InvalidRemainingAccounts);
+    require!(accs.len() >= n, FloyDexError::InvalidRemainingAccounts);
     let (head, tail) = accs.split_at(n);
     *accs = tail;
     Ok(head)
@@ -193,9 +193,9 @@ pub fn load_risk_inputs<'info>(
         }
         let pair = take(accs, 2)?;
         let loader = AccountLoader::<Market>::try_from(&pair[0])
-            .map_err(|_| error!(KryonError::InvalidRemainingAccounts))?;
+            .map_err(|_| error!(FloyDexError::InvalidRemainingAccounts))?;
         let m = loader.load()?;
-        require!(m.market_id == id, KryonError::InvalidRemainingAccounts);
+        require!(m.market_id == id, FloyDexError::InvalidRemainingAccounts);
         let view = market_view(&m, &pair[1], now)?;
         markets.push(if for_liquidation {
             view.liquidation_snapshot(user.last_increase_ts)
@@ -218,18 +218,18 @@ pub fn load_risk_inputs<'info>(
         require_keys_eq!(
             *triple[0].owner,
             crate::ID,
-            KryonError::InvalidRemainingAccounts
+            FloyDexError::InvalidRemainingAccounts
         );
         let c = Collateral::try_deserialize(&mut &triple[0].try_borrow_data()?[..])
-            .map_err(|_| error!(KryonError::InvalidRemainingAccounts))?;
+            .map_err(|_| error!(FloyDexError::InvalidRemainingAccounts))?;
         require!(
             c.index == b.collateral_index,
-            KryonError::InvalidRemainingAccounts
+            FloyDexError::InvalidRemainingAccounts
         );
         require_keys_eq!(
             triple[2].key(),
             c.mint,
-            KryonError::InvalidRemainingAccounts
+            FloyDexError::InvalidRemainingAccounts
         );
         prices.push(collateral_price(&c, &triple[1], &triple[2], now)?);
     }
@@ -265,7 +265,7 @@ pub fn collateral_price(
             snap.validate(now, &closed).core()?;
             core::cmp::min(c.haircut_bps.saturating_add(c.closed_haircut_bps), 10_000)
         }
-        Err(e) => return Err(error!(KryonError::from(e))),
+        Err(e) => return Err(error!(FloyDexError::from(e))),
     };
     let multiplier = crate::token_ext::ui_multiplier(mint_ai, now as i64)?;
     Ok(CollateralPrice {
@@ -297,7 +297,7 @@ fn snapshot_parts(
             .prices
             .iter()
             .find(|p| p.index == b.collateral_index)
-            .ok_or(KryonError::InvalidRemainingAccounts)?;
+            .ok_or(FloyDexError::InvalidRemainingAccounts)?;
         // Value rounds toward −∞, so assets and debts are both counted conservatively.
         let value = mul_div_floor(amount, p.price, PRECISION).core()?;
         collateral.push(CollateralBalance {

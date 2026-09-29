@@ -34,6 +34,18 @@ pub struct PauseChanged {
 }
 
 #[event]
+pub struct FeeCollectorUpdated {
+    pub collector: Pubkey,
+}
+
+#[event]
+pub struct FeesCollected {
+    pub mint: Pubkey,
+    pub collector: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
 pub struct MarketCreated {
     pub market_id: u16,
     pub pyth_feed_id: [u8; 32],
@@ -76,6 +88,35 @@ pub struct OrderCancelled {
     pub sub_id: u8,
     pub nonce: u64,
     pub below_nonce: u64,
+}
+
+#[event]
+pub struct BookPosted {
+    pub market_id: u16,
+    pub owner: Pubkey,
+    pub nonce: u64,
+    pub price: u64,
+    pub size: u64,
+    pub is_long: bool,
+}
+
+#[event]
+pub struct BookCancelled {
+    pub market_id: u16,
+    pub owner: Pubkey,
+    pub nonce: u64,
+}
+
+#[event]
+pub struct BookMatched {
+    pub market_id: u16,
+    pub maker: Pubkey,
+    pub taker: Pubkey,
+    pub maker_nonce: u64,
+    pub taker_nonce: u64,
+    pub price: u64,
+    pub size: u64,
+    pub taker_is_long: bool,
 }
 
 #[event]

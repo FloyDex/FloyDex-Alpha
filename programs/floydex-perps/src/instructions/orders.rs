@@ -2,7 +2,7 @@
 //! of records that can never matter again.
 
 use crate::constants::*;
-use crate::error::KryonError;
+use crate::error::FloyDexError;
 use crate::events::OrderCancelled;
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -102,7 +102,7 @@ pub fn handle_reclaim_order_state(
     let now = Clock::get()?.unix_timestamp as u64;
     require!(
         now > ctx.accounts.order_record.reclaimable_at(),
-        KryonError::NotReclaimable
+        FloyDexError::NotReclaimable
     );
     Ok(())
 }
