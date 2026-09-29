@@ -1,4 +1,4 @@
-# @kryon/db
+# @floydex/db
 
 Prisma schema and generated client for the off-chain stack (matcher, indexer,
 keepers, settlement queue, leaderboard/portfolio projections). Ported from
@@ -9,7 +9,7 @@ keepers, settlement queue, leaderboard/portfolio projections). Ported from
 
 ```bash
 docker compose up -d          # postgres:16 on localhost:5433
-export DATABASE_URL=postgresql://kryon:kryon@localhost:5433/kryon
+export DATABASE_URL=postgresql://floydex:floydex@localhost:5433/floydex
 export DIRECT_URL=$DATABASE_URL
 yarn db:generate
 yarn db:migrate:dev           # first run: creates the schema

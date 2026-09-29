@@ -1,8 +1,8 @@
 # Local Postgres for the off-chain stack. Not for production — see the
 # services-vm memory / ops docs for the real box. Run:
 #   docker compose up -d
-#   DATABASE_URL=postgresql://kryon:kryon@localhost:5433/kryon \
-#   DIRECT_URL=postgresql://kryon:kryon@localhost:5433/kryon \
+#   DATABASE_URL=postgresql://floydex:floydex@localhost:5433/floydex \
+#   DIRECT_URL=postgresql://floydex:floydex@localhost:5433/floydex \
 #   yarn db:migrate:dev
 #
 # DIRECT_URL is schema.prisma's non-pooled connection for migrations; there's
@@ -12,20 +12,20 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: kryon
-      POSTGRES_PASSWORD: kryon
-      POSTGRES_DB: kryon
+      POSTGRES_USER: floydex
+      POSTGRES_PASSWORD: floydex
+      POSTGRES_DB: floydex
     ports:
       # Non-default host port so this never collides with a Postgres already
-      # running on the machine (e.g. for another Kryon repo).
+      # running on the machine (e.g. for another FloyDex repo).
       - "5433:5432"
     volumes:
-      - kryon-sol-postgres:/var/lib/postgresql/data
+      - floydex-postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kryon"]
+      test: ["CMD-SHELL", "pg_isready -U floydex"]
       interval: 2s
       timeout: 2s
       retries: 20
 
 volumes:
-  kryon-sol-postgres:
+  floydex-postgres:

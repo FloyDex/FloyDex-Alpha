@@ -1,4 +1,4 @@
-// Prisma persistence layer for the Kryon-sol off-chain stack: matcher,
+// Prisma persistence layer for the FloyDex off-chain stack: matcher,
 // indexer, keepers, the settlement queue, and the audit/leaderboard/portfolio
 // projections. Ported from `reference/stellar/offchain/prisma/schema.prisma`
 // (see `docs/prd/04-migration-map.md` §2 and `docs/prd/11-lessons-from-stellar.md`
@@ -289,7 +289,7 @@ model TxJob {
   payloadHash   String
   /// Structured job data the submitter needs to build the transaction, e.g.
   /// for kind="settle_fill": marketId, the maker/taker OrderArgs, their
-  /// signatures/signerPubkeys, fillSize, fillPrice (`programs/kryon-perps/
+  /// signatures/signerPubkeys, fillSize, fillPrice (`programs/floydex-perps/
   /// src/instructions/settle.rs`'s `FillArgs`). Kept separate from
   /// `unsignedTx` because the submitter rebuilds the transaction fresh each
   /// attempt (new blockhash, current priority fee), rather than resubmitting
@@ -346,7 +346,7 @@ model KeeperAction {
 model DeploymentArtifact {
   id           String   @id
   network      String
-  /// Always "kryon_perps" today (`03` A1: one Anchor program, not several
+  /// Always "floydex_perps" today (`03` A1: one Anchor program, not several
   /// contracts), kept as a string in case that ever changes.
   contractName String
   programId    String
