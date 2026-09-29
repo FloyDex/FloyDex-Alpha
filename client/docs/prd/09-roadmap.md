@@ -159,8 +159,8 @@ Start: **Mon 2026-09-28**. Assumes 1–2 core developers. Dates are targets;
 ## Phase 8 — Growth (Mar–Jun 2027)
 - [ ] Portfolio margin + Basis Vault (D1)
 - [ ] Commodities/FX markets; Pyth Pro extended hours (if the budget allows)
-- [ ] Pre-listing markets (D5); FloyDex-token pre-market only after ticker is announced
-- [ ] TGE, once the `08` §A1 gates are met
+- [ ] Pre-listing markets (D5); $FLOYDEX mint already live — see `08`
+- [ ] $FLOYDEX desk utility (fee tiers / backstop stake), once the `08` §A1 gates are met
 
 ## Budget sketch (first 6 months, USD, estimates)
 

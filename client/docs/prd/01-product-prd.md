@@ -72,7 +72,7 @@ Numbers are as of Sept 2026. Links are in `../sources.md`.
 - **Pre-listing markets** for IPOs and upcoming token launches. The book sets
   the price, OI caps are hard, and the market converts to oracle pricing once
   the asset lists.
-- Protocol token (ticker TBD) and governance (see `08`).
+- Protocol token **$FLOYDEX** (mint live; utility after gates — see `08`).
 
 ### Not doing (explicitly)
 - No spot trading venue. Spot routing goes through Jupiter and Raydium.

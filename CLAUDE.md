@@ -4,6 +4,10 @@
 **Website:** https://floydex.com
 **Telegram:** https://t.me/floydex_com
 **X:** https://x.com/floydex_com
+**$FLOYDEX mint:** `2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy`
+**ClawPump:** https://clawpump.tech/tokens/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy
+**DexScreener:** https://dexscreener.com/solana/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy
+**Padre:** https://trade.padre.gg/trade/solana/7mmwd8DHp9S6mnkBUSFruynA5A3pUqp17Ka5KqxKdtCC
 
 Solana-native tokenized-stock perps. Hybrid CLOB: off-chain matching, on-chain
 settlement of user-signed intents, one Anchor program.

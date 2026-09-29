@@ -77,7 +77,7 @@ supports hundreds of fills per second across markets.
   IPO exists. The book sets the price, OI caps are hard, and the market
   converts to the Pyth price at listing.
 - **Pre-launch token perps:** the same machinery works for upcoming Solana
-  token launches, including a FloyDex token once a ticker is announced (see `08`).
+  token launches, including **$FLOYDEX** (mint live — see `08`).
 - **Earnings weeks:** the session calendar can mark earnings windows with a
   higher margin multiplier (a small extension of `SessionWindow`).
 

@@ -2,7 +2,7 @@
 
 Next.js frontend for [FloyDex](https://floydex.com)
 ([FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha)):
-Solana-native tokenized-stock perps. Telegram: [t.me/floydex_com](https://t.me/floydex_com) · X: [@floydex_com](https://x.com/floydex_com).
+Solana-native tokenized-stock perps. Telegram: [t.me/floydex_com](https://t.me/floydex_com) · X: [@floydex_com](https://x.com/floydex_com) · [$FLOYDEX](https://dexscreener.com/solana/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy) (`2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy`).
 
 ## Setup
 

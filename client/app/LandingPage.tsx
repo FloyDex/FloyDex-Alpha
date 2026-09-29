@@ -9,12 +9,14 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { ACTIVE_MARKET_SYMBOLS, DEFAULT_MARKET_SYMBOL } from '@/config';
+import { FLOYDEX_TOKEN } from '@/config/token';
 import { useNetwork } from '@/features/network/NetworkContext';
 import { STAKE_PUBLIC } from '@/lib/market/stake';
 
 const GITHUB_REPO = 'https://github.com/FloyDex/FloyDex-Alpha';
 const TELEGRAM = 'https://t.me/floydex_com';
 const X_HANDLE = 'https://x.com/floydex_com';
+const TOKEN_PAGE = FLOYDEX_TOKEN.dexscreener;
 
 const LANDING_NAV = [
   { to: `/trade/${DEFAULT_MARKET_SYMBOL}`, label: 'Trade' },
@@ -451,6 +453,16 @@ export function LandingPage() {
             >
               <XLogoIcon />
             </a>
+            <a
+              href={TOKEN_PAGE}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="$FLOYDEX"
+              title="$FLOYDEX"
+              className="s5-nav-social text-[12px] font-semibold tracking-wide text-[#14F195]"
+            >
+              $FLOYDEX
+            </a>
             <button className="s5-menu-pill" onClick={() => setMenuOpen(m => !m)}>
               <svg viewBox="0 0 20 10" fill="none" width="20" height="10" aria-hidden="true">
                 <line x1="0" y1="1.5" x2="20" y2="1.5" stroke="currentColor" strokeWidth="1.5" />
@@ -740,6 +752,16 @@ export function LandingPage() {
                     </a>
                     <a href={X_HANDLE} target="_blank" rel="noopener noreferrer" aria-label="X" title="X">
                       <XLogoIcon size={20} />
+                    </a>
+                    <a
+                      href={TOKEN_PAGE}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="$FLOYDEX"
+                      title="$FLOYDEX"
+                      className="text-[13px] font-semibold tracking-wide text-[#14F195]"
+                    >
+                      $FLOYDEX
                     </a>
                   </li>
                 </ul>

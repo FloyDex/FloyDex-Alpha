@@ -8,10 +8,13 @@
 [![Live](https://img.shields.io/badge/live-floydex.com-14F195)](https://floydex.com)
 [![Telegram](https://img.shields.io/badge/telegram-floydex__com-26A5E4?logo=telegram)](https://t.me/floydex_com)
 [![X](https://img.shields.io/badge/X-floydex__com-000000?logo=x)](https://x.com/floydex_com)
+[![$FLOYDEX](https://img.shields.io/badge/%24FLOYDEX-DexScreener-14F195)](https://dexscreener.com/solana/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy)
 
 **Website:** [floydex.com](https://floydex.com)  
 **Telegram:** [t.me/floydex_com](https://t.me/floydex_com)  
 **X:** [@floydex_com](https://x.com/floydex_com)  
+**$FLOYDEX:** [ClawPump](https://clawpump.tech/tokens/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy) · [DexScreener](https://dexscreener.com/solana/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy) · [Padre](https://trade.padre.gg/trade/solana/7mmwd8DHp9S6mnkBUSFruynA5A3pUqp17Ka5KqxKdtCC)  
+**CA:** `2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy`  
 **Repo:** [github.com/FloyDex/FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha)
 
 FloyDex is a Solana-native **hybrid CLOB** for tokenized-stock and crypto
@@ -211,8 +214,8 @@ See also `docs/prd/01-product-prd.md` §3.
 - **Tokenized equity holders** — post xStocks as margin; basis / funding products later.
 - **Market makers** — API + SDK, maker-friendly fee path, no per-order gas.
 - **Operators / admins** — desk overview, trader table, bans, payout queue.
-- **Agent platforms** — ClawPump skill for portfolio / market intelligence / perps
-  (tokenize only when the operator explicitly says so).
+- **Agent platforms** — ClawPump skill for portfolio / market intelligence / perps;
+  **$FLOYDEX** mint is live (share CA / trade links — do not re-launch).
 
 ---
 
@@ -261,16 +264,21 @@ Public keys only. **Never commit** private keys, wallet JSON, or `.env`.
 | **Treasury / operator** | `41jft3o6Q7HBFw1UPJqh2jsLDz12zaRa6WuRFG9iJDhj` | `NEXT_PUBLIC_TREASURY` / deposit destination & withdraw source for the venue ledger |
 | **Program** | `2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB` | `floydex-perps` (also used on the documented devnet gate) |
 | **USDC mint (mainnet)** | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | Settlement asset |
+| **$FLOYDEX mint** | `2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy` | Protocol token (pump.fun / ClawPump, Sep 2026) |
+| **$FLOYDEX/SOL pair** | `7mmwd8DHp9S6mnkBUSFruynA5A3pUqp17Ka5KqxKdtCC` | Padre / Raydium-style pool id |
 
 **Fee:** `PLATFORM_FEE_BPS = 100` → **1.00%** of notional per fill (charged in the
 venue ledger and sent on-chain to the fee collector when the pending batch
 clears).
 
-Explorer links (mainnet):
+Explorer / trade links (mainnet):
 
 - [Fee collector](https://explorer.solana.com/address/HPXzdeaarrnLL8PKGi11PT2BBd8HY5yty7WwDBZavCbn)
 - [Treasury](https://explorer.solana.com/address/41jft3o6Q7HBFw1UPJqh2jsLDz12zaRa6WuRFG9iJDhj)
 - [Program](https://explorer.solana.com/address/2vgBHV763RtsBZGNpnuvbkGDKJdtt1DxP9tUDo4NZxUB)
+- [$FLOYDEX on ClawPump](https://clawpump.tech/tokens/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy)
+- [$FLOYDEX on DexScreener](https://dexscreener.com/solana/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy)
+- [$FLOYDEX on Padre](https://trade.padre.gg/trade/solana/7mmwd8DHp9S6mnkBUSFruynA5A3pUqp17Ka5KqxKdtCC)
 
 ### Devnet gate (`deployments/devnet.json`)
 
@@ -344,13 +352,17 @@ sequenceDiagram
   LLM-->>UI: text + provider id
 ```
 
-### ClawPump (agent skill — no token launch by default)
+### ClawPump (agent skill + live $FLOYDEX)
 
 - **Role:** Host the FloyDex agent skill so portfolio, market-intelligence,
   wallet, and perps tools can call the desk (`skills/floydex-perps/`).
 - **Config:** `CLAWPUMP_API_KEY` (server-only) when calling ClawPump APIs.
-- **Hard rule:** Do **not** enable `token-launch` or run `npx clawpump launch`
-  unless the operator explicitly asks to tokenize later.
+- **Token:** **$FLOYDEX** launched Sep 29, 2026 via ClawPump / pump.fun.
+  Mint `2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy` —
+  [ClawPump](https://clawpump.tech/tokens/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy) ·
+  [DexScreener](https://dexscreener.com/solana/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy) ·
+  [Padre](https://trade.padre.gg/trade/solana/7mmwd8DHp9S6mnkBUSFruynA5A3pUqp17Ka5KqxKdtCC).
+  Do **not** run another launch; point agents at these links.
 
 ```mermaid
 sequenceDiagram
@@ -365,7 +377,7 @@ sequenceDiagram
   Skill->>Desk: POST brief / market context
   Desk-->>Skill: UsePod-backed (or fallback) brief
   Skill-->>Operator: Answer in agent UI
-  Note over Claw,Skill: token-launch disabled until operator says so
+  Note over Claw,Skill: $FLOYDEX already live — share CA / trade links
 ```
 
 ### Pyth (sponsored oracle)
@@ -514,9 +526,9 @@ volume, ~1,500 daily active traders (see `01` §7).
 | Stream | Mechanism |
 |---|---|
 | **Trading fees** | 1% platform fee on fills → `FEE_COLLECTOR` USDC wallet |
-| **Maker rebates / tiers** | Fee config on exchange (program path); token fee tiers later |
+| **Maker rebates / tiers** | Fee config on exchange (program path); $FLOYDEX fee tiers later |
 | **Insurance / stake** | Stakers backstop; share of risk premium over time |
-| **Future protocol token** | Buyback / fee discounts / listing governance — **after** traction gates (`08`) |
+| **$FLOYDEX** | Live mint (see Addresses). Buyback / fee discounts / listing governance switch on after utility gates (`08`) |
 
 No revenue-share promises in marketing until counsel signs off. Primary cash
 flow today is the **1% desk fee** flushed to the revenue collector address
@@ -535,7 +547,7 @@ Full checklist: `docs/prd/09-roadmap.md`.
 | 2 | Session, funding, liq, insurance, xStocks haircuts, fuzz, weekend backtest, **devnet gate** | Done |
 | 3 | Order intake, matcher, submitter, reconciler, kit/db | Largely done |
 | Next | Indexer polish, production MM liquidity, audits, deposit caps, points | In progress |
-| Later | Portfolio margin, Basis Vault, pre-listing markets, protocol token TGE | Planned |
+| Later | Portfolio margin, Basis Vault, pre-listing markets, $FLOYDEX utility (fee tiers / stake) | Planned |
 
 **Explicit non-goals (v1):** spot venue, issuing our own stock tokens,
 cross-chain deploy.
@@ -550,6 +562,7 @@ cross-chain deploy.
 | **Website** | [floydex.com](https://floydex.com) |
 | **Telegram** | [t.me/floydex_com](https://t.me/floydex_com) |
 | **X** | [@floydex_com](https://x.com/floydex_com) |
+| **$FLOYDEX** | [DexScreener](https://dexscreener.com/solana/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy) · CA `2PuJ…vUPy` |
 | **Repo** | [FloyDex/FloyDex-Alpha](https://github.com/FloyDex/FloyDex-Alpha) |
 
 ### Co-founders
@@ -723,6 +736,6 @@ Copyright (c) 2026 FloyDex.
 4. [`docs/prd/05-program-design-anchor.md`](./docs/prd/05-program-design-anchor.md) — accounts & settlement  
 5. [`docs/prd/06-oracle-pyth.md`](./docs/prd/06-oracle-pyth.md) — Pyth  
 6. [`docs/prd/07-session-risk-equities.md`](./docs/prd/07-session-risk-equities.md) — sessions  
-7. [`docs/prd/08-token-and-launch.md`](./docs/prd/08-token-and-launch.md) — points / token (ticker TBD)  
+7. [`docs/prd/08-token-and-launch.md`](./docs/prd/08-token-and-launch.md) — $FLOYDEX mint + utility path  
 8. [`docs/prd/09-roadmap.md`](./docs/prd/09-roadmap.md) — phased build  
 9. [`CLAUDE.md`](./CLAUDE.md) — agent / contributor hard rules  

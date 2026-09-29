@@ -10,6 +10,7 @@ import { NotificationBell } from "@/features/navbar/components/NotificationBell"
 import { SettingsMenu } from "@/features/navbar/components/SettingsMenu";
 import { FuturesDrawerLinks, FuturesMenu } from "@/features/navbar/components/FuturesMenu";
 import { PopularTicker } from "@/features/navbar/components/PopularTicker";
+import { FLOYDEX_TOKEN } from "@/config/token";
 import { STAKE_PUBLIC } from "@/lib/market/stake";
 import { DEFAULT_MARKET_SYMBOL } from "@/config";
 import { useTradeSettings } from "@/stores/settings";
@@ -17,6 +18,7 @@ import { useTradeSettings } from "@/stores/settings";
 const GITHUB_REPO = "https://github.com/FloyDex/FloyDex-Alpha";
 const TELEGRAM = "https://t.me/floydex_com";
 const X_HANDLE = "https://x.com/floydex_com";
+const TOKEN_PAGE = FLOYDEX_TOKEN.dexscreener;
 
 const TABS = [
   { label: "Markets", href: "/markets", match: "/markets" },
@@ -146,6 +148,16 @@ export function TopNav() {
           >
             <XLogoIcon />
           </a>
+          <a
+            href={TOKEN_PAGE}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="$FLOYDEX on DexScreener"
+            title="$FLOYDEX"
+            className="hidden h-[34px] items-center rounded-[7px] px-2 text-[11px] font-semibold tracking-wide text-[#14F195] transition-colors hover:bg-[#070B0A] hover:text-[#3DFFB0] sm:inline-flex"
+          >
+            $FLOYDEX
+          </a>
           <WalletConnect />
           <NotificationBell />
           <SettingsMenu />
@@ -193,6 +205,15 @@ export function TopNav() {
                 {t.label}
               </a>
             ))}
+            <a
+              href={TOKEN_PAGE}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMenuOpen(false)}
+              className="block rounded-[8px] px-4 py-3 text-[15px] font-semibold text-[#14F195] transition-colors hover:bg-[#070B0A] hover:text-[#3DFFB0]"
+            >
+              $FLOYDEX
+            </a>
             <button
               type="button"
               onClick={() => {

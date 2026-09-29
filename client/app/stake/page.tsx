@@ -6,6 +6,7 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { toast } from "sonner";
 import { TopNav } from "@/components/common/TopNav";
 import { PLATFORM_FEE_BPS } from "@/config";
+import { FLOYDEX_TOKEN } from "@/config/token";
 import { apiFetch } from "@/lib/api";
 import { shortenAddress } from "@/lib/format";
 import {
@@ -295,7 +296,15 @@ export default function StakePage() {
           </div>
           {!STAKE_PUBLIC ? (
             <p className="px-4 py-14 text-center text-[13px] text-[#6b7c74]">
-              Protocol-token locking opens at TGE (ticker TBD). Terms will list here.
+              $FLOYDEX locking for fee tiers opens after utility gates.{" "}
+              <a
+                href={FLOYDEX_TOKEN.dexscreener}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#14F195] underline-offset-2 hover:underline"
+              >
+                Trade $FLOYDEX
+              </a>
             </p>
           ) : !connected ? (
             <p className="px-4 py-14 text-center text-[13px] text-[#6b7c74]">Connect a wallet to book a term.</p>
