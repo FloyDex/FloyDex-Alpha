@@ -1,5 +1,5 @@
 import { Connection } from "@solana/web3.js";
-import { PrismaClient } from "@kryon/db";
+import { PrismaClient } from "@floydex/db";
 import { bootEnv } from "../../kit/src/env.ts";
 import { createLogger } from "../../kit/src/logger.ts";
 import { createAlerter } from "../../kit/src/alerter.ts";

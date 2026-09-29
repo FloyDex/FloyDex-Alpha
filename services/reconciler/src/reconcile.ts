@@ -15,7 +15,7 @@
  * charged — that's the indexer's job (item g, reading the real
  * `FillSettled` event) and is expected to overwrite these once it exists.
  */
-import type { Prisma, PrismaClient } from "@kryon/db";
+import type { Prisma, PrismaClient } from "@floydex/db";
 import type { Logger } from "../../kit/src/logger.ts";
 import type { StoredFillPayload, StoredOrderArgs } from "../../submitter/src/message.ts";
 import { decideRetry, type OrderState } from "./validity.ts";
