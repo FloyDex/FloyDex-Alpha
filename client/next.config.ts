@@ -69,7 +69,7 @@ const csp = [
   "font-src 'self' data: https://fonts.gstatic.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://s3.tradingview.com`,
-  "frame-src 'self' https://s.tradingview.com https://www.tradingview.com",
+  "frame-src 'self' https://s.tradingview.com https://www.tradingview.com https://dexscreener.com https://www.dexscreener.com",
   // Both networks' RPC and Horizon endpoints are listed: the navbar toggle
   // serves both venues from one bundle, so a build for either must be able to
   // reach the other's chain endpoints after a switch.

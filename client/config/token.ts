@@ -9,6 +9,9 @@ export const FLOYDEX_TOKEN = {
   pair: "7mmwd8DHp9S6mnkBUSFruynA5A3pUqp17Ka5KqxKdtCC",
   clawpump: "https://clawpump.tech/tokens/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy",
   dexscreener: "https://dexscreener.com/solana/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy",
+  /** Pair chart embed (DexScreener). Mint page URL stays on `dexscreener`. */
+  dexscreenerEmbed:
+    "https://dexscreener.com/solana/7mmwd8DHp9S6mnkBUSFruynA5A3pUqp17Ka5KqxKdtCC?embed=1&loadChartSettings=0&chartLeftToolbar=0&chartDefaultOnMobile=1&chartTheme=dark&theme=dark&chartStyle=0&chartType=usd&interval=15",
   padre: "https://trade.padre.gg/trade/solana/7mmwd8DHp9S6mnkBUSFruynA5A3pUqp17Ka5KqxKdtCC",
   pumpfun: "https://pump.fun/coin/2PuJ8eLNWeHLhG5YR5SD4mNwkQGduBiW2CWPuYq3vUPy",
 } as const;
