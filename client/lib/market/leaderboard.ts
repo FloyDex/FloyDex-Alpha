@@ -1,5 +1,5 @@
 /** Flip to true when the public leaderboard is ready again. */
-export const LEADERBOARD_PUBLIC = false;
+export const LEADERBOARD_PUBLIC = true;
 
 export type LeaderboardPeriod = "DAY" | "WEEK" | "MONTH" | "ALL";
 
