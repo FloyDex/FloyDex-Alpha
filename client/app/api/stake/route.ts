@@ -25,7 +25,10 @@ import {
   STAKE_PUBLIC,
   STAKE_SUPPLY,
   STAKE_TERMS,
+  STAKE_TREASURY,
   isOpenStake,
+  positionPayout,
+  stakeReward,
   termByDays,
   type StakePosition,
 } from "@/lib/market/stake";
@@ -35,12 +38,7 @@ import { bodyTooLarge, rateLimit, requestKey } from "@/lib/rate-limit";
 import { isSolanaAddress } from "@/lib/solana/address";
 import { shortenAddress } from "@/lib/format";
 import { solanaRpcUrl } from "@/lib/solana/rpc";
-import { sendTreasuryToken } from "@/lib/solana/treasury";
-
-const TREASURY =
-  process.env.NEXT_PUBLIC_TREASURY ||
-  process.env.SOLANA_OPERATOR_PUBKEY ||
-  "41jft3o6Q7HBFw1UPJqh2jsLDz12zaRa6WuRFG9iJDhj";
+import { sendTreasuryToken, stakeOperatorKey } from "@/lib/solana/treasury";
 
 async function snapshot(owner: string) {
   const wallet = owner && isSolanaAddress(owner) ? await floydexWalletBalance(owner) : 0;
@@ -58,6 +56,7 @@ async function snapshot(owner: string) {
     baseFeeBps: PLATFORM_FEE_BPS,
     holdTiers: HOLD_FEE_TIERS,
     stakeTiers: STAKE_FEE_TIERS,
+    treasury: STAKE_TREASURY,
     token: {
       symbol: FLOYDEX_TOKEN.symbol,
       mint: FLOYDEX_TOKEN.mint,
@@ -161,16 +160,23 @@ export async function POST(req: NextRequest) {
     if (Date.now() < row.unlockAt) {
       return NextResponse.json({ ok: false, error: "Term is still locked" }, { status: 400 });
     }
+    const payout = positionPayout(row);
     const sent = await sendTreasuryToken(
       owner,
-      row.principal,
+      payout,
       new PublicKey(STAKE_MINT),
       STAKE_DECIMALS,
+      { signer: stakeOperatorKey(), expectedPubkey: STAKE_TREASURY },
     );
     if (!sent.ok) return NextResponse.json({ ok: false, error: sent.error }, { status: 502 });
     markStakeReturned(row.id, sent.signature);
     await flushVenue();
-    return NextResponse.json({ ok: true, signature: sent.signature, ...(await snapshot(owner)) });
+    return NextResponse.json({
+      ok: true,
+      signature: sent.signature,
+      payout,
+      ...(await snapshot(owner)),
+    });
   }
 
   const term = termByDays(Number(body.days));
@@ -195,7 +201,7 @@ export async function POST(req: NextRequest) {
   }
   const treasuryAta = getAssociatedTokenAddressSync(
     new PublicKey(STAKE_MINT),
-    new PublicKey(TREASURY),
+    new PublicKey(STAKE_TREASURY),
   ).toBase58();
   const credited = creditedFloydex(tx, owner, treasuryAta);
   if (!(credited >= 1)) {
@@ -208,6 +214,8 @@ export async function POST(req: NextRequest) {
     owner,
     days: term.days,
     principal,
+    apyPct: term.apyPct,
+    reward: stakeReward(principal, term.apyPct),
     lockedAt: now,
     unlockAt: now + term.days * 86_400_000,
     signature,

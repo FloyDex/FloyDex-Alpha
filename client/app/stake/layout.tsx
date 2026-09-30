@@ -1,7 +1,7 @@
 export const metadata = {
   title: "Stake — FloyDex",
   description:
-    "Hold or lock $FLOYDEX to cut desk fees. Principal returns at unlock. Live DexScreener chart on the stake page.",
+    "Lock $FLOYDEX for a term yield (principal + reward at unlock) and a lower desk fee. Live DexScreener chart on the stake page.",
 };
 
 export default function StakeLayout({ children }: { children: React.ReactNode }) {

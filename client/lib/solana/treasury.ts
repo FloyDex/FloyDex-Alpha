@@ -31,16 +31,24 @@ function decodeSecretKey(raw: string): Uint8Array {
   return decode(raw);
 }
 
-export function operatorKey(): Keypair | null {
-  const raw = process.env.SOLANA_PRIVATE_KEY?.trim();
-  if (!raw) return null;
+function keyFromEnv(raw: string | undefined): Keypair | null {
+  if (!raw?.trim()) return null;
   try {
-    const secret = decodeSecretKey(raw);
+    const secret = decodeSecretKey(raw.trim());
     if (secret.length === 32) return Keypair.fromSeed(secret);
     return Keypair.fromSecretKey(secret);
   } catch {
     return null;
   }
+}
+
+export function operatorKey(): Keypair | null {
+  return keyFromEnv(process.env.SOLANA_PRIVATE_KEY);
+}
+
+/** Signer for $FLOYDEX stake unlocks. Prefers SOLANA_STAKE_PRIVATE_KEY, else SOLANA_PRIVATE_KEY. */
+export function stakeOperatorKey(): Keypair | null {
+  return keyFromEnv(process.env.SOLANA_STAKE_PRIVATE_KEY) || operatorKey();
 }
 
 export function operatorPubkey(): string | null {
@@ -95,8 +103,9 @@ export async function sendTreasuryToken(
   amount: number,
   mint: PublicKey = USDC,
   decimals = 6,
+  opts?: { signer?: Keypair | null; expectedPubkey?: string },
 ): Promise<{ ok: true; signature: string } | { ok: false; error: string }> {
-  const operator = operatorKey();
+  const operator = opts?.signer ?? operatorKey();
   if (!operator) {
     return {
       ok: false,
@@ -106,14 +115,16 @@ export async function sendTreasuryToken(
   }
 
   const expected =
+    opts?.expectedPubkey?.trim() ||
     process.env.SOLANA_OPERATOR_PUBKEY?.trim() ||
     process.env.NEXT_PUBLIC_TREASURY?.trim() ||
     "";
   if (expected && expected !== operator.publicKey.toBase58()) {
     return {
       ok: false,
-      error:
-        "Treasury key does not match NEXT_PUBLIC_TREASURY / SOLANA_OPERATOR_PUBKEY — deposits and withdrawals must use the same wallet",
+      error: opts?.expectedPubkey
+        ? `Stake unlock signer must be ${expected} — set SOLANA_STAKE_PRIVATE_KEY for that wallet`
+        : "Treasury key does not match NEXT_PUBLIC_TREASURY / SOLANA_OPERATOR_PUBKEY — deposits and withdrawals must use the same wallet",
     };
   }
 

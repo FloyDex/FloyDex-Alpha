@@ -1,12 +1,20 @@
-import { PLATFORM_FEE_BPS } from "@/config";
+import { FEE_COLLECTOR, PLATFORM_FEE_BPS } from "@/config";
 import { FLOYDEX_TOKEN } from "@/config/token";
 
-/** Stake is live. The benefit is a lower desk fee, not a minted yield. */
+/** Stake is live: term yield at unlock + a lower desk fee while locked. */
 export const STAKE_PUBLIC = true;
 
 export const STAKE_MINT = FLOYDEX_TOKEN.mint;
 export const STAKE_DECIMALS = 6;
 export const STAKE_SUPPLY = 1_000_000_000;
+
+/**
+ * Wallet that receives locked $FLOYDEX. Unlock payouts (principal + reward)
+ * must be signed by this wallet's key on the server.
+ */
+export const STAKE_TREASURY =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_STAKE_TREASURY?.trim()) ||
+  FEE_COLLECTOR;
 
 /** Wallet balance (not locked) that cuts the 1% desk fee. */
 export const HOLD_FEE_TIERS = [
@@ -28,14 +36,15 @@ export const STAKE_FEE_BPS = 25;
 
 export type FeeTier = { minTokens: number; bps: number };
 
-export type StakeTerm = { days: number };
+/** Period yield labeled APY on the page (same schedule as OpenGap-style desks). */
+export type StakeTerm = { days: number; apyPct: number };
 
 export const STAKE_TERMS: StakeTerm[] = [
-  { days: 7 },
-  { days: 30 },
-  { days: 90 },
-  { days: 180 },
-  { days: 360 },
+  { days: 7, apyPct: 3.5 },
+  { days: 30, apyPct: 15 },
+  { days: 90, apyPct: 45 },
+  { days: 180, apyPct: 90 },
+  { days: 360, apyPct: 180 },
 ];
 
 export type StakePosition = {
@@ -43,6 +52,10 @@ export type StakePosition = {
   owner: string;
   days: number;
   principal: number;
+  /** Period yield percent locked in at stake time. */
+  apyPct: number;
+  /** Token reward owed at unlock (principal × apyPct / 100). */
+  reward: number;
   lockedAt: number;
   unlockAt: number;
   signature: string;
@@ -52,6 +65,27 @@ export type StakePosition = {
 
 export function termByDays(days: number): StakeTerm | null {
   return STAKE_TERMS.find((t) => t.days === days) ?? null;
+}
+
+/** Flat period reward — not annualized. 1000 @ 15% → 150. */
+export function stakeReward(principal: number, apyPct: number): number {
+  if (!(principal > 0) || !(apyPct > 0)) return 0;
+  const scale = 10 ** STAKE_DECIMALS;
+  return Math.round((principal * apyPct * scale) / 100) / scale;
+}
+
+export function stakePayout(principal: number, apyPct: number): number {
+  return principal + stakeReward(principal, apyPct);
+}
+
+export function positionReward(row: Pick<StakePosition, "principal" | "days" | "apyPct" | "reward">): number {
+  if (typeof row.reward === "number" && Number.isFinite(row.reward)) return row.reward;
+  const apy = typeof row.apyPct === "number" ? row.apyPct : termByDays(row.days)?.apyPct ?? 0;
+  return stakeReward(row.principal, apy);
+}
+
+export function positionPayout(row: Pick<StakePosition, "principal" | "days" | "apyPct" | "reward">): number {
+  return row.principal + positionReward(row);
 }
 
 export function isOpenStake(row: StakePosition, now = Date.now()): boolean {
@@ -95,9 +129,14 @@ export function formatUnlock(at: number): string {
   return new Date(at).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+export function formatApy(apyPct: number): string {
+  return Number.isInteger(apyPct) ? String(apyPct) : apyPct.toFixed(1);
 }
 
 export function bpsToPct(bps: number): string {

@@ -6,12 +6,10 @@ import {
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { FLOYDEX_TOKEN } from "@/config/token";
-import { STAKE_DECIMALS } from "@/lib/market/stake";
+import { STAKE_DECIMALS, STAKE_TREASURY } from "@/lib/market/stake";
 import { getSolanaConnection } from "./connection";
 
-const TREASURY = new PublicKey(
-  process.env.NEXT_PUBLIC_TREASURY || "41jft3o6Q7HBFw1UPJqh2jsLDz12zaRa6WuRFG9iJDhj",
-);
+const TREASURY = new PublicKey(STAKE_TREASURY);
 
 /** Move $FLOYDEX from the trader wallet into the treasury stake account. */
 export async function transferFloydexToTreasury(
